@@ -65,7 +65,7 @@ This project consists of two main Java classes:
 
 ## Building the Project
 
-You can build the project using `./mvnw clean pacakge`. This creates a [Quarkus Uber-Jar](https://quarkus.io/guides/maven-tooling#uber-jar-maven).
+You can build the project using `./mvnw clean package`. This creates a [Quarkus Uber-Jar](https://quarkus.io/guides/maven-tooling#uber-jar-maven).
 
 ## License
 
