@@ -25,7 +25,13 @@
             src: url('SpecialElite-Regular.ttf') format('truetype');
         }
 
+        @font-face {
+            font-family: 'Roboto';
+            src: url('Roboto.ttf') format('truetype');
+        }
+        
         @page {
+            size: A4;
             margin: 30px 20px;
 
             @top-center {
@@ -39,13 +45,14 @@
         body {
             margin: 0;
 
-            /* Font provided with builder. */
-            font-family: '<unkown>';
-            
+            font-family: 'Roboto';
+
             font-size: 15px;
         }
 
-        h1, h2, h3 {
+        h1,
+        h2,
+        h3 {
             font-family: "MyFont";
         }
 

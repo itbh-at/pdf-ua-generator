@@ -46,8 +46,8 @@ public class TemplateRenderService {
             builder.useFastMode();
             builder.useSVGDrawer(new BatikSVGDrawer());
             builder.usePdfUaAccessibility(true);
-            builder.useFont(() -> getClass().getClassLoader().getResourceAsStream("Roboto.ttf"), "Roboto");
             builder.usePdfVersion(2f);
+            builder.withProducer("itbh.at PDF UA Generator");
             builder.withHtmlContent(Files.readString(pdfHtmFile.toPath()), templateFile.toURI().toString());
             builder.toStream(os);
             builder.run();

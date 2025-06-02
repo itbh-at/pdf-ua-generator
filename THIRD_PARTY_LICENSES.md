@@ -40,7 +40,7 @@ This project uses the following third-party libraries:
 
 - **License**:  SIL Open Font License, Version 1.1
 - **URL**: <https://fonts.google.com/specimen/Roboto/license>
-- **Notes**: Roboto Regular is used as a fallback font
+- **Notes**: Roboto Regular is used in the demo
 
 ### Sepcial Elite
 
