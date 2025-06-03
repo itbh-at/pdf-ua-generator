@@ -22,11 +22,15 @@ public class BuildCommand implements Runnable {
     @Parameters(paramLabel = "<source file>", description = "The XHTML source file to be converted to PDF/UA")
     File sourceFile;
 
-    @Option(names = {"-p", "--params"}, description = "Template variables as Key=value map entries", split = ",")
+    @Option(names = { "-p", "--params" }, description = "Template variables as Key=value map entries", split = ",")
     Map<String, String> params;
 
-    @Option(names = {"-w", "--watch"}, description = "Watch the source file for changes and rebuild on change")
+    @Option(names = { "-w", "--watch" }, description = "Watch the source file for changes and rebuild on change")
     boolean watch;
+
+    @Option(names = { "-v",
+            "--pdf-version" }, description = "The PDF version to be used. Possible values are 1.4, 1.5, 1.6, 1.7 and 2.0. It default to version 2.0.", defaultValue = "2.0")
+    float pdfVersion;
 
     @Inject
     TemplateRenderService renderService;
@@ -50,7 +54,8 @@ public class BuildCommand implements Runnable {
                         if (fileName.toString().equals(sourceFile.getName())) {
                             System.out.println("Rebuilding....");
                             renderService.pdf(sourceFile, params,
-                                    new File(sourceFile.getParent(), replaceExtension(sourceFile.getName(), ".pdf")));
+                                    new File(sourceFile.getParent(), replaceExtension(sourceFile.getName(), ".pdf")),
+                                    pdfVersion);
                         }
 
                     }
@@ -62,7 +67,7 @@ public class BuildCommand implements Runnable {
                 }
             } else {
                 renderService.pdf(sourceFile, params,
-                        new File(sourceFile.getParent(), replaceExtension(sourceFile.getName(), ".pdf")));
+                        new File(sourceFile.getParent(), replaceExtension(sourceFile.getName(), ".pdf")), pdfVersion);
             }
         } catch (InterruptedException e) {
             Quarkus.asyncExit();

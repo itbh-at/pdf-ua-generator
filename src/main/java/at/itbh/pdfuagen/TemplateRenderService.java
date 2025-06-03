@@ -38,7 +38,7 @@ public class TemplateRenderService {
         Files.writeString(outputFile.toPath(), text(Files.readString(templateFile.toPath()), record));
     }
 
-    public void pdf(File templateFile, Map<String, String> params, File outputFile) throws IOException {
+    public void pdf(File templateFile, Map<String, String> params, File outputFile, float pdfVersion) throws IOException {
         File pdfHtmFile = new File(outputFile.getParentFile(), outputFile.getName() + ".xhtml");
         xhtml(templateFile, params, pdfHtmFile);
         try (OutputStream os = new FileOutputStream(outputFile)) {
@@ -46,7 +46,7 @@ public class TemplateRenderService {
             builder.useFastMode();
             builder.useSVGDrawer(new BatikSVGDrawer());
             builder.usePdfUaAccessibility(true);
-            builder.usePdfVersion(2f);
+            builder.usePdfVersion(pdfVersion);
             builder.withProducer("itbh.at PDF UA Generator");
             builder.withHtmlContent(Files.readString(pdfHtmFile.toPath()), templateFile.toURI().toString());
             builder.toStream(os);
