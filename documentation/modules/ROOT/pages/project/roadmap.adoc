@@ -44,8 +44,10 @@ reduced before anything builds on it
 
 |2 Schema and validation
 |Schema derivation from the syntax tree; field definitions; field type
-`image`; formatting functions for date, number and currency; CLI `validate`,
-`schema`, `check`; errors with JSON Pointer
+`image`; formatting functions for date, number and currency, per language;
+language variants (`template.<lang>.xhtml`) with RFC 4647 selection and one
+shared schema; CLI `validate`, `schema`, `check`, `--lang`; errors with JSON
+Pointer
 |The test corpus yields correct schemas and precise error locations
 |
 
@@ -53,14 +55,15 @@ reduced before anything builds on it
 |PostgreSQL with Flyway; revisions; HTTPS fetcher with host allowlist; assets
 stored once per hash and served at
 `+/assets/{sha256}+`; publish checks; REST API; problem details with URNs; OIDC
-roles; worker pool with 503; warm-up before readiness
+roles; worker pool with 503; warm-up before readiness; `Accept-Language` and
+`lang` parameter, `Content-Language`, `Vary: Accept-Language`
 |Create, publish, validate and render work through the API
 |
 
 |4 Layouts
 |`+{#insert}+` areas; style catalog; components as user tags with
 `component.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
-`email.css` per layout
+`email.css` per layout; message files per language for layout texts
 |A layout change never alters a published template unnoticed
 |
 
@@ -82,7 +85,7 @@ accessibility checker
 |7 Editor, stage 1
 |Qute pages with htmx: management, field definitions, example data,
 publishing; CodeMirror 6 with Qute mode, completion and server diagnostics; PDF
-preview; ETag conflict detection
+preview; ETag conflict detection; editing language variants side by side
 |An experienced editor publishes a template without a developer
 |
 

@@ -86,6 +86,20 @@ plain text).
 - A template with `styling: free` is rendered to PDF and XHTML only. DOCX and
   ODT are not offered for it (see Output formats).
 
+## Language variants
+
+- A template may, but need not, exist in several languages: the default file
+  (`template.xhtml`) plus optional variants named with a BCP 47 tag
+  (`template.de-AT.xhtml`, `template.en.xhtml`). Layout texts come from the
+  layout's message files per language.
+- Selection: the API matches `Accept-Language` by RFC 4647 lookup; a `lang`
+  query parameter takes precedence; the CLI uses `--lang`. No matching variant
+  means the default variant — never an error. Responses carry
+  `Content-Language` and `Vary: Accept-Language`.
+- All variants of a template use the same data fields (one JSON Schema); the
+  publish check verifies this. Date, number and currency formatting follow the
+  selected language.
+
 ## Output formats
 
 - Formats: PDF (openhtmltopdf), XHTML, email HTML, DOCX, ODT, plain text. Qute

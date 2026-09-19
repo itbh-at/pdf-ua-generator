@@ -100,6 +100,24 @@ layout allows it. Free CSS works only for PDF and XHTML, keeps hard limits (no
 `@import`, no `!important`, only layout fonts, only template assets or
 attachments in `url()`), and never bypasses the publish checks.
 
+== Language variants
+
+A template may exist in several languages, but need not. The default file
+(`template.xhtml`) serves every request; optional variants carry a BCP 47 tag
+in their name (`template.de-AT.xhtml`). Each variant is a complete template, so
+editors can edit every language version on its own; texts that belong to the
+layout, such as footer labels, come from the layout's message files per
+language.
+
+The API picks the variant from `Accept-Language` with the RFC 4647 lookup; a
+`lang` query parameter takes precedence, for example in links sent by email.
+Without a matching variant the default is used — a document is always
+delivered. Responses name the language in `Content-Language` and declare
+`Vary: Accept-Language` for caches. All variants share one JSON Schema, which
+the publish check enforces, so a caller never has to know which language will
+be rendered. Dates, numbers and currencies are formatted for the selected
+language.
+
 == Data and schema
 
 Data is JSON, read into maps and lists that Qute resolves directly. The schema
