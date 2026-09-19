@@ -160,6 +160,18 @@ templates, made in Word or LibreOffice:
   files, so Word and LibreOffice show the layout's fonts, not a substitute.
 * The document language is always that of the rendered variant.
 
+[NOTE]
+====
+LibreOffice does not draw embedded fonts while its Skia rendering is on: the
+text is there — the spell checker underlines it — but no glyphs appear. Switch
+it off under Tools ▸ Options ▸ LibreOffice ▸ View ▸ "Use Skia for all
+rendering". The documents themselves are sound: the same files render
+completely when LibreOffice converts them to PDF, and in Word.
+
+Prefer a static font file over a variable one in a layout: office applications
+handle static instances reliably.
+====
+
 [[content-rules]]
 == Rules for content
 
