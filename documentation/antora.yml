@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Antora component descriptor. Marks `documentation/` as the documentation
+# component. The playbook (antora-playbook.yml) and the UI bundle (ui-bundle/)
+# live in this directory.
+name: pdf-ua-generator
+title: PDF UA Generator
+version: latest
+start_page: ROOT:index.adoc
+nav:
+  - modules/ROOT/nav.adoc

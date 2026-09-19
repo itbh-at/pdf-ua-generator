@@ -15,7 +15,8 @@ plain text).
 ## Stack
 
 - Java, Quarkus, Qute, openhtmltopdf (`io.github.openhtmltopdf`), Apache PDFBox,
-  Apache Batik (SVG), Picocli. Build with Maven.
+  Apache Batik (SVG), Picocli. Build with Maven through mise:
+  `mise run build`.
 - Base package: `at.itbh.pdfuagen`.
 - Three Maven modules:
   - `core` — plain Java library: template parsing, schema derivation,
@@ -204,8 +205,7 @@ old-school senior developer: direct and minimal.
   taken from https://github.com/itbh-at/wusel/tree/main/documentation/ui-bundle
   (adapted from the Antora Default UI; MPL-2.0 — keep its `LICENSE` and
   `NOTICE`).
-- Build: `mise exec -- ./documentation/build.sh` (official) or
-  `mise exec -- ./documentation/build.sh watch` (live).
+- Build: `mise run docs` (official) or `mise run docs-watch` (live).
 - The docs follow **Diátaxis** (https://diataxis.fr/): `tutorials/`, `how-to/`,
   `reference/`, `explanation/` and `project/` under
   `documentation/modules/ROOT/pages/`. Put a page in the quadrant that matches

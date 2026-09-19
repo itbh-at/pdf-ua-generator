@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# mise: single source of truth for all toolchains of this project.
+# The same file is read on developer machines, in CI and inside container
+# images, so every tool version is identical everywhere.
+#
+#   mise install            # installs the tools pinned below
+#   mise run build          # compile, test and package all modules
+#   mise run test           # run the tests
+#   mise run docs           # build the Antora docs (documentation/build/site)
+#   mise run docs-watch     # live preview of the docs
+#   mise run headers        # apply the SPDX licence headers
+#   mise run headers-check  # verify every file carries one
+
+[tools]
+java = "temurin-25.0.4+7.0.LTS"
+maven = "3.9.16"
+node = "24"                 # runtime for the Antora docs (documentation/build.sh)
+"npm:antora" = "3.2.0"      # the `antora` CLI itself
+# Full-text search for the docs. Not a CLI but a library antora `require`s;
+# documentation/build.sh links it next to the playbook so antora finds it.
+"npm:@antora/lunr-extension" = "1.0.0-alpha.13"
+watchexec = "2.5.1"         # file-event watcher for `docs-watch`
+"npm:browser-sync" = "3.0.4"  # live-preview server for `docs-watch`
+"ubi:korandoru/hawkeye" = "6.5.1"  # licence-header tool; see licenserc.toml
+
+[tasks.build]
+description = "Compile, test and package all modules"
+run = "mvn -B -ntp verify"
+
+[tasks.test]
+description = "Run the tests of all modules"
+run = "mvn -B -ntp test"
+
+[tasks.docs]
+description = "Build the Antora docs"
+run = "./documentation/build.sh"
+
+[tasks.docs-watch]
+description = "Live preview of the Antora docs (rebuild on change)"
+run = "./documentation/build.sh watch"
+
+[tasks.headers]
+description = "Apply the Apache-2.0 SPDX licence headers (hawkeye)"
+run = "hawkeye format"
+
+[tasks.headers-check]
+description = "Check that all files carry the licence header"
+run = "hawkeye check"

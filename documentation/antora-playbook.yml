@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Antora playbook for the pdf-ua-generator docs.
+# Run through mise:  mise run docs   (or mise run docs-watch)
+#
+# The UI bundle under ./ui-bundle is checked in unpacked. It is the ITBH theme,
+# adapted from the Antora Default UI and licensed MPL-2.0 (see ui-bundle/LICENSE
+# and ui-bundle/NOTICE).
+site:
+  title: PDF UA Generator
+  start_page: pdf-ua-generator::index.adoc
+
+content:
+  sources:
+    # `branches: HEAD` uses the current working tree, including uncommitted
+    # changes of the checked-out branch.
+    - url: ..
+      branches: HEAD
+      start_path: documentation
+
+antora:
+  extensions:
+    # Full-text search, running entirely in the reader's browser.
+    - require: '@antora/lunr-extension'
+
+runtime:
+  log:
+    format: pretty
+    failure_level: warn
+
+ui:
+  bundle:
+    url: ui-bundle
+
+asciidoc:
+  attributes:
+    attribute-missing: warn

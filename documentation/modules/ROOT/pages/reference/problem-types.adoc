@@ -1,0 +1,57 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Problem types
+:description: The problem type URNs the REST API returns, with status code and meaning.
+
+All errors of the REST API are RFC 9457 problem details with the media type
+`application/problem+json`. The `type` member identifies the kind of error.
+Project-specific types are URNs of the form
+`urn:itbh:pdf-ua-generator:problem:<name>`. A URN is used only after it is
+listed on this page.
+
+Validation errors carry an `errors` member with one entry per violation:
+
+[source,json]
+----
+{
+  "type": "urn:itbh:pdf-ua-generator:problem:invalid-data",
+  "title": "Data does not match template schema",
+  "status": 422,
+  "instance": "/documents/invoice",
+  "errors": [
+    { "detail": "expected number, got string", "pointer": "#/items/2/price" },
+    { "detail": "required property missing", "pointer": "#/customer/name" }
+  ]
+}
+----
+
+`pointer` is a JSON Pointer to the offending value, written as a URI fragment.
+
+== Types
+
+[cols="2,1,4",options="header"]
+|===
+|Type |Status |Meaning
+
+|`urn:itbh:pdf-ua-generator:problem:invalid-data`
+|422
+|The data does not match the JSON Schema of the template revision. `errors`
+lists every violation.
+
+|`urn:itbh:pdf-ua-generator:problem:format-not-supported`
+|406
+|The requested output format is not offered by the template, for example DOCX
+for a template with free CSS.
+
+|`urn:itbh:pdf-ua-generator:problem:image-rejected`
+|422
+|An image is not PNG, JPEG or SVG, exceeds the size or dimension limits, or
+comes from a host that is not allowed.
+
+|`urn:itbh:pdf-ua-generator:problem:attachment-missing`
+|422
+|The data refers to a request attachment that was not sent.
+|===

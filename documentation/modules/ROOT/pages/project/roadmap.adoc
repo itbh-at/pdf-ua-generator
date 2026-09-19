@@ -1,0 +1,108 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Roadmap
+:description: The phases of the rebuild, in order, with what each delivers and when it is done.
+
+The rebuild runs on the branch `epic/rebuild`. The phases are strictly serial:
+each is completed before the next starts. `main` receives the rebuild only as a
+whole.
+
+[cols="1,4,3,1",options="header"]
+|===
+|Phase |Content |Done when |Status
+
+|0 Foundations
+|`mise.toml`; Maven modules `core`, `cli`, `server`; legacy removed (Maven
+wrapper, native Dockerfiles, old sources); Antora with the ITBH theme and
+Diátaxis; licence Apache-2.0 with SPDX headers
+|Build and docs build succeed
+|done
+
+|1 Rendering core
+|Current openhtmltopdf and PDFBox; in-memory rendering; JSON data; Qute strict
+and without reflection; resolver for assets, attachments and the host
+allowlist; image limits; SVG in secure mode; caches; PDF 1.7; veraPDF; CLI
+`render` with `--attach`; JMH benchmark
+|The demo template renders to PDF/UA confirmed by veraPDF
+|
+
+|1a Proof of concept
+|Demo template with all building blocks, rendered to PDF, XHTML, email HTML,
+plain text, DOCX and ODT with minimal writers; all automated checks
+|Every format passes its checks — otherwise the set of building blocks is
+reduced before anything builds on it
+|
+
+|2 Schema and validation
+|Schema derivation from the syntax tree; field definitions; field type
+`image`; formatting functions for date, number and currency; CLI `validate`,
+`schema`, `check`; errors with JSON Pointer
+|The test corpus yields correct schemas and precise error locations
+|
+
+|3 Server
+|PostgreSQL with Flyway; revisions; assets stored once per hash and served at
+`+/assets/{sha256}+`; publish checks; REST API; problem details with URNs; OIDC
+roles; worker pool with 503; warm-up before readiness
+|Create, publish, validate and render work through the API
+|
+
+|4 Layouts
+|`+{#insert}+` areas; style catalog; components as user tags with
+`component.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
+`email.css` per layout
+|A layout change never alters a published template unnoticed
+|
+
+|5 Operations
+|Containerfile with mise, JRE and AOT cache; Helm chart for Kubernetes and
+`podman kube play`; `kubeconform`; CI smoke test; load test
+|Several pods render under load and the autoscaler reacts
+|
+
+|6 Formats complete
+|Document model with shared checker; DOCX writer; ODT writer; plain text; email
+HTML with inlined styles; `multipart/alternative`; PNG fallback for SVG
+|Every format passes its automated checks; DOCX also passes Word's
+accessibility checker
+|
+
+|7 Editor, stage 1
+|Qute pages with htmx: management, field definitions, example data,
+publishing; CodeMirror 6 with Qute mode, completion and server diagnostics; PDF
+preview; ETag conflict detection
+|An experienced editor publishes a template without a developer
+|
+
+|Prototype
+|Clickable block editor, tested with real editors
+|The interaction design is settled
+|
+
+|8 Editor, stage 2
+|TipTap block editor; Qute only as placeholder, loop and condition nodes; own
+JSON format with translation to Qute XHTML in `core`; one-way switch to code
+mode
+|An editor without Qute knowledge creates an accessible template
+|
+
+|Later
+|QR code and chart components; real-time collaboration
+|–
+|
+|===
+
+== Open decisions
+
+[cols="3,1,2",options="header"]
+|===
+|Decision |Before |Recommendation
+
+|Does a content template pin a specific layout revision?
+|Phase 4
+|Yes; moving to a newer layout revision is explicit and re-runs the publish
+checks
+|===

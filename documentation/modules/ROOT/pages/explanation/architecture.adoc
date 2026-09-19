@@ -1,0 +1,203 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Architecture
+:description: How templates, data, rendering, the CLI and the REST service fit together, and why they are built this way.
+
+This page explains the design of the generator and the reasons behind it. What
+is built when is on the xref:project/roadmap.adoc[roadmap].
+
+== The idea in one paragraph
+
+A template is XHTML with Print CSS and Qute expressions. Data is JSON. Qute
+renders the template with the data *once*; every output format is produced
+from that one rendered XHTML. Templates are not compiled into the application:
+they are added, changed and deleted at runtime. Because the build-time checks
+Qute normally provides are therefore not available, the generator performs them
+itself whenever a template revision is saved, and derives a JSON Schema from
+the template so data can be checked before rendering.
+
+== Three modules
+
+[cols="1,3",options="header"]
+|===
+|Module |Responsibility
+
+|`core`
+|Plain Java library, no Quarkus. Template parsing, schema derivation,
+validation, rendering, the document model and all format writers. The Qute
+engine is configured here and only here, so the CLI and the server render
+identically. Templates are looked up through an interface; `core` contains no
+database or HTTP code.
+
+|`cli`
+|Plain Java and Picocli on top of `core`. Works only with command-line
+arguments, files and stdin/stdout. No Quarkus, no database, no network access,
+no interactive features.
+
+|`server`
+|Quarkus REST service on top of `core`: template store in PostgreSQL, REST API,
+security and the editor UI.
+|===
+
+Keeping `core` free of Quarkus keeps the CLI small and fast to start, and makes
+the rendering behaviour independent of how it is invoked.
+
+== Templates at runtime
+
+Qute can check templates at build time, but only for templates that are part
+of the build. Here, editors create templates while the service runs, so that
+is not possible. Instead, saving a template revision runs the *publish checks*:
+
+. Qute parses the template; the result must be well-formed XHTML.
+. The JSON Schema is derived and compared with the field definitions.
+. The template is rendered with its example data.
+. veraPDF confirms that the PDF conforms to PDF/UA.
+
+A revision that fails a check cannot be published. These checks are the
+replacement for the build-time checks, not an optional extra.
+
+=== Revisions
+
+Every save creates an immutable revision, either a draft or published. Rendering
+uses the latest published revision unless a request names a specific one
+(`id@revision`), which makes a document reproducible later. The SHA-256 of a
+revision's content is the key for all caches (parsed template, compiled schema,
+fonts, assets).
+
+=== Layouts, components and content templates
+
+[cols="1,1,3",options="header"]
+|===
+|Kind |Written by |Contents
+
+|Layout
+|Developers
+|Page format, Print CSS, headers and footers, fonts, named areas
+(`+{#insert}+`), the style catalog, and the per-layout files for other formats:
+`email.css`, `.dotx` (DOCX) and `.ott` (ODT).
+
+|Component
+|Developers
+|Reusable blocks as Qute user tags, e.g. columns, box, footnote, signature,
+each with a descriptor (`component.json`) listing its parameters.
+
+|Content template
+|Editors
+|Fills the areas of a layout, using the style catalog and the components.
+|===
+
+Content templates are styled only through the *style catalog* — named styles
+that exist with the same name in the layout CSS, the `.dotx` and the `.ott` —
+and through components. Free choice of font size is the most common cause of
+inaccessible documents (a large bold paragraph instead of a heading) and cannot
+be mapped to DOCX or ODT. Named styles can.
+
+For emergencies a revision can opt into *free CSS* (`styling: free`) if its
+layout allows it. Free CSS works only for PDF and XHTML, keeps hard limits (no
+`@import`, no `!important`, only layout fonts, only template assets or
+attachments in `url()`), and never bypasses the publish checks.
+
+== Data and schema
+
+Data is JSON, read into maps and lists that Qute resolves directly. The schema
+is derived from the template's syntax tree: a `+{#for}+` over a value makes it an
+array, `+{a.b}+` makes `a` an object, a value used only inside `+{#if}+` or with a
+default is optional. The syntax tree says nothing about types, so every
+template also carries *field definitions* with types (text, number, date,
+boolean, image, list, object). Deriving and comparing the two gives a real
+JSON Schema (draft 2020-12) and catches fields the template uses but does not
+define.
+
+Validation reports every violation with a JSON Pointer to the offending value.
+Properties the template does not use are allowed, so callers can send their
+existing data objects unchanged.
+
+== Output formats
+
+----
+Qute + JSON → XHTML ─┬─ openhtmltopdf → PDF/UA
+                     ├─ XHTML (self-contained)
+                     ├─ email HTML
+                     └─ document model ─┬─ DOCX (docx4j-core)
+                                        ├─ ODT (StAX + ZIP)
+                                        └─ plain text
+----
+
+* *PDF* is rendered by openhtmltopdf with PDFBox; target is PDF/UA-1 on PDF 1.7.
+* *XHTML* embeds all images and fonts as data URIs, for archiving and preview.
+* *Email HTML* uses the layout's `email.css` instead of the Print CSS, inlines
+  the styles into `style` attributes, uses absolute image URLs and lays out
+  columns and boxes with tables marked `role="presentation"`. Email clients
+  such as Gmail do not show data URIs, and Outlook understands little CSS.
+* *DOCX, ODT and plain text* are written from a format-neutral document model.
+  The model supports a fixed set of building blocks: headings, paragraphs,
+  lists, tables with header rows, images, links, emphasis, language changes,
+  page breaks, catalog styles, and the blocks `columns`, `col`, `box` and
+  `footnote`. Anything else is an error rather than a silent approximation. The
+  accessibility checker runs on the model, once for all three formats.
+* `multipart/alternative` returns plain text and email HTML from one render,
+  in the structure an email needs. The service never sends mail itself.
+
+DOCX and ODT carry the same content, structure and named styles as the PDF,
+but not a pixel-identical layout: page breaks and spacing are decided by Word
+and LibreOffice.
+
+The DOCX writer is our own code on `docx4j-core`. `docx4j-ImportXHTML` is not
+used: it is tied to an old openhtmltopdf release, and its handling of headings,
+alt texts and table headers is undocumented.
+
+== Images
+
+Images are PNG, JPEG or SVG. They come from three places:
+
+* *Template assets* (logo, icons) belong to a revision, are stored once per
+  content hash and are served publicly at `+/assets/{sha256}+`, so email HTML can
+  reference them.
+* *Request attachments* are sent as parts of a `multipart/form-data` request;
+  the JSON refers to the part and carries the alt text.
+* *External URLs* are accepted only from a configured list of hosts. For email
+  HTML they are passed through unchanged; for PDF, DOCX and ODT they are
+  fetched over HTTPS with strict limits.
+
+Informative images need a non-empty alt text; decorative images are marked as
+such. SVG is processed without scripts, external resources or external
+entities, and image dimensions are checked before decoding.
+
+== Errors
+
+All API errors are RFC 9457 problem details, produced by the Quarkiverse
+extension `quarkus-http-problem`. Validation errors list each violation in an
+`errors` member with `detail` and `pointer`. Problem types are URNs, listed on
+xref:reference/problem-types.adoc[Problem types].
+
+== Performance
+
+The service keeps everything reusable in memory: parsed templates, compiled
+schemas, fonts, font metrics and assets. On start it loads all published
+revisions and renders their example data in every format before readiness
+reports ready, so a new pod receives traffic only when it is warm. Rendering
+runs in a worker pool sized to the CPU cores; when the queue is full the
+service answers 503 with `Retry-After`, which lets the autoscaler react instead
+of requests timing out.
+
+== Deployment
+
+The service is stateless; all state lives in PostgreSQL. It runs in JVM mode
+only — standalone, as an OCI image under podman, or scaled out in Kubernetes.
+One Helm chart serves both Kubernetes and `podman kube play` (rendered with
+`helm template`); for podman it adds a local PostgreSQL and Keycloak. One
+deployment serves one tenant; separate tenants are separate deployments.
+
+== Editor
+
+The editor UI consists of server-rendered Qute pages with htmx. JavaScript is
+used only for the two embedded editors: a block editor (TipTap/ProseMirror) for
+editors without Qute knowledge, and a code editor (CodeMirror 6) with Qute
+support. Diagnostics — Qute and XHTML errors with line and column — come from
+the server. Block-edited templates are stored in our own JSON format, not in
+the document format of an editor library; `core` translates it into Qute XHTML
+and escapes all literal text, so only placeholder nodes produce Qute
+expressions.

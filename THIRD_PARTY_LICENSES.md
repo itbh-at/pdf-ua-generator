@@ -1,55 +1,51 @@
 # Third-Party Licenses
 
-## Software
+This project is licensed under the Apache License 2.0. The third-party
+components below keep their own licences. Runtime dependencies are limited to
+Apache-2.0, MIT, BSD, EPL, MPL-2.0 and LGPL; this file is updated whenever a
+dependency is added or removed.
 
-This project uses the following third-party libraries:
+## Runtime dependencies
 
-### OpenHTML to PDF
-
-- **License**: LGPL v3
-- **URL**: <https://github.com/openhtmltopdf/openhtmltopdf>
-- **Notes**: Used for rendering XHTML + CSS to PDF/UA-compliant documents.
-
-### Apache Batik
-
-- **License**: Apache License 2.0
-- **URL**: <https://xmlgraphics.apache.org/batik/>
-- **Notes**: Used for SVG rendering within HTML documents.
-
-### Quarkus Qute
-
-- **License**: Apache License 2.0
-- **URL**: <https://quarkus.io/guides/qute>
-- **Notes**: Template engine used for dynamic variable substitution in XHTML files.
-
-### Quarkus (Core Framework)
+### Quarkus (server)
 
 - **License**: Apache License 2.0
 - **URL**: <https://quarkus.io/>
-- **Notes**: Framework used to build and run the application.
+- **Used for**: the REST service (`server` module).
 
-### Picocli
+### Picocli (CLI)
 
 - **License**: Apache License 2.0
 - **URL**: <https://picocli.info/>
-- **Notes**: Provides command-line interface support and argument parsing.
+- **Used for**: command-line parsing (`cli` module).
 
-## Fonts
+## Test dependencies
+
+### JUnit 5
+
+- **License**: Eclipse Public License 2.0
+- **URL**: <https://junit.org/>
+- **Used for**: tests.
+
+## Fonts (demo)
 
 ### Roboto
 
-- **License**:  SIL Open Font License, Version 1.1
+- **License**: SIL Open Font License, Version 1.1
 - **URL**: <https://fonts.google.com/specimen/Roboto/license>
-- **Notes**: Roboto Regular is used in the demo
+- **Used for**: the demo template (`demo/Roboto.ttf`).
 
-### Sepcial Elite
+### Special Elite
 
-- **License**: Apache License 2.0 
+- **License**: Apache License 2.0
 - **URL**: <https://fonts.google.com/specimen/Special+Elite/license>
-- **Notes**: Speicesl Elite Regular is used in the demo
+- **Used for**: the demo template (`demo/SpecialElite-Regular.ttf`).
 
-## License Compliance
+## Documentation
 
-This project is licensed under the GNU General Public License v3.0 (GPLv3), which is compatible with all the above licenses.
+### ITBH documentation theme (Antora UI bundle)
 
-Each library is used in compliance with its respective license terms.
+- **License**: Mozilla Public License 2.0 (derived from the Antora Default UI)
+- **Location**: `documentation/ui-bundle/` (see its `LICENSE` and `NOTICE`)
+- **Used for**: building the documentation site only; not part of the
+  software.

@@ -1,0 +1,35 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Licence
+:description: Apache-2.0 for the project, and how the licences of the dependencies fit with it.
+
+== The licence
+
+The PDF UA Generator is licensed under *Apache-2.0* (see `LICENSE` in the
+repository root). IT Beratung Hermann GmbH holds the copyright. Every source
+file carries an SPDX header; `mise run headers` applies it and
+`mise run headers-check` verifies it.
+
+Versions up to and including 1.0.0-SNAPSHOT were published under GPL-3.0.
+Copies obtained under that licence remain under it.
+
+== Dependencies
+
+Runtime dependencies must be licensed under Apache-2.0, MIT, BSD, EPL,
+MPL-2.0 or LGPL. GPL and AGPL are allowed only for test and build tools. A
+dual-licensed library is used under its permissive option. The current list is
+kept in `THIRD_PARTY_LICENSES.md` in the repository root.
+
+LGPL libraries (openhtmltopdf) are shipped as separate JARs so they can be
+replaced: the CLI keeps them in a `lib/` directory next to its JAR, the server
+uses the Quarkus fast-jar layout. Neither is merged into an uber-jar.
+
+== Documentation theme
+
+The UI bundle of this documentation (`documentation/ui-bundle`) is adapted from
+the Antora Default UI and licensed under MPL-2.0 (see its `LICENSE` and
+`NOTICE`). It is used only to build the documentation site and is not part of
+the software.

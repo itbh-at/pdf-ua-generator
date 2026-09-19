@@ -1,0 +1,16 @@
+    {{!-- Add additional meta tags here --}}
+    <meta name="author" content="IT Beratung Hermann GmbH">
+    {{!--
+      Link previews: title, description and canonical URL of the page. No
+      preview image yet — the project has no social card.
+    --}}
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{site.title}}">
+    <meta property="og:title" content="{{#if page.title}}{{{detag page.title}}}{{else}}{{site.title}}{{/if}}">
+    {{#with page.description}}
+    <meta property="og:description" content="{{{detag this}}}">
+    {{/with}}
+    {{#with page.canonicalUrl}}
+    <meta property="og:url" content="{{{this}}}">
+    {{/with}}
+    <meta name="twitter:card" content="summary">

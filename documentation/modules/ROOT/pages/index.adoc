@@ -1,0 +1,41 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= PDF UA Generator
+:description: Renders Qute templates with JSON data into accessible PDF, HTML, DOCX, ODT and plain-text documents.
+
+The PDF UA Generator turns a template and a JSON data structure into an
+accessible document. Templates are XHTML with Print CSS and
+https://quarkus.io/guides/qute[Qute] expressions; they are created, changed and
+deleted at runtime. The generator derives a JSON Schema from every template, so
+data can be checked before anything is rendered.
+
+Output formats:
+
+* PDF/UA, rendered with openhtmltopdf and Apache PDFBox
+* XHTML, self-contained
+* HTML for email, with inlined styles and absolute image URLs
+* DOCX and ODT
+* plain text
+
+It runs in two ways:
+
+* as a *command-line tool* that works on files and directories, without a
+  database or network access, and
+* as a *REST service* with a template store, running standalone on a JVM, under
+  podman or scaled out in Kubernetes.
+
+NOTE: The generator is being rebuilt. The
+xref:project/roadmap.adoc[roadmap] shows what exists today and what comes next.
+
+== Where to go
+
+* xref:explanation/architecture.adoc[Architecture] — how the parts fit
+  together and why.
+* xref:reference/problem-types.adoc[Problem types] — the error types the API
+  returns.
+* xref:project/roadmap.adoc[Roadmap] — the phases of the rebuild.
+* xref:project/licence.adoc[Licence] — Apache-2.0 and the licences of the
+  dependencies.

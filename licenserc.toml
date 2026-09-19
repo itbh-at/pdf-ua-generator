@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Licence-header management via hawkeye (https://github.com/korandoru/hawkeye).
+#   mise run headers        # apply headers (hawkeye format)
+#   mise run headers-check  # verify every file has one (hawkeye check)
+
+inlineHeader = """SPDX-License-Identifier: Apache-2.0
+Copyright 2026 IT Beratung Hermann GmbH"""
+
+# Whole directories rather than today's extensions, so a new file type cannot
+# slip in without a header. hawkeye honours .gitignore (build output is
+# skipped) and skips file types it has no comment style for.
+includes = [
+  "pom.xml",
+  "core/**",
+  "cli/**",
+  "server/**",
+  "mise.toml",
+  "licenserc.toml",
+  "documentation/build.sh",
+  "documentation/*.yml",
+  "documentation/modules/**/*.adoc",
+]

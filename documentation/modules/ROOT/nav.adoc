@@ -1,0 +1,16 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+* xref:index.adoc[Start here]
+
+.Reference
+* xref:reference/problem-types.adoc[Problem types]
+
+.Explanation
+* xref:explanation/architecture.adoc[Architecture]
+
+.Project
+* xref:project/roadmap.adoc[Roadmap]
+* xref:project/licence.adoc[Licence]
