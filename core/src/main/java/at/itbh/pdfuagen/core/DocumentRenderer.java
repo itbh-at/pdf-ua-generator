@@ -10,10 +10,12 @@ import at.itbh.pdfuagen.core.model.DocumentModel;
 import at.itbh.pdfuagen.core.model.ModelBuilder;
 import at.itbh.pdfuagen.core.model.PageBoxes;
 import at.itbh.pdfuagen.core.schema.DataSchema;
+import at.itbh.pdfuagen.core.schema.LayoutRules;
 import at.itbh.pdfuagen.core.writer.CssRules;
 import at.itbh.pdfuagen.core.writer.DocxWriter;
 import at.itbh.pdfuagen.core.writer.EmailHtmlWriter;
 import at.itbh.pdfuagen.core.writer.OdtWriter;
+import at.itbh.pdfuagen.core.writer.OfficeTemplate;
 import at.itbh.pdfuagen.core.writer.TextWriter;
 import com.openhtmltopdf.extend.FSCacheEx;
 import com.openhtmltopdf.extend.FSCacheValue;
@@ -275,7 +277,7 @@ public final class DocumentRenderer {
       case XHTML -> renderXhtml(document, resolver);
       case TEXT -> renderText(request, document, resolver);
       case EMAIL_HTML -> renderEmail(request, document, resolver);
-      case DOCX, ODT -> renderOffice(format, document, resolver);
+      case DOCX, ODT -> renderOffice(request, format, document, resolver);
     };
   }
 
@@ -320,6 +322,58 @@ public final class DocumentRenderer {
     return model;
   }
 
+  private static final java.util.regex.Pattern FONT_FACE =
+      java.util.regex.Pattern.compile("@font-face\\s*\\{([^}]*)\\}");
+  private static final java.util.regex.Pattern FONT_FAMILY =
+      java.util.regex.Pattern.compile("font-family\\s*:\\s*['\"]?([^;'\"}]+)['\"]?");
+  private static final java.util.regex.Pattern FONT_SRC =
+      java.util.regex.Pattern.compile("url\\(\\s*['\"]?([^'\")]+)['\"]?\\s*\\)");
+
+  /**
+   * The font files of the document's {@code @font-face} rules, by family: the first source of the
+   * first rule of each family, resolved relative to its stylesheet.
+   */
+  private static Map<String, byte[]> fonts(Document document, ResourceResolver resolver) {
+    Map<String, byte[]> fonts = new java.util.LinkedHashMap<>();
+    org.w3c.dom.NodeList all = document.getElementsByTagName("*");
+    for (int i = 0; i < all.getLength(); i++) {
+      org.w3c.dom.Element element = (org.w3c.dom.Element) all.item(i);
+      String name =
+          (element.getLocalName() != null ? element.getLocalName() : element.getTagName())
+              .toLowerCase(java.util.Locale.ROOT);
+      if (name.equals("style")) {
+        fontFaces(element.getTextContent(), ResourceResolver.BASE, resolver, fonts);
+      } else if (name.equals("link")
+          && "stylesheet".equalsIgnoreCase(element.getAttribute("rel").strip())) {
+        String uri = resolver.resolveUri(ResourceResolver.BASE, element.getAttribute("href"));
+        if (uri != null) {
+          resolver
+              .load(uri)
+              .ifPresent(
+                  r ->
+                      fontFaces(
+                          new String(r.bytes(), StandardCharsets.UTF_8), uri, resolver, fonts));
+        }
+      }
+    }
+    return fonts;
+  }
+
+  private static void fontFaces(
+      String css, String base, ResourceResolver resolver, Map<String, byte[]> fonts) {
+    java.util.regex.Matcher face = FONT_FACE.matcher(css);
+    while (face.find()) {
+      java.util.regex.Matcher family = FONT_FAMILY.matcher(face.group(1));
+      java.util.regex.Matcher src = FONT_SRC.matcher(face.group(1));
+      if (family.find() && src.find() && !fonts.containsKey(family.group(1).strip())) {
+        String uri = resolver.resolveUri(base, src.group(1));
+        if (uri != null) {
+          resolver.load(uri).ifPresent(r -> fonts.put(family.group(1).strip(), r.bytes()));
+        }
+      }
+    }
+  }
+
   /** The text of all stylesheets of the document: {@code <style>} and linked template CSS. */
   private static String stylesheets(Document document, ResourceResolver resolver) {
     StringBuilder css = new StringBuilder();
@@ -345,11 +399,24 @@ public final class DocumentRenderer {
     return css.toString();
   }
 
-  private Rendered renderOffice(OutputFormat format, Document document, ResourceResolver resolver)
+  private Rendered renderOffice(
+      RenderRequest request, OutputFormat format, Document document, ResourceResolver resolver)
       throws RenderException {
     DocumentModel model = model(document, resolver);
+    // A layout's Word and ODF templates give styles and page setup; its fonts are embedded.
+    String prefix = Layouts.prefix(request.repository()).orElse(null);
+    OfficeTemplate template =
+        prefix == null
+            ? OfficeTemplate.NONE
+            : new OfficeTemplate(
+                request.repository().resource(prefix + LayoutRules.DOTX).orElse(null),
+                request.repository().resource(prefix + LayoutRules.OTT).orElse(null),
+                fonts(document, resolver));
     try {
-      byte[] bytes = format == OutputFormat.DOCX ? DocxWriter.write(model) : OdtWriter.write(model);
+      byte[] bytes =
+          format == OutputFormat.DOCX
+              ? DocxWriter.write(model, template)
+              : OdtWriter.write(model, template);
       return new Rendered(format, bytes, List.of());
     } catch (IOException e) {
       throw new RenderException(

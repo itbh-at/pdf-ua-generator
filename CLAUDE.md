@@ -82,6 +82,10 @@ plain text).
   `example.json` and `example/` for the publish checks. Revisions are
   immutable; in-memory caches are keyed by content hash, and status is always
   read from the database.
+- Database columns derived from bundle files (`template.kind`,
+  `revision.layout_id`, `layout_revision`) are an index, never a second source.
+  When the way they are derived changes, a Flyway migration recomputes them
+  from the stored files.
 
 ## Template styling
 
@@ -145,9 +149,15 @@ plain text).
   styles, and the blocks `columns`, `col`, `box`, `footnote`. Components mark
   these blocks with `data-block="…"`. Anything outside this set is an error,
   never silently approximated.
-- Page layout and styles for DOCX and ODT come from a template file per layout:
-  `.dotx` for DOCX, `.ott` for ODT. Every catalog style has the same name in
-  the layout CSS, the `.dotx` and the `.ott`; the publish check verifies this.
+- Page layout, default font and styles for DOCX and ODT come from a template
+  file per layout: `layout.dotx` for DOCX, `layout.ott` for ODT. The writers
+  add only styles the template lacks and find catalog styles by name. Every
+  catalog style has the same name in the layout CSS, the `.dotx` and the
+  `.ott`; the publish check verifies this.
+- DOCX and ODT embed the layout's fonts (from its `@font-face` rules) that their
+  template names — DOCX obfuscated as ECMA-376 requires, ODT under `Fonts/` —
+  so no office application substitutes a system font. List markers use only
+  characters every text font has.
 - Email: `email-html` is a separate rendition — layout-provided `email.css`,
   styles inlined into `style` attributes, absolute image URLs, layout tables
   with `role="presentation"`. Not offered for `styling: free`.

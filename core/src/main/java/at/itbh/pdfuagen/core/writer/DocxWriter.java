@@ -27,11 +27,15 @@ import at.itbh.pdfuagen.core.model.DocumentModel.Table;
 import at.itbh.pdfuagen.core.model.DocumentModel.Text;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 /**
  * Writes WordprocessingML (DOCX) from the model, without an office library. Accessibility
@@ -49,10 +53,25 @@ public final class DocxWriter {
   static final String REL_TYPE =
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
 
-  /** Text width of an A4 page with 2 cm margins, in twentieths of a point and in EMU. */
-  private static final int TEXT_WIDTH_TWIPS = 11906 - 2 * 1134;
+  /** Page size and margins without a Word template: A4 with 2 cm margins, in twips. */
+  private static final Map<String, String> PAGE_SIZE = Map.of("w:w", "11906", "w:h", "16838");
 
-  private static final long TEXT_WIDTH_EMU = TEXT_WIDTH_TWIPS * 635L;
+  private static final Map<String, String> PAGE_MARGINS =
+      Map.of(
+          "w:top",
+          "1134",
+          "w:right",
+          "1134",
+          "w:bottom",
+          "1134",
+          "w:left",
+          "1134",
+          "w:header",
+          "709",
+          "w:footer",
+          "709",
+          "w:gutter",
+          "0");
 
   private record Relationship(String id, String type, String target, boolean external) {}
 
@@ -71,8 +90,72 @@ public final class DocxWriter {
   private int drawingCount;
   private int bookmarkCount;
 
-  private DocxWriter(DocumentModel model) {
+  /** From the layout's Word template: styles, page setup, theme, fonts to embed. */
+  private final OfficeTemplate template;
+
+  private final Document templateStyles;
+  private final Map<String, String> templateStyleIds = new HashMap<>();
+  private final Map<String, String> pageSize = new LinkedHashMap<>(PAGE_SIZE);
+  private final Map<String, String> pageMargins = new LinkedHashMap<>(PAGE_MARGINS);
+  private final byte[] theme;
+  private final Map<String, byte[]> embeddedFonts = new LinkedHashMap<>();
+
+  /** The template's default font, also for list markers; {@code null} without a template. */
+  private String defaultFont;
+
+  /** Text width in twentieths of a point and in EMU, from page width and margins. */
+  private final int textWidthTwips;
+
+  private final long textWidthEmu;
+
+  private DocxWriter(DocumentModel model, OfficeTemplate template) throws IOException {
     this.model = model;
+    this.template = template;
+    if (template.dotx() != null) {
+      templateStyles =
+          OfficeTemplate.parse(
+              OfficeTemplate.part(template.dotx(), "word/styles.xml")
+                  .orElseThrow(() -> new IOException("the Word template has no styles")));
+      for (Element style : OfficeTemplate.descendants(templateStyles, W, "style")) {
+        OfficeTemplate.child(style, W, "name")
+            .ifPresent(
+                n ->
+                    templateStyleIds.put(
+                        n.getAttributeNS(W, "val"), style.getAttributeNS(W, "styleId")));
+      }
+      Optional<byte[]> document = OfficeTemplate.part(template.dotx(), "word/document.xml");
+      if (document.isPresent()) {
+        List<Element> sections =
+            OfficeTemplate.descendants(OfficeTemplate.parse(document.get()), W, "sectPr");
+        if (!sections.isEmpty()) {
+          Element section = sections.getLast();
+          OfficeTemplate.child(section, W, "pgSz").ifPresent(e -> attributes(e, pageSize));
+          OfficeTemplate.child(section, W, "pgMar").ifPresent(e -> attributes(e, pageMargins));
+        }
+      }
+      theme = OfficeTemplate.part(template.dotx(), "word/theme/theme1.xml").orElse(null);
+      OfficeTemplate.child(templateStyles.getDocumentElement(), W, "docDefaults")
+          .flatMap(d -> OfficeTemplate.descendants(d, W, "rFonts").stream().findFirst())
+          .map(f -> f.getAttributeNS(W, "ascii"))
+          .filter(f -> !f.isEmpty())
+          .ifPresent(f -> defaultFont = f);
+      for (Element fonts : OfficeTemplate.descendants(templateStyles, W, "rFonts")) {
+        for (String attribute : List.of("ascii", "hAnsi", "cs", "eastAsia")) {
+          String family = fonts.getAttributeNS(W, attribute);
+          if (template.fonts().containsKey(family)) {
+            embeddedFonts.put(family, template.fonts().get(family));
+          }
+        }
+      }
+    } else {
+      templateStyles = null;
+      theme = null;
+    }
+    textWidthTwips =
+        Integer.parseInt(pageSize.get("w:w"))
+            - Integer.parseInt(pageMargins.get("w:left"))
+            - Integer.parseInt(pageMargins.get("w:right"));
+    textWidthEmu = textWidthTwips * 635L;
     relationships.add(new Relationship("rIdStyles", REL_TYPE + "styles", "styles.xml", false));
     relationships.add(
         new Relationship("rIdNumbering", REL_TYPE + "numbering", "numbering.xml", false));
@@ -83,7 +166,30 @@ public final class DocxWriter {
   }
 
   public static byte[] write(DocumentModel model) throws IOException {
-    return new DocxWriter(model).write();
+    return write(model, OfficeTemplate.NONE);
+  }
+
+  /**
+   * @param template the layout's Word template and fonts: its styles, default font and page setup
+   *     are the base; styles it lacks are added
+   */
+  public static byte[] write(DocumentModel model, OfficeTemplate template) throws IOException {
+    return new DocxWriter(model, template).write();
+  }
+
+  private static String[] flatten(Map<String, String> attributes) {
+    return attributes.entrySet().stream()
+        .flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue()))
+        .toArray(String[]::new);
+  }
+
+  private static void attributes(Element element, Map<String, String> into) {
+    for (int i = 0; i < element.getAttributes().getLength(); i++) {
+      org.w3c.dom.Node attribute = element.getAttributes().item(i);
+      if (W.equals(attribute.getNamespaceURI())) {
+        into.put("w:" + attribute.getLocalName(), attribute.getNodeValue());
+      }
+    }
   }
 
   private byte[] write() throws IOException {
@@ -129,24 +235,9 @@ public final class DocxWriter {
       relationships.add(new Relationship("rIdFooter", REL_TYPE + "footer", "footer1.xml", false));
       doc.empty("w:footerReference", "w:type", "default", "r:id", "rIdFooter");
     }
-    doc.empty("w:pgSz", "w:w", "11906", "w:h", "16838")
-        .empty(
-            "w:pgMar",
-            "w:top",
-            "1134",
-            "w:right",
-            "1134",
-            "w:bottom",
-            "1134",
-            "w:left",
-            "1134",
-            "w:header",
-            "709",
-            "w:footer",
-            "709",
-            "w:gutter",
-            "0")
-        .close();
+    doc.empty("w:pgSz", flatten(pageSize));
+    doc.empty("w:pgMar", flatten(pageMargins));
+    doc.close();
     doc.close().close();
     footnotes.close();
 
@@ -165,6 +256,16 @@ public final class DocxWriter {
     }
     if (!model.footer().isEmpty()) {
       zip.add("word/footer1.xml", pageBand("w:ftr", "Footer", model.footer()));
+    }
+    if (theme != null) {
+      relationships.add(
+          new Relationship("rIdTheme", REL_TYPE + "theme", "theme/theme1.xml", false));
+      zip.add("word/theme/theme1.xml", theme);
+    }
+    if (!embeddedFonts.isEmpty()) {
+      relationships.add(
+          new Relationship("rIdFontTable", REL_TYPE + "fontTable", "fontTable.xml", false));
+      fontTable(zip);
     }
     zip.add("word/_rels/document.xml.rels", documentRelationships());
     for (Map.Entry<String, byte[]> entry : media.entrySet()) {
@@ -299,7 +400,7 @@ public final class DocxWriter {
       x.empty(
           "w:tcW",
           "w:w",
-          String.valueOf(TEXT_WIDTH_TWIPS * cell.colspan() / columns),
+          String.valueOf(textWidthTwips * cell.colspan() / columns),
           "w:type",
           "dxa");
       if (cell.colspan() > 1) {
@@ -352,7 +453,7 @@ public final class DocxWriter {
     x.open("w:tr");
     for (List<Block> cell : cells) {
       x.open("w:tc").open("w:tcPr");
-      x.empty("w:tcW", "w:w", String.valueOf(TEXT_WIDTH_TWIPS / cells.size()), "w:type", "dxa");
+      x.empty("w:tcW", "w:w", String.valueOf(textWidthTwips / cells.size()), "w:type", "dxa");
       if (framed) {
         x.empty("w:shd", "w:val", "clear", "w:color", "auto", "w:fill", "F2F2F2");
       }
@@ -381,10 +482,10 @@ public final class DocxWriter {
     }
   }
 
-  private static void grid(Xml x, int columns) {
+  private void grid(Xml x, int columns) {
     x.open("w:tblGrid");
     for (int i = 0; i < columns; i++) {
-      x.empty("w:gridCol", "w:w", String.valueOf(TEXT_WIDTH_TWIPS / Math.max(1, columns)));
+      x.empty("w:gridCol", "w:w", String.valueOf(textWidthTwips / Math.max(1, columns)));
     }
     x.close();
   }
@@ -497,9 +598,9 @@ public final class DocxWriter {
     relationships.add(new Relationship(relId, REL_TYPE + "image", name, false));
     long cx = raster.width() * 9525L;
     long cy = raster.height() * 9525L;
-    if (cx > TEXT_WIDTH_EMU) {
-      cy = cy * TEXT_WIDTH_EMU / cx;
-      cx = TEXT_WIDTH_EMU;
+    if (cx > textWidthEmu) {
+      cy = cy * textWidthEmu / cx;
+      cx = textWidthEmu;
     }
     String alt = image.decorative() ? "" : image.alt() == null ? "" : image.alt();
     x.open("w:r").open("w:drawing");
@@ -592,11 +693,17 @@ public final class DocxWriter {
     if (catalogName == null) {
       return null;
     }
+    if (templateStyleIds.containsKey(catalogName)) {
+      return templateStyleIds.get(catalogName);
+    }
     paragraphStyles.add(catalogName);
     return "Catalog-" + styleId(catalogName);
   }
 
   private String characterStyle(String catalogName) {
+    if (templateStyleIds.containsKey(catalogName)) {
+      return templateStyleIds.get(catalogName);
+    }
     characterStyles.add(catalogName);
     return "CatalogChar-" + styleId(catalogName);
   }
@@ -610,7 +717,80 @@ public final class DocxWriter {
     return name.length() > 40 ? name.substring(0, 40) : name;
   }
 
-  private byte[] styles() {
+  private byte[] styles() throws IOException {
+    byte[] own = ownStyles();
+    if (templateStyles == null) {
+      return own;
+    }
+    // The template's styles and defaults win; the writer's fill in what it lacks.
+    Document merged = (Document) templateStyles.cloneNode(true);
+    Element root = merged.getDocumentElement();
+    java.util.Set<String> ids = new java.util.HashSet<>(templateStyleIds.values());
+    Document ours = OfficeTemplate.parse(own);
+    if (OfficeTemplate.child(root, W, "docDefaults").isEmpty()) {
+      root.insertBefore(
+          merged.importNode(
+              OfficeTemplate.child(ours.getDocumentElement(), W, "docDefaults").orElseThrow(),
+              true),
+          root.getFirstChild());
+    }
+    for (Element style : OfficeTemplate.children(ours.getDocumentElement(), W, "style")) {
+      if (!ids.contains(style.getAttributeNS(W, "styleId"))) {
+        root.appendChild(merged.importNode(style, true));
+      }
+    }
+    // The document language is the rendered one, not the template's.
+    Element defaults = OfficeTemplate.child(root, W, "docDefaults").orElseThrow();
+    Element runDefaults = childOrNew(childOrNew(defaults, "rPrDefault"), "rPr");
+    Element lang = childOrNew(runDefaults, "lang");
+    String language = model.lang().isBlank() ? "en-US" : model.lang();
+    lang.setAttributeNS(W, "w:val", language);
+    lang.setAttributeNS(W, "w:eastAsia", language);
+    lang.setAttributeNS(W, "w:bidi", language);
+    return OfficeTemplate.serialize(merged);
+  }
+
+  private static Element childOrNew(Element parent, String localName) {
+    return OfficeTemplate.child(parent, W, localName)
+        .orElseGet(
+            () -> {
+              Element e = parent.getOwnerDocument().createElementNS(W, "w:" + localName);
+              parent.appendChild(e);
+              return e;
+            });
+  }
+
+  /** Embeds the layout's fonts the Word template names, obfuscated as Word requires. */
+  private void fontTable(Zip zip) throws IOException {
+    Xml table = new Xml();
+    table.open("w:fonts", "xmlns:w", W, "xmlns:r", R);
+    Xml rels = new Xml();
+    rels.open(
+        "Relationships", "xmlns", "http://schemas.openxmlformats.org/package/2006/relationships");
+    int n = 0;
+    for (Map.Entry<String, byte[]> font : embeddedFonts.entrySet()) {
+      n++;
+      String key = OfficeTemplate.fontKey(font.getValue());
+      table.open("w:font", "w:name", font.getKey());
+      table.empty("w:embedRegular", "r:id", "rIdFont" + n, "w:fontKey", key);
+      table.close();
+      rels.empty(
+          "Relationship",
+          "Id",
+          "rIdFont" + n,
+          "Type",
+          REL_TYPE + "font",
+          "Target",
+          "fonts/font" + n + ".odttf");
+      zip.add("word/fonts/font" + n + ".odttf", OfficeTemplate.obfuscate(font.getValue(), key));
+    }
+    table.close();
+    rels.close();
+    zip.add("word/fontTable.xml", table.bytes());
+    zip.add("word/_rels/fontTable.xml.rels", rels.bytes());
+  }
+
+  private byte[] ownStyles() {
     String lang = model.lang().isBlank() ? "en-US" : model.lang();
     Xml x = new Xml();
     x.open("w:styles", "xmlns:w", W);
@@ -642,8 +822,8 @@ public final class DocxWriter {
       x.empty("w:name", "w:val", band.toLowerCase(java.util.Locale.ROOT))
           .empty("w:basedOn", "w:val", "Normal");
       x.open("w:pPr").open("w:tabs");
-      x.empty("w:tab", "w:val", "center", "w:pos", String.valueOf(TEXT_WIDTH_TWIPS / 2));
-      x.empty("w:tab", "w:val", "right", "w:pos", String.valueOf(TEXT_WIDTH_TWIPS));
+      x.empty("w:tab", "w:val", "center", "w:pos", String.valueOf(textWidthTwips / 2));
+      x.empty("w:tab", "w:val", "right", "w:pos", String.valueOf(textWidthTwips));
       x.close().empty("w:spacing", "w:after", "0").close();
       x.open("w:rPr").empty("w:sz", "w:val", "18").close();
       x.close();
@@ -696,7 +876,8 @@ public final class DocxWriter {
   }
 
   private byte[] numberingPart() {
-    String[] bullets = {"•", "◦", "▪"};
+    // Characters every text font has; ◦ and ▪ are missing in many and fall back to another font.
+    String[] bullets = {"•", "–", "·"};
     Xml x = new Xml();
     x.open("w:numbering", "xmlns:w", W);
     for (int abstractId = 0; abstractId < 2; abstractId++) {
@@ -712,6 +893,10 @@ public final class DocxWriter {
             "w:val",
             ordered ? "%" + (level + 1) + "." : bullets[level % bullets.length]);
         x.empty("w:lvlJc", "w:val", "left");
+        if (defaultFont != null) {
+          // Without a font, markers take the application's default font, not the layout's.
+          x.open("w:rPr").empty("w:rFonts", "w:ascii", defaultFont, "w:hAnsi", defaultFont).close();
+        }
         x.open("w:pPr")
             .empty("w:ind", "w:left", String.valueOf(720 * (level + 1)), "w:hanging", "360")
             .close();
@@ -733,6 +918,9 @@ public final class DocxWriter {
   private byte[] settings() {
     Xml x = new Xml();
     x.open("w:settings", "xmlns:w", W);
+    if (!embeddedFonts.isEmpty()) {
+      x.empty("w:embedTrueTypeFonts");
+    }
     x.open("w:footnotePr")
         .empty("w:footnote", "w:id", "-1")
         .empty("w:footnote", "w:id", "0")
@@ -766,6 +954,23 @@ public final class DocxWriter {
     x.empty("Default", "Extension", "xml", "ContentType", "application/xml");
     x.empty("Default", "Extension", "png", "ContentType", "image/png");
     x.empty("Default", "Extension", "jpeg", "ContentType", "image/jpeg");
+    if (!embeddedFonts.isEmpty()) {
+      x.empty(
+          "Default",
+          "Extension",
+          "odttf",
+          "ContentType",
+          "application/vnd.openxmlformats-officedocument.obfuscatedFont");
+      x.empty("Override", "PartName", "/word/fontTable.xml", "ContentType", wml + "fontTable+xml");
+    }
+    if (theme != null) {
+      x.empty(
+          "Override",
+          "PartName",
+          "/word/theme/theme1.xml",
+          "ContentType",
+          "application/vnd.openxmlformats-officedocument.theme+xml");
+    }
     x.empty("Override", "PartName", "/word/document.xml", "ContentType", wml + "document.main+xml");
     x.empty("Override", "PartName", "/word/styles.xml", "ContentType", wml + "styles+xml");
     x.empty("Override", "PartName", "/word/numbering.xml", "ContentType", wml + "numbering+xml");

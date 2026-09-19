@@ -205,6 +205,12 @@ DOCX and ODT carry the same content, structure and named styles as the PDF,
 but not a pixel-identical layout: page breaks and spacing are decided by Word
 and LibreOffice.
 
+Their look comes from the layout's Word and ODF templates (`layout.dotx`,
+`layout.ott`): styles, default font and page setup, with the layout's fonts
+embedded. CSS cannot be translated into Word or ODF styles faithfully; office
+templates made in the office applications can express exactly what those
+applications offer.
+
 The DOCX and ODT writers are our own code on JDK StAX and ZIP, without an office
 library. Both formats are ZIP files with a handful of XML parts, and the
 translation from the model is our own code in any case. `docx4j-core` would add

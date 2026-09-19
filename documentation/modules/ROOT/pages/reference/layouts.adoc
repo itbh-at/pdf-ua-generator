@@ -33,8 +33,8 @@ e.g. for `@page` boxes with translated texts.
 |Stylesheet for email HTML.
 
 |`layout.dotx`, `layout.ott`
-|Optional Word and ODF templates; every catalog style must exist in them by
-name.
+|Word and ODF templates: the base of DOCX and ODT, see below. Optional; without
+them the writers use their own plain styles.
 
 |anything else
 |Stylesheets, fonts, images of the layout.
@@ -143,6 +143,22 @@ areas — give them a preview text:
 pdf-ua-generator render -t demo/layout -f pdf
 pdf-ua-generator check -t demo/layout -d example.json
 ----
+
+== DOCX and ODT
+
+CSS does not map to Word and ODF styles, so a layout brings them as office
+templates, made in Word or LibreOffice:
+
+* Styles, the default font and the page setup (size, margins) of
+  `layout.dotx` and `layout.ott` are taken as they are. Styles a template lacks
+  are added by the writers.
+* Catalog styles are found by their name (Word: the style name, ODF: the
+  display name or name); every catalog style must exist in both templates.
+* Headings keep their outline level and the standard names (`Heading1`… in
+  Word, `Heading_20_1`… in ODF), so the document structure stays accessible.
+* The fonts the templates name are embedded from the layout's `@font-face`
+  files, so Word and LibreOffice show the layout's fonts, not a substitute.
+* The document language is always that of the rendered variant.
 
 [[content-rules]]
 == Rules for content

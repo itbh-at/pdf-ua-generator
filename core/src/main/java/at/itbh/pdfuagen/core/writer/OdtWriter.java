@@ -28,12 +28,15 @@ import at.itbh.pdfuagen.core.model.DocumentModel.Table;
 import at.itbh.pdfuagen.core.model.DocumentModel.Text;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 /**
  * Writes an OpenDocument text document (ODF 1.3) from the model with JDK StAX and ZIP.
@@ -57,7 +60,27 @@ public final class OdtWriter {
     {"loext", "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"},
   };
 
-  private static final double TEXT_WIDTH_CM = 17.0;
+  static final String OFFICE = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+  static final String STYLE = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+  static final String FO = "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0";
+  static final String SVG = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
+  static final String XLINK = "http://www.w3.org/1999/xlink";
+
+  /** Page width, height and margins without an ODF template: A4 with 2 cm margins. */
+  private static final Map<String, String> PAGE =
+      Map.of(
+          "fo:page-width",
+          "21cm",
+          "fo:page-height",
+          "29.7cm",
+          "fo:margin-top",
+          "2cm",
+          "fo:margin-bottom",
+          "2cm",
+          "fo:margin-left",
+          "2cm",
+          "fo:margin-right",
+          "2cm");
 
   private record TextStyleKey(Set<Mark> marks, String lang, String catalog) {}
 
@@ -70,12 +93,62 @@ public final class OdtWriter {
   private int imageCount;
   private int tableCount;
 
-  private OdtWriter(DocumentModel model) {
+  /** From the layout's ODF template: styles, page setup, fonts to embed. */
+  private final Document templateStyles;
+
+  /** Template styles by display name and by name, for catalog styles. */
+  private final Map<String, String> templateStyleNames = new HashMap<>();
+
+  private final Map<String, String> page = new LinkedHashMap<>(PAGE);
+  private final Map<String, byte[]> fonts;
+  private final Map<String, byte[]> embeddedFonts = new LinkedHashMap<>();
+  private final double textWidthCm;
+
+  private OdtWriter(DocumentModel model, OfficeTemplate template) throws IOException {
     this.model = model;
+    this.fonts = template.fonts();
+    if (template.ott() != null) {
+      templateStyles =
+          OfficeTemplate.parse(
+              OfficeTemplate.part(template.ott(), "styles.xml")
+                  .orElseThrow(() -> new IOException("the ODF template has no styles.xml")));
+      for (Element style : OfficeTemplate.descendants(templateStyles, STYLE, "style")) {
+        String name = style.getAttributeNS(STYLE, "name");
+        templateStyleNames.put(name, name);
+        String display = style.getAttributeNS(STYLE, "display-name");
+        if (!display.isEmpty()) {
+          templateStyleNames.put(display, name);
+        }
+      }
+      List<Element> layouts =
+          OfficeTemplate.descendants(templateStyles, STYLE, "page-layout-properties");
+      if (!layouts.isEmpty()) {
+        for (String attribute : PAGE.keySet()) {
+          String value = layouts.getFirst().getAttributeNS(FO, attribute.substring(3));
+          if (!value.isEmpty()) {
+            page.put(attribute, value);
+          }
+        }
+      }
+    } else {
+      templateStyles = null;
+    }
+    textWidthCm =
+        OfficeTemplate.centimetres(page.get("fo:page-width"))
+            - OfficeTemplate.centimetres(page.get("fo:margin-left"))
+            - OfficeTemplate.centimetres(page.get("fo:margin-right"));
   }
 
   public static byte[] write(DocumentModel model) throws IOException {
-    return new OdtWriter(model).write();
+    return write(model, OfficeTemplate.NONE);
+  }
+
+  /**
+   * @param template the layout's ODF template and fonts: its styles, fonts and page setup are the
+   *     base; styles it lacks are added
+   */
+  public static byte[] write(DocumentModel model, OfficeTemplate template) throws IOException {
+    return new OdtWriter(model, template).write();
   }
 
   private byte[] write() throws IOException {
@@ -88,10 +161,15 @@ public final class OdtWriter {
     Zip zip = new Zip();
     zip.addStored(
         "mimetype", "application/vnd.oasis.opendocument.text".getBytes(StandardCharsets.US_ASCII));
+    byte[] content = content(body);
+    byte[] styles = styles();
     zip.add("META-INF/manifest.xml", manifest());
-    zip.add("content.xml", content(body));
-    zip.add("styles.xml", styles());
+    zip.add("content.xml", content);
+    zip.add("styles.xml", styles);
     zip.add("meta.xml", meta());
+    for (Map.Entry<String, byte[]> font : embeddedFonts.entrySet()) {
+      zip.add(font.getKey(), font.getValue());
+    }
     for (Map.Entry<String, byte[]> entry : pictures.entrySet()) {
       zip.add(entry.getKey(), entry.getValue());
     }
@@ -289,7 +367,7 @@ public final class OdtWriter {
     if (t.marks().isEmpty() && !lang && t.style() == null) {
       return null;
     }
-    if (t.style() != null) {
+    if (t.style() != null && !templateStyleNames.containsKey(t.style())) {
       characterCatalog.add(t.style());
     }
     TextStyleKey key = new TextStyleKey(t.marks(), lang ? t.lang() : null, t.style());
@@ -302,9 +380,9 @@ public final class OdtWriter {
     pictures.put(name, raster.bytes());
     double width = raster.width() / 96.0 * 2.54;
     double height = raster.height() / 96.0 * 2.54;
-    if (width > TEXT_WIDTH_CM) {
-      height = height * TEXT_WIDTH_CM / width;
-      width = TEXT_WIDTH_CM;
+    if (width > textWidthCm) {
+      height = height * textWidthCm / width;
+      width = textWidthCm;
     }
     x.open(
         "draw:frame",
@@ -341,6 +419,9 @@ public final class OdtWriter {
   private String paragraphStyle(String catalog, String fallback) {
     if (catalog == null) {
       return fallback;
+    }
+    if (templateStyleNames.containsKey(catalog)) {
+      return templateStyleNames.get(catalog);
     }
     paragraphCatalog.add(catalog);
     return "Catalog_" + styleId(catalog);
@@ -387,10 +468,10 @@ public final class OdtWriter {
         "Standard");
     x.empty("style:paragraph-properties", "fo:break-after", "page").close();
     x.open("style:style", "style:name", "Tbl", "style:family", "table");
-    x.empty("style:table-properties", "style:width", cm(TEXT_WIDTH_CM), "table:align", "margins")
+    x.empty("style:table-properties", "style:width", cm(textWidthCm), "table:align", "margins")
         .close();
     x.open("style:style", "style:name", "Layout", "style:family", "table");
-    x.empty("style:table-properties", "style:width", cm(TEXT_WIDTH_CM), "table:align", "margins")
+    x.empty("style:table-properties", "style:width", cm(textWidthCm), "table:align", "margins")
         .close();
     x.open("style:style", "style:name", "TblCell", "style:family", "table-cell");
     x.empty(
@@ -440,7 +521,10 @@ public final class OdtWriter {
           "style:family",
           "text",
           "style:parent-style-name",
-          key.catalog() == null ? null : "CatalogChar_" + styleId(key.catalog()));
+          key.catalog() == null
+              ? null
+              : templateStyleNames.getOrDefault(
+                  key.catalog(), "CatalogChar_" + styleId(key.catalog())));
       String[] lang = key.lang() == null ? null : key.lang().split("[-_]", 2);
       x.empty(
           "style:text-properties",
@@ -460,7 +544,79 @@ public final class OdtWriter {
     return x.bytes();
   }
 
-  private byte[] styles() {
+  private byte[] styles() throws IOException {
+    byte[] own = ownStyles();
+    Document merged = OfficeTemplate.parse(own);
+    Element root = merged.getDocumentElement();
+    if (templateStyles != null) {
+      // The template's fonts and named styles win; the writer's fill in what it lacks.
+      Element decls = OfficeTemplate.child(root, OFFICE, "font-face-decls").orElseThrow();
+      OfficeTemplate.child(templateStyles.getDocumentElement(), OFFICE, "font-face-decls")
+          .ifPresent(
+              template -> {
+                for (Element face : OfficeTemplate.children(template, STYLE, "font-face")) {
+                  decls.appendChild(merged.importNode(face, true));
+                }
+              });
+      Element styles = OfficeTemplate.child(root, OFFICE, "styles").orElseThrow();
+      Element template =
+          OfficeTemplate.child(templateStyles.getDocumentElement(), OFFICE, "styles").orElse(null);
+      if (template != null) {
+        for (org.w3c.dom.Node node = template.getFirstChild();
+            node != null;
+            node = node.getNextSibling()) {
+          if (!(node instanceof Element element)) {
+            continue;
+          }
+          Element existing = same(styles, element);
+          Element imported = (Element) merged.importNode(element, true);
+          if (existing != null) {
+            styles.replaceChild(imported, existing);
+          } else {
+            styles.appendChild(imported);
+          }
+        }
+      }
+    }
+    // Embed the layout's fonts the styles name.
+    for (Element face : OfficeTemplate.descendants(merged, STYLE, "font-face")) {
+      String family = face.getAttributeNS(SVG, "font-family").replaceAll("^['\"]|['\"]$", "");
+      byte[] font = fonts.get(family);
+      if (font == null || !OfficeTemplate.children(face, SVG, "font-face-src").isEmpty()) {
+        continue;
+      }
+      String path = "Fonts/" + family.replaceAll("[^A-Za-z0-9]", "_") + ".ttf";
+      embeddedFonts.put(path, font);
+      Element src = merged.createElementNS(SVG, "svg:font-face-src");
+      Element uri = merged.createElementNS(SVG, "svg:font-face-uri");
+      uri.setAttributeNS(XLINK, "xlink:href", path);
+      uri.setAttributeNS(XLINK, "xlink:type", "simple");
+      Element format = merged.createElementNS(SVG, "svg:font-face-format");
+      format.setAttributeNS(SVG, "svg:string", "truetype");
+      uri.appendChild(format);
+      src.appendChild(uri);
+      face.appendChild(src);
+    }
+    return OfficeTemplate.serialize(merged);
+  }
+
+  /** The element in {@code styles} with the same kind, family and name, or {@code null}. */
+  private static Element same(Element styles, Element element) {
+    for (org.w3c.dom.Node node = styles.getFirstChild();
+        node != null;
+        node = node.getNextSibling()) {
+      if (node instanceof Element e
+          && e.getLocalName().equals(element.getLocalName())
+          && java.util.Objects.equals(e.getNamespaceURI(), element.getNamespaceURI())
+          && e.getAttributeNS(STYLE, "family").equals(element.getAttributeNS(STYLE, "family"))
+          && e.getAttributeNS(STYLE, "name").equals(element.getAttributeNS(STYLE, "name"))) {
+        return e;
+      }
+    }
+    return null;
+  }
+
+  private byte[] ownStyles() {
     String[] lang =
         model.lang().isBlank() ? new String[] {"en", "US"} : model.lang().split("[-_]", 2);
     Xml x = new Xml();
@@ -536,8 +692,8 @@ public final class OdtWriter {
           "style:class",
           "extra");
       x.open("style:paragraph-properties").open("style:tab-stops");
-      x.empty("style:tab-stop", "style:position", cm(TEXT_WIDTH_CM / 2), "style:type", "center");
-      x.empty("style:tab-stop", "style:position", cm(TEXT_WIDTH_CM), "style:type", "right");
+      x.empty("style:tab-stop", "style:position", cm(textWidthCm / 2), "style:type", "center");
+      x.empty("style:tab-stop", "style:position", cm(textWidthCm), "style:type", "right");
       x.close().close();
       x.empty("style:text-properties", "fo:font-size", "9pt");
       x.close();
@@ -646,18 +802,9 @@ public final class OdtWriter {
     x.open("style:page-layout", "style:name", "pm1");
     x.empty(
         "style:page-layout-properties",
-        "fo:page-width",
-        "21cm",
-        "fo:page-height",
-        "29.7cm",
-        "fo:margin-top",
-        "2cm",
-        "fo:margin-bottom",
-        "2cm",
-        "fo:margin-left",
-        "2cm",
-        "fo:margin-right",
-        "2cm");
+        page.entrySet().stream()
+            .flatMap(e -> java.util.stream.Stream.of(e.getKey(), e.getValue()))
+            .toArray(String[]::new));
     x.open("style:header-style")
         .empty(
             "style:header-footer-properties", "fo:min-height", "0cm", "fo:margin-bottom", "0.3cm")
@@ -728,7 +875,8 @@ public final class OdtWriter {
   }
 
   private static void listStyle(Xml x, String name, boolean ordered) {
-    String[] bullets = {"•", "◦", "▪"};
+    // Characters every text font has; ◦ and ▪ are missing in many and fall back to another font.
+    String[] bullets = {"•", "–", "·"};
     x.open("text:list-style", "style:name", name);
     for (int level = 1; level <= 10; level++) {
       if (ordered) {
@@ -797,6 +945,14 @@ public final class OdtWriter {
         "application/vnd.oasis.opendocument.text");
     for (String part : List.of("content.xml", "styles.xml", "meta.xml")) {
       x.empty("manifest:file-entry", "manifest:full-path", part, "manifest:media-type", "text/xml");
+    }
+    for (String font : embeddedFonts.keySet()) {
+      x.empty(
+          "manifest:file-entry",
+          "manifest:full-path",
+          font,
+          "manifest:media-type",
+          "application/x-font-ttf");
     }
     for (String picture : pictures.keySet()) {
       x.empty(

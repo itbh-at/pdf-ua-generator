@@ -71,15 +71,19 @@ revision; a second demo layout for the same document
 |done
 
 |5 Operations
-|Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
+|Import of layouts (and templates) into the cluster: bundles in their own OCI
+image, uploaded and published by an idempotent Kubernetes job of the chart
+(same content hash, no new revision); Containerfile with mise, JRE and AOT
+cache; generated `NOTICE` and licence
 texts in the image; Helm chart for Kubernetes and
 `podman kube play`; `kubeconform`; CI smoke test; load test
 |Several pods render under load and the autoscaler reacts
 |
 
 |6 Formats complete
-|Writers complete: `.dotx`/`.ott` per layout as base of styles, headers and
-footers; image sizes from the template; SVG with PNG fallback; `rowspan`;
+|Writers complete: headers and footers styled by the layout's `.dotx`/`.ott`
+(styles, default font, page setup and embedded fonts from them are done, taken
+ahead with phase 4); image sizes from the template; SVG with PNG fallback; `rowspan`;
 `multipart/alternative`; email HTML written through the StAX writer
 instead of string assembly
 |Every format passes its automated checks; DOCX also passes Word's
