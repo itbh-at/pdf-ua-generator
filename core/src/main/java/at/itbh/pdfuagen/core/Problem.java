@@ -21,6 +21,7 @@ public record Problem(String type, String detail, String location) {
   public static final String RESOURCE_REJECTED = "resource-rejected";
   public static final String ATTACHMENT_MISSING = "attachment-missing";
   public static final String INVALID_DATA = "invalid-data";
+  public static final String ACCESSIBILITY = "accessibility";
 
   @Override
   public String toString() {

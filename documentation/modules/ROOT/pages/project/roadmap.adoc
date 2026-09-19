@@ -33,10 +33,14 @@ check; Spotless formatting; JMH benchmark
 
 |1a Proof of concept
 |Demo template with all building blocks, rendered to PDF, XHTML, email HTML,
-plain text, DOCX and ODT with minimal writers; all automated checks
+plain text, DOCX and ODT; document model with accessibility checker; DOCX and
+ODT writers without an office library; running headers and footers with page
+numbers from `@page`; decorative images as PDF artifacts; CLI formats and
+`verify`; `mise run check-formats` with veraPDF, axe-core, ODF validator and
+LibreOffice
 |Every format passes its checks — otherwise the set of building blocks is
 reduced before anything builds on it
-|
+|done
 
 |2 Schema and validation
 |Schema derivation from the syntax tree; field definitions; field type
@@ -68,8 +72,9 @@ texts in the image; Helm chart for Kubernetes and
 |
 
 |6 Formats complete
-|Document model with shared checker; DOCX writer; ODT writer; plain text; email
-HTML with inlined styles; `multipart/alternative`; PNG fallback for SVG
+|Writers complete: `.dotx`/`.ott` per layout as base of styles, headers and
+footers; image sizes from the template; SVG with PNG fallback; `rowspan`;
+`multipart/alternative`
 |Every format passes its automated checks; DOCX also passes Word's
 accessibility checker
 |

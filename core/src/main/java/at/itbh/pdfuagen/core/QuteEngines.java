@@ -34,6 +34,7 @@ final class QuteEngines {
 
   static final String XHTML = "application/xhtml+xml";
   static final Variant XHTML_VARIANT = Variant.forContentType(XHTML);
+  static final Variant TEXT_VARIANT = Variant.forContentType(Variant.TEXT_PLAIN);
 
   private QuteEngines() {}
 
@@ -88,7 +89,8 @@ final class QuteEngines {
 
                       @Override
                       public Optional<Variant> getVariant() {
-                        return Optional.of(XHTML_VARIANT);
+                        // Plain-text templates (<name>.txt) are not HTML-escaped.
+                        return Optional.of(id.endsWith(".txt") ? TEXT_VARIANT : XHTML_VARIANT);
                       }
                     });
   }

@@ -52,6 +52,13 @@ for a template with free CSS.
 template uses but the data lacks, or rendered output that is not well-formed
 XHTML.
 
+|`urn:itbh:pdf-ua-generator:problem:accessibility`
+|422
+|The rendered document violates an accessibility rule: no title or language,
+a skipped heading level, an empty heading, an informative image without alt
+text, a table without header cells, or a link without text. See
+xref:reference/building-blocks.adoc#_accessibility_rules[Accessibility rules].
+
 |`urn:itbh:pdf-ua-generator:problem:resource-rejected`
 |422
 |A resource the template references is not allowed or not available: a

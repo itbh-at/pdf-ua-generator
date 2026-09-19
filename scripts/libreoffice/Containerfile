@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Headless LibreOffice for the format check (scripts/check-formats.sh): exports
+# the generated DOCX and ODT as PDF/UA, which veraPDF then validates. Used only
+# for checks, never at runtime.
+FROM registry.fedoraproject.org/fedora-minimal:44
+RUN dnf -y install --setopt=install_weak_deps=False libreoffice-writer libreoffice-langpack-de \
+        google-noto-sans-fonts \
+    && dnf clean all
+ENTRYPOINT ["soffice", "--headless", "--norestore"]

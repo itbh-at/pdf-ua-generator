@@ -29,7 +29,10 @@ class DemoTemplateTest {
       data = JsonData.parse(in);
     }
     return new RenderRequest(
-        "demo.xhtml", new DirectoryTemplateRepository(DEMO, List.of()), data, Map.of());
+        "demo.xhtml",
+        new DirectoryTemplateRepository(DEMO, List.of()),
+        data,
+        Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));
   }
 
   @Test

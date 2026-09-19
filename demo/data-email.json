@@ -1,0 +1,31 @@
+{
+  "customer": {
+    "name": "Jane Doe"
+  },
+  "items": [
+    "First bullet item",
+    "Second bullet item",
+    "Third bullet item"
+  ],
+  "order": {
+    "number": "2026-0042",
+    "positions": [
+      {
+        "name": "Consulting",
+        "quantity": 8,
+        "price": "960.00"
+      },
+      {
+        "name": "Workshop",
+        "quantity": 1,
+        "price": "1,450.00"
+      },
+      {
+        "name": "Travel expenses",
+        "quantity": 1,
+        "price": "84.50"
+      }
+    ],
+    "total": "2,494.50"
+  }
+}

@@ -13,7 +13,7 @@ import picocli.CommandLine.Command;
     name = "pdf-ua-generator",
     mixinStandardHelpOptions = true,
     versionProvider = Main.VersionProvider.class,
-    subcommands = RenderCommand.class,
+    subcommands = {RenderCommand.class, VerifyCommand.class},
     description = "Renders Qute templates with JSON data into accessible documents.")
 public final class Main implements Runnable {
 

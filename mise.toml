@@ -11,6 +11,7 @@
 #   mise run fmt            # format the Java sources (Google Java Style)
 #   mise run setup-hooks    # once per clone: pre-commit checks the formatting
 #   mise run bench          # render benchmark (JMH)
+#   mise run check-formats  # render the demo in every format and check each result
 #   mise run docs           # build the Antora docs (documentation/build/site)
 #   mise run docs-watch     # live preview of the docs
 #   mise run headers        # apply the SPDX licence headers
@@ -27,6 +28,10 @@ node = "24"                 # runtime for the Antora docs (documentation/build.s
 watchexec = "2.5.1"         # file-event watcher for `docs-watch`
 "npm:browser-sync" = "3.0.4"  # live-preview server for `docs-watch`
 "ubi:korandoru/hawkeye" = "6.5.1"  # licence-header tool; see licenserc.toml
+# Accessibility check of the HTML outputs (scripts/axe-check.mjs); libraries,
+# not CLIs — the script resolves them through `mise where`.
+"npm:axe-core" = "4.13.0"
+"npm:jsdom" = "30.1.0"
 
 [tasks.build]
 description = "Compile, test and package all modules"
@@ -47,6 +52,10 @@ run = "mvn -B -ntp -q spotless:check"
 [tasks.setup-hooks]
 description = "Use the checked-in git hooks (pre-commit refuses unformatted Java sources)"
 run = "git config core.hooksPath .githooks"
+
+[tasks.check-formats]
+description = "Render the demo in every format and check each (veraPDF, axe-core, ODF validator, LibreOffice)"
+run = "./scripts/check-formats.sh"
 
 [tasks.bench]
 description = "Render benchmark (JMH): cold and warm, per format"

@@ -40,8 +40,11 @@ final class SelfContainedXhtml {
     return all;
   }
 
+  static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+
   void inline(Document document) {
     removeAll(document, "bookmarks");
+    toXhtmlNamespace(document);
     for (Element img : elements(document, "img")) {
       String src = img.getAttribute("src");
       if (!src.isEmpty()) {
@@ -147,11 +150,25 @@ final class SelfContainedXhtml {
     for (int i = 0; i < all.getLength(); i++) {
       Element element = (Element) all.item(i);
       String name = element.getLocalName() != null ? element.getLocalName() : element.getTagName();
-      if (name.equalsIgnoreCase(localName)) {
+      if (localName.equals("*") || name.equalsIgnoreCase(localName)) {
         result.add(element);
       }
     }
     return result;
+  }
+
+  /**
+   * Puts elements without a namespace into the XHTML namespace; otherwise a browser reading the
+   * output as {@code application/xhtml+xml} treats it as plain XML.
+   */
+  private static void toXhtmlNamespace(Document document) {
+    for (Element element : elements(document, "*")) {
+      if (element.getNamespaceURI() == null) {
+        String name =
+            element.getLocalName() != null ? element.getLocalName() : element.getTagName();
+        document.renameNode(element, XHTML_NAMESPACE, name);
+      }
+    }
   }
 
   private static void removeAll(Document document, String localName) {

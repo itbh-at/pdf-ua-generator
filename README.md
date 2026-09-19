@@ -5,17 +5,20 @@ documents: PDF/UA, XHTML, email HTML, DOCX, ODT and plain text. Available as a
 command-line tool and as a REST service.
 
 > **Status:** being rebuilt on the branch `epic/rebuild`. The command-line
-> tool renders PDF and XHTML; the REST service follows in phase 3. See the
+> tool renders every format; the REST service follows in phase 3. See the
 > roadmap in the documentation.
 
 ## Usage
 
 ```bash
-pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json --verify
+pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png --verify
+pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png -f docx
 ```
 
-Renders `demo/demo.xhtml` with the data from `demo/data.json` into
-`demo/demo.pdf` and checks it against PDF/UA-1. The distribution
+The first command renders `demo/demo.xhtml` with the data from
+`demo/data.json` and the attached photo into `demo/demo.pdf` and checks it
+against PDF/UA-1; the second writes `demo/demo.docx`. Formats: `pdf`, `xhtml`,
+`email-html`, `text`, `docx`, `odt`. The distribution
 `cli/target/pdf-ua-generator-<version>.zip` contains the launcher
 `bin/pdf-ua-generator`.
 
@@ -27,6 +30,7 @@ All toolchains are pinned in `mise.toml`.
 mise install          # JDK, Maven, Antora, …
 mise run setup-hooks  # once per clone: refuse commits with unformatted code
 mise run build        # compile, test and package all modules
+mise run check-formats  # render the demo in every format and check each
 mise run docs         # build the documentation into documentation/build/site
 ```
 

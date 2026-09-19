@@ -5,8 +5,12 @@
 
 * xref:index.adoc[Start here]
 
+.How-to
+* xref:how-to/check-output-formats.adoc[Check the output formats]
+
 .Reference
 * xref:reference/cli.adoc[Command line]
+* xref:reference/building-blocks.adoc[Template building blocks]
 * xref:reference/problem-types.adoc[Problem types]
 
 .Explanation

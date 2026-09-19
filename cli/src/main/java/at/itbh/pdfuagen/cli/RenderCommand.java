@@ -14,10 +14,13 @@ import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
 import at.itbh.pdfuagen.core.RenderRequest;
 import at.itbh.pdfuagen.core.Rendered;
+import at.itbh.pdfuagen.core.ResourceFetcher;
+import at.itbh.pdfuagen.core.ResourceLimits;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.URI;
 import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -25,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -83,15 +88,24 @@ final class RenderCommand implements Callable<Integer> {
       names = {"-f", "--format"},
       defaultValue = "pdf",
       paramLabel = "<format>",
+      converter = FormatConverter.class,
+      completionCandidates = FormatCandidates.class,
       description = "Output format: ${COMPLETION-CANDIDATES}. Default: ${DEFAULT-VALUE}.")
   Format format;
+
+  @Option(
+      names = "--public-base-url",
+      paramLabel = "<url>",
+      description =
+          "Base of the public asset URLs (<url>/assets/<sha256>) for images in email-html.")
+  URI publicBaseUrl;
 
   @Option(
       names = {"-o", "--output"},
       paramLabel = "<file|->",
       description =
-          "Output file; '-' writes to stdout. Default: next to the template, <name>.pdf or"
-              + " <name>.rendered.xhtml.")
+          "Output file; '-' writes to stdout. Default: next to the template, <name>.pdf,"
+              + " .rendered.xhtml, .email.html, .rendered.txt, .docx or .odt.")
   String output;
 
   @Option(
@@ -105,17 +119,40 @@ final class RenderCommand implements Callable<Integer> {
   boolean watch;
 
   enum Format {
-    pdf(OutputFormat.PDF),
-    xhtml(OutputFormat.XHTML);
+    pdf(OutputFormat.PDF, ".pdf"),
+    xhtml(OutputFormat.XHTML, ".rendered.xhtml"),
+    email_html(OutputFormat.EMAIL_HTML, ".email.html"),
+    text(OutputFormat.TEXT, ".rendered.txt"),
+    docx(OutputFormat.DOCX, ".docx"),
+    odt(OutputFormat.ODT, ".odt");
 
     final OutputFormat outputFormat;
+    final String suffix;
 
-    Format(OutputFormat outputFormat) {
+    Format(OutputFormat outputFormat, String suffix) {
       this.outputFormat = outputFormat;
+      this.suffix = suffix;
     }
   }
 
-  private final DocumentRenderer renderer = new DocumentRenderer();
+  /** Accepts the format names with a hyphen ({@code email-html}). */
+  static final class FormatConverter implements CommandLine.ITypeConverter<Format> {
+    @Override
+    public Format convert(String value) {
+      return Format.valueOf(value.strip().toLowerCase(java.util.Locale.ROOT).replace('-', '_'));
+    }
+  }
+
+  static final class FormatCandidates implements Iterable<String> {
+    @Override
+    public java.util.Iterator<String> iterator() {
+      return java.util.Arrays.stream(Format.values())
+          .map(f -> f.name().replace('_', '-'))
+          .iterator();
+    }
+  }
+
+  private DocumentRenderer renderer;
 
   @Override
   public Integer call() throws Exception {
@@ -127,6 +164,9 @@ final class RenderCommand implements Callable<Integer> {
       throw new picocli.CommandLine.ParameterException(
           spec.commandLine(), "--watch cannot write to stdout");
     }
+    renderer =
+        new DocumentRenderer(
+            ResourceFetcher.NONE, ResourceLimits.DEFAULT, Duration.ofSeconds(30), publicBaseUrl);
     if (!watch) {
       return renderOnce();
     }
@@ -197,7 +237,7 @@ final class RenderCommand implements Callable<Integer> {
     String name = Path.of(templateId).getFileName().toString();
     int dot = name.lastIndexOf('.');
     String base = dot > 0 ? name.substring(0, dot) : name;
-    return root.resolve(format == Format.pdf ? base + ".pdf" : base + ".rendered.xhtml");
+    return root.resolve(base + format.suffix);
   }
 
   private static void write(byte[] content, Path path) throws IOException {

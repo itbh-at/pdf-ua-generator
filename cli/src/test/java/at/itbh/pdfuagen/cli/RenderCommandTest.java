@@ -40,7 +40,7 @@ class RenderCommandTest {
             "-t",
             DEMO.resolve("demo.xhtml").toString(),
             "-d",
-            DEMO.resolve("data.json").toString(),
+            DEMO.resolve("data-email.json").toString(),
             "-o",
             out.toString(),
             "--verify");
@@ -60,7 +60,7 @@ class RenderCommandTest {
             "-t",
             DEMO.resolve("demo.xhtml").toString(),
             "-d",
-            DEMO.resolve("data.json").toString(),
+            DEMO.resolve("data-email.json").toString(),
             "-f",
             "XHTML",
             "-o",
@@ -93,7 +93,60 @@ class RenderCommandTest {
             DEMO.resolve("demo.xhtml").toString(),
             "-o",
             tmp.resolve("x.pdf").toString()));
-    assertTrue(err.toString().contains("items"), err::toString);
+    assertTrue(err.toString().contains("not found"), err::toString);
+  }
+
+  @Test
+  void rendersOfficeAndTextFormats() throws Exception {
+    for (String format : new String[] {"docx", "odt", "text"}) {
+      Path out = tmp.resolve("demo." + format);
+      int exit =
+          run(
+              "render",
+              "-t",
+              DEMO.resolve("demo.xhtml").toString(),
+              "-d",
+              DEMO.resolve("data.json").toString(),
+              "-a",
+              "photo=" + DEMO.resolve("photo.png"),
+              "-f",
+              format,
+              "-o",
+              out.toString());
+      assertEquals(0, exit, err::toString);
+      assertTrue(Files.size(out) > 0);
+    }
+  }
+
+  @Test
+  void emailHtmlNeedsAPublicBaseUrlForAssets() {
+    String[] args = {
+      "render",
+      "-t",
+      DEMO.resolve("demo.xhtml").toString(),
+      "-d",
+      DEMO.resolve("data-email.json").toString(),
+      "-f",
+      "email-html",
+      "-o",
+      tmp.resolve("demo.html").toString()
+    };
+    assertEquals(1, run(args));
+    assertTrue(err.toString().contains("public base URL"), err::toString);
+  }
+
+  @Test
+  void verifyCommandChecksPdfFiles() throws Exception {
+    Path pdf = tmp.resolve("demo.pdf");
+    run(
+        "render",
+        "-t",
+        DEMO.resolve("demo.xhtml").toString(),
+        "-d",
+        DEMO.resolve("data-email.json").toString(),
+        "-o",
+        pdf.toString());
+    assertEquals(0, run("verify", pdf.toString()), err::toString);
   }
 
   @Test

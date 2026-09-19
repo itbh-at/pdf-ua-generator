@@ -18,6 +18,7 @@ includes = [
   "server/**",
   "mise.toml",
   ".githooks/**",
+  "scripts/**",
   "licenserc.toml",
   "documentation/build.sh",
   "documentation/*.yml",

@@ -93,9 +93,13 @@ plain text).
 - DOCX and ODT are produced from a format-neutral document model in `core`. The
   XHTML is translated into that model; the accessibility checker for DOCX and
   ODT runs on the model, once for both formats.
-- DOCX writer: `docx4j-core` with our own model-to-WordML code.
-  `docx4j-ImportXHTML` is not used.
-- ODT writer: no library — JDK StAX and `ZipOutputStream`, target ODF 1.3.
+- DOCX and ODT writers: no office library — JDK StAX and `ZipOutputStream`
+  (DOCX: WordprocessingML; ODT: ODF 1.3). No docx4j, no ODF Toolkit.
+- Running headers and footers come from the `@page` margin boxes of the
+  template CSS (strings, `counter(page)`, `counter(pages)`) and are written to
+  PDF, DOCX and ODT; anything else in their `content` is an error.
+- Decorative images (`alt=""` or `role="presentation"`) become CSS backgrounds
+  before PDF rendering, so openhtmltopdf marks them as artifacts.
 - The model supports a fixed set of building blocks only: headings,
   paragraphs, lists, tables with header rows, images (with alt text or marked
   decorative), links, `strong`/`em`, `lang` changes, page breaks, catalog
@@ -159,6 +163,9 @@ plain text).
   PDF/UA validation; a change that breaks this is a failing change.
 - veraPDF is a library dependency of `core` (used by the CLI `check` command and
   by the server when a template revision is published), not an external tool.
+- `mise run check-formats` renders the demo template in every format and checks
+  each (veraPDF, axe-core, ODF validator, LibreOffice export as PDF/UA). It
+  must pass after every change to rendering or a writer.
 - Demo and test templates use semantic XHTML: `lang` attribute, document title,
   heading hierarchy, `alt` on images, `th`/`scope` on tables, embedded fonts.
 
@@ -196,14 +203,16 @@ old-school senior developer: direct and minimal.
 
 ## Toolchain — mise only
 
-- **All** toolchains and dev tools (JDK, Maven, Node, Antora, Helm, …) are
-  pinned in `mise.toml` and used through `mise`. No SDKMAN, no system JDK, no
+- **All** toolchains and dev tools (JDK, Maven, Node, Antora, Helm, axe-core,
+  …) are pinned in `mise.toml` and used through `mise`. No SDKMAN, no system JDK, no
   `./mvnw`.
 - `mise run <task>` when a task exists (the list is in `mise.toml`), otherwise
   `mise exec -- <cmd>`.
 - Use mise inside container images too (same `mise.toml`), not an
   `eclipse-temurin:`/`maven:` base image.
-- Not managed by mise, and therefore a host prerequisite: `podman`.
+- Not managed by mise, and therefore a host prerequisite: `podman`. LibreOffice
+  for the format check runs in a podman image
+  (`scripts/libreoffice/Containerfile`), never from the host.
 
 ## Documentation
 

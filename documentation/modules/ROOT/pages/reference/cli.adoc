@@ -45,8 +45,8 @@ Renders a template with JSON data into a document.
 
 ----
 pdf-ua-generator render -t <file|dir> [-d <file|->] [-a <name>=<file>]...
-                        [-I <dir>]... [-f pdf|xhtml] [-o <file|->]
-                        [--verify] [-w]
+                        [-I <dir>]... [-f <format>] [-o <file|->]
+                        [--public-base-url <url>] [--verify] [-w]
 ----
 
 [cols="2,5",options="header"]
@@ -70,12 +70,26 @@ template directory. Repeatable.
 Repeatable.
 
 |`-f`, `--format <format>`
-|`pdf` (default) or `xhtml`. XHTML output is self-contained: images, fonts and
-stylesheets are embedded as data URIs.
+a|One of:
+
+* `pdf` (default) — PDF/UA-1
+* `xhtml` — self-contained: images, fonts and stylesheets embedded as data URIs
+* `email-html` — styles from `email.css` inlined, absolute image URLs
+* `text` — plain text; a template `<name>.txt` next to the template replaces
+  the generated text
+* `docx`, `odt`
+
+DOCX, ODT, email HTML and text accept only the
+xref:reference/building-blocks.adoc[building blocks].
 
 |`-o`, `--output <file\|->`
 |Output file; `-` writes to stdout. Default: next to the template, as
-`<name>.pdf` or `<name>.rendered.xhtml`.
+`<name>.pdf`, `.rendered.xhtml`, `.email.html`, `.rendered.txt`, `.docx` or
+`.odt`.
+
+|`--public-base-url <url>`
+|Base of the public URLs of template assets in email HTML:
+`<url>/assets/<sha256>`.
 
 |`--verify`
 |Validate the PDF against PDF/UA-1 with veraPDF and fail if it does not
@@ -109,8 +123,19 @@ Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
 === Example
 
 ----
-pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json --verify
+pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png --verify
 ----
+
+== `verify`
+
+Validates PDF files against PDF/UA-1 with veraPDF.
+
+----
+pdf-ua-generator verify <pdf>...
+----
+
+Exit code `0` if every file conforms, `1` otherwise; the failed rules are
+printed to stderr.
 
 == Resources a template may use
 

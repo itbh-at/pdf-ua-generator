@@ -5,6 +5,15 @@
 
 package at.itbh.pdfuagen.core;
 
+import at.itbh.pdfuagen.core.model.AccessibilityChecker;
+import at.itbh.pdfuagen.core.model.DocumentModel;
+import at.itbh.pdfuagen.core.model.ModelBuilder;
+import at.itbh.pdfuagen.core.model.PageBoxes;
+import at.itbh.pdfuagen.core.writer.CssRules;
+import at.itbh.pdfuagen.core.writer.DocxWriter;
+import at.itbh.pdfuagen.core.writer.EmailHtmlWriter;
+import at.itbh.pdfuagen.core.writer.OdtWriter;
+import at.itbh.pdfuagen.core.writer.TextWriter;
 import com.openhtmltopdf.extend.FSCacheEx;
 import com.openhtmltopdf.extend.FSCacheValue;
 import com.openhtmltopdf.extend.impl.FSDefaultCacheStore;
@@ -21,12 +30,17 @@ import io.quarkus.qute.Template;
 import io.quarkus.qute.TemplateException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.WeakHashMap;
 import java.util.logging.Level;
 import org.w3c.dom.Document;
@@ -68,9 +82,13 @@ public final class DocumentRenderer {
 
   private record RepositoryState(Engine engine, FSCacheEx<String, FSCacheValue> fontMetrics) {}
 
+  /** Stylesheet a layout provides for email HTML. */
+  public static final String EMAIL_CSS = "email.css";
+
   private final ResourceFetcher fetcher;
   private final ResourceLimits limits;
   private final Duration timeout;
+  private final URI publicBaseUrl;
   private final Map<TemplateRepository, RepositoryState> states =
       Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -80,9 +98,19 @@ public final class DocumentRenderer {
   }
 
   public DocumentRenderer(ResourceFetcher fetcher, ResourceLimits limits, Duration timeout) {
+    this(fetcher, limits, timeout, null);
+  }
+
+  /**
+   * @param publicBaseUrl base of the public asset URLs ({@code <base>/assets/<sha256>}) used in
+   *     email HTML, or {@code null} if template assets cannot be referenced publicly
+   */
+  public DocumentRenderer(
+      ResourceFetcher fetcher, ResourceLimits limits, Duration timeout, URI publicBaseUrl) {
     this.fetcher = fetcher;
     this.limits = limits;
     this.timeout = timeout;
+    this.publicBaseUrl = publicBaseUrl;
   }
 
   /** Renders the template with Qute only; the result is the XHTML every format starts from. */
@@ -110,11 +138,186 @@ public final class DocumentRenderer {
     return switch (format) {
       case PDF -> renderPdf(request, document, resolver);
       case XHTML -> renderXhtml(document, resolver);
+      case TEXT -> renderText(request, document, resolver);
+      case EMAIL_HTML -> renderEmail(request, document, resolver);
+      case DOCX, ODT -> renderOffice(format, document, resolver);
     };
+  }
+
+  /** Builds and checks the format-neutral model that DOCX, ODT, text and email are written from. */
+  private static DocumentModel model(Document document, ResourceResolver resolver)
+      throws RenderException {
+    List<Problem> problems = new ArrayList<>();
+    ModelBuilder builder =
+        new ModelBuilder(
+            reference -> {
+              String uri = resolver.resolveUri(ResourceResolver.BASE, reference);
+              if (uri == null
+                  || !resolver.allow(
+                      uri,
+                      com.openhtmltopdf.outputdevice.helper.ExternalResourceType.IMAGE_RASTER)) {
+                return Optional.empty();
+              }
+              return resolver
+                  .load(uri)
+                  .flatMap(
+                      r -> {
+                        if (r.kind().mediaType == null) {
+                          problems.add(
+                              new Problem(
+                                  Problem.IMAGE_REJECTED,
+                                  "only PNG, JPEG and SVG images are allowed",
+                                  uri));
+                          return Optional.empty();
+                        }
+                        return Optional.of(
+                            new ModelBuilder.LoadedImage(uri, r.bytes(), r.kind().mediaType));
+                      });
+            });
+    DocumentModel model = builder.build(document);
+    PageBoxes.Result pageBoxes = PageBoxes.parse(stylesheets(document, resolver));
+    model = model.withPageBoxes(pageBoxes.header(), pageBoxes.footer());
+    problems.addAll(pageBoxes.problems());
+    problems.addAll(resolver.problems());
+    problems.addAll(builder.problems());
+    problems.addAll(AccessibilityChecker.check(model));
+    failOnProblems(problems);
+    return model;
+  }
+
+  /** The text of all stylesheets of the document: {@code <style>} and linked template CSS. */
+  private static String stylesheets(Document document, ResourceResolver resolver) {
+    StringBuilder css = new StringBuilder();
+    org.w3c.dom.NodeList all = document.getElementsByTagName("*");
+    for (int i = 0; i < all.getLength(); i++) {
+      org.w3c.dom.Element element = (org.w3c.dom.Element) all.item(i);
+      String name =
+          (element.getLocalName() != null ? element.getLocalName() : element.getTagName())
+              .toLowerCase(java.util.Locale.ROOT);
+      if (name.equals("style")) {
+        css.append(element.getTextContent()).append('\n');
+      } else if (name.equals("link")
+          && "stylesheet".equalsIgnoreCase(element.getAttribute("rel").strip())) {
+        String uri = resolver.resolveUri(ResourceResolver.BASE, element.getAttribute("href"));
+        if (uri != null) {
+          resolver
+              .load(uri)
+              .ifPresent(
+                  r -> css.append(new String(r.bytes(), StandardCharsets.UTF_8)).append('\n'));
+        }
+      }
+    }
+    return css.toString();
+  }
+
+  private Rendered renderOffice(OutputFormat format, Document document, ResourceResolver resolver)
+      throws RenderException {
+    DocumentModel model = model(document, resolver);
+    try {
+      byte[] bytes = format == OutputFormat.DOCX ? DocxWriter.write(model) : OdtWriter.write(model);
+      return new Rendered(format, bytes, List.of());
+    } catch (IOException e) {
+      throw new RenderException(
+          new Problem(
+              Problem.TEMPLATE_ERROR, format + " cannot be written: " + e.getMessage(), null),
+          e);
+    }
+  }
+
+  private Rendered renderText(RenderRequest request, Document document, ResourceResolver resolver)
+      throws RenderException {
+    // A template may provide its own plain-text version: <name>.txt next to <name>.xhtml.
+    String textId = textTemplateId(request.templateId());
+    if (request.repository().template(textId).isPresent()) {
+      String text =
+          renderSource(
+              new RenderRequest(
+                  textId, request.repository(), request.data(), request.attachments()));
+      return new Rendered(OutputFormat.TEXT, text.getBytes(StandardCharsets.UTF_8), List.of());
+    }
+    DocumentModel model = model(document, resolver);
+    return new Rendered(
+        OutputFormat.TEXT, TextWriter.write(model).getBytes(StandardCharsets.UTF_8), List.of());
+  }
+
+  private Rendered renderEmail(RenderRequest request, Document document, ResourceResolver resolver)
+      throws RenderException {
+    Optional<byte[]> cssBytes = request.repository().resource(EMAIL_CSS);
+    if (cssBytes.isEmpty()) {
+      throw new RenderException(
+          List.of(
+              new Problem(
+                  Problem.TEMPLATE_ERROR,
+                  "the template provides no " + EMAIL_CSS + " for email HTML",
+                  request.templateId())));
+    }
+    DocumentModel model = model(document, resolver);
+    List<Problem> problems = new ArrayList<>();
+    String html;
+    try {
+      html =
+          EmailHtmlWriter.write(
+              model,
+              CssRules.parse(new String(cssBytes.get(), StandardCharsets.UTF_8)),
+              image -> publicUrl(image, problems));
+    } catch (IOException e) {
+      throw new RenderException(
+          new Problem(
+              Problem.TEMPLATE_ERROR, "email HTML cannot be written: " + e.getMessage(), null),
+          e);
+    }
+    failOnProblems(problems);
+    return new Rendered(OutputFormat.EMAIL_HTML, html.getBytes(StandardCharsets.UTF_8), List.of());
+  }
+
+  /**
+   * Public URL of an image in email HTML: template assets at {@code <base>/assets/<sha256>} (SVG as
+   * a PNG rendition, {@code .png}, since many mail clients do not show SVG), external URLs
+   * unchanged. Request attachments have no public URL.
+   */
+  private String publicUrl(DocumentModel.Image image, List<Problem> problems) {
+    String source = image.source();
+    if (source.startsWith("https:")) {
+      return source;
+    }
+    if (source.startsWith("attachment:")) {
+      problems.add(
+          new Problem(
+              Problem.RESOURCE_REJECTED,
+              "attachments cannot be used in email HTML; pass an external URL instead",
+              source));
+      return "";
+    }
+    if (publicBaseUrl == null) {
+      problems.add(
+          new Problem(
+              Problem.RESOURCE_REJECTED,
+              "template assets in email HTML need a public base URL",
+              source));
+      return "";
+    }
+    String base = publicBaseUrl.toString().replaceAll("/+$", "");
+    String suffix = "image/svg+xml".equals(image.mediaType()) ? ".png" : "";
+    return base + "/assets/" + sha256(image.bytes()) + suffix;
+  }
+
+  static String sha256(byte[] bytes) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  static String textTemplateId(String templateId) {
+    int dot = templateId.lastIndexOf('.');
+    int slash = templateId.lastIndexOf('/');
+    return (dot > slash ? templateId.substring(0, dot) : templateId) + ".txt";
   }
 
   private Rendered renderPdf(RenderRequest request, Document document, ResourceResolver resolver)
       throws RenderException {
+    DecorativeImages.toBackgrounds(document, resolver);
     List<String> warnings = new ArrayList<>();
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     PdfRendererBuilder builder =

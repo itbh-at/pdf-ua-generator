@@ -145,9 +145,25 @@ DOCX and ODT carry the same content, structure and named styles as the PDF,
 but not a pixel-identical layout: page breaks and spacing are decided by Word
 and LibreOffice.
 
-The DOCX writer is our own code on `docx4j-core`. `docx4j-ImportXHTML` is not
-used: it is tied to an old openhtmltopdf release, and its handling of headings,
-alt texts and table headers is undocumented.
+The DOCX and ODT writers are our own code on JDK StAX and ZIP, without an office
+library. Both formats are ZIP files with a handful of XML parts, and the
+translation from the model is our own code in any case. `docx4j-core` would add
+about 25 libraries and a slow start of its XML binding; `docx4j-ImportXHTML` is
+tied to an old openhtmltopdf release and says nothing about headings, alt texts
+or table headers.
+
+Running headers and footers with page numbers come from the `@page` margin
+boxes of the template CSS (`content: counter(page) " / " counter(pages)`), so
+one declaration serves PDF, DOCX and ODT.
+
+PDF/UA requires decorative images to be artifacts, but openhtmltopdf tags every
+`<img>` as a figure. Before PDF rendering, decorative images are therefore
+replaced by elements that show the image as a background, which openhtmltopdf
+marks as an artifact.
+
+Every format is checked automatically (`mise run check-formats`): veraPDF for
+the PDF, axe-core for the HTML outputs, the ODF validator for ODT, and
+LibreOffice exports DOCX and ODT as PDF/UA for veraPDF.
 
 == Images
 
@@ -155,7 +171,8 @@ Images are PNG, JPEG or SVG. They come from three places:
 
 * *Template assets* (logo, icons) belong to a revision, are stored once per
   content hash and are served publicly at `+/assets/{sha256}+`, so email HTML can
-  reference them.
+  reference them. SVG assets are also served as a PNG rendition
+  (`+/assets/{sha256}.png+`), since many mail clients do not display SVG.
 * *Request attachments* are sent as parts of a `multipart/form-data` request;
   the JSON refers to the part and carries the alt text.
 * *External URLs* are accepted only from a configured list of hosts. For email

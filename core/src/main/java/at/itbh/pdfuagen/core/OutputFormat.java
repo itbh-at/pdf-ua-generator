@@ -12,7 +12,19 @@ public enum OutputFormat {
   PDF("application/pdf", "pdf"),
 
   /** Self-contained XHTML: images, fonts and stylesheets embedded as data URIs. */
-  XHTML("application/xhtml+xml", "xhtml");
+  XHTML("application/xhtml+xml", "xhtml"),
+
+  /** HTML for email bodies: inlined styles from {@code email.css}, absolute image URLs. */
+  EMAIL_HTML("text/html", "html"),
+
+  /** Plain text, UTF-8, wrapped at 72 characters. */
+  TEXT("text/plain", "txt"),
+
+  /** WordprocessingML. */
+  DOCX("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
+
+  /** OpenDocument text, ODF 1.3. */
+  ODT("application/vnd.oasis.opendocument.text", "odt");
 
   private final String mediaType;
   private final String extension;

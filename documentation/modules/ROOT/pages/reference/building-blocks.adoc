@@ -1,0 +1,139 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Template building blocks
+:description: The XHTML elements, data-block markers, page boxes and stylesheets a template may use, and what each becomes in every output format.
+
+DOCX, ODT, email HTML and plain text are written from a format-neutral document
+model. The model knows a fixed set of building blocks; an element outside this
+set is an error (`template-error`), never silently approximated. PDF and XHTML
+are rendered from the XHTML directly.
+
+== Blocks
+
+[cols="2,3,3",options="header"]
+|===
+|XHTML |DOCX / ODT |Email HTML / text
+
+|`<h1>`…`<h6>` (optional `id`, `class`)
+|Heading styles with outline level; `id` becomes a bookmark
+|`<h1>`…`<h6>` / underlined heading
+
+|`<p>` (optional `class`)
+|Paragraph; `class` becomes a paragraph style of the same name
+|`<p>` with inlined style / wrapped paragraph
+
+|`<ul>`, `<ol>`, `<li>` (nested)
+|Real lists (Word numbering, ODF list styles)
+|Lists / `-` and `1.`
+
+|`<table>` with `<caption>`, `<thead>`, `<tbody>`, `<tfoot>`, `<th>`, `<td>`, `colspan`
+|Table with repeating header rows; the caption also becomes the table title.
+`rowspan` is not supported.
+|Table with `scope` on header cells / aligned columns
+
+|`<img src alt>`
+|Image with alt text
+|`<img>` with absolute URL / `[alt text]`
+
+|`<img alt="">` or `role="presentation"`
+|Image marked decorative
+|`<img alt="" role="presentation">` / omitted
+
+|`<div data-block="columns">` with `<div data-block="col">` children
+|Layout table without header
+|Table with `role="presentation"` / columns one after the other
+
+|`<div data-block="box" class="…">`
+|Framed, shaded layout table
+|Framed table cell / lines prefixed with `\|`
+
+|`<div data-block="page-break">`
+|Page break
+|Nothing
+
+|`<div>` without `data-block`
+|Transparent: its content is used as if the `<div>` were not there
+|Same
+|===
+
+== Text
+
+[cols="2,3",options="header"]
+|===
+|XHTML |Meaning
+
+|`<strong>`, `<b>`, `<em>`, `<i>`
+|Strong and emphasised text
+
+|`<span class="…">`
+|Catalog character style
+
+|`<span lang="de-AT">`
+|Language change; screen readers switch pronunciation
+
+|`<a href="https://…">`, `<a href="#id">`
+|External link, or link to a heading with that `id`
+
+|`<br/>`
+|Line break
+
+|`<span data-block="footnote">…</span>`
+|Footnote. For PDF, style it with `float: footnote` (see the demo template).
+|===
+
+== Accessibility rules
+
+Checked on the model for DOCX, ODT, email HTML and plain text (problem type
+`accessibility`); for PDF, veraPDF checks the result.
+
+* The document has a `<title>` and a `lang` attribute on `<html>`.
+* Heading levels are not skipped (no `<h3>` directly after `<h1>`), and no
+  heading is empty.
+* Every informative image has a non-empty `alt`; decorative images have
+  `alt=""` or `role="presentation"`.
+* Every table has header cells.
+* Every link has text.
+
+== Decorative images in PDF
+
+PDF/UA requires decorative images to be artifacts. Before PDF rendering, every
+decorative `<img>` is replaced by a `<span>` showing the image as a background,
+which the PDF renderer marks as an artifact. The span keeps `id`, `class` and
+`style`, so style decorative images with class selectors (`.divider`), not
+element selectors (`img.divider`).
+
+== Page headers and footers
+
+Running headers and footers come from the margin boxes of the `@page` rule and
+appear in PDF, DOCX and ODT:
+
+[source,css]
+----
+@page {
+  @top-left     { content: "Order confirmation"; }
+  @bottom-right { content: counter(page) " / " counter(pages); }
+}
+----
+
+Supported boxes: `top-left`, `top-center`, `top-right`, `bottom-left`,
+`bottom-center`, `bottom-right`. Supported content: strings, `counter(page)`
+and `counter(pages)`. Anything else is an error for DOCX and ODT. Rules with a
+page selector (`@page :first`) apply to PDF only.
+
+== Stylesheet for email HTML
+
+Email HTML needs a stylesheet `email.css` next to the template. Its rules are
+inlined into `style` attributes; only element (`p`), class (`.lead`) and
+element-with-class (`td.box`) selectors are used. Boxes are styled as
+`td.box`, columns as `td.col` and `table.columns`, the footnote list as
+`ol.footnotes`.
+
+Images in email HTML need a public URL:
+
+* template assets: `<public-base-url>/assets/<sha256>`; SVG as a PNG rendition
+  `<sha256>.png`, since many mail clients do not display SVG;
+* external `https` URLs: unchanged;
+* request attachments: not possible — an error.

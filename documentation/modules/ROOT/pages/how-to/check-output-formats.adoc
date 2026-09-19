@@ -1,0 +1,56 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Check the output formats
+:description: Render the demo template in every format and run the automated accessibility and conformance checks.
+
+Use this after changing the renderer, a writer or the demo template.
+
+. Build the tool:
++
+----
+mise run build
+----
+
+. Run the checks:
++
+----
+mise run check-formats
+----
++
+The first run builds a podman image with LibreOffice
+(`localhost/pdf-ua-generator-libreoffice`), which takes a few minutes.
+
+. Read the result. Each step prints one line per file; the run ends with
+`check-formats: all formats passed` or `check-formats: FAILED`. The rendered
+files and the PDFs LibreOffice exported are in `target/formats/`.
+
+[cols="1,3",options="header"]
+|===
+|Step |What it checks
+
+|PDF/UA (veraPDF)
+|`demo.pdf` conforms to PDF/UA-1.
+
+|HTML accessibility (axe-core)
+|`demo.xhtml` and `demo.email.html` have no violations of the WCAG 2.2 A/AA
+rules and axe best practices. Colour contrast and landmark regions are not
+checked: jsdom does not lay out pages, and letters need no landmarks.
+
+|ODF schema (odfvalidator)
+|`demo.odt` conforms to the ODF 1.3 schema (extended conformance, because the
+decorative flag is a LibreOffice extension).
+
+|DOCX and ODT via LibreOffice
+|LibreOffice exports `demo.docx` and `demo.odt` as PDF/UA; veraPDF validates
+the result. This shows that headings, alt texts, table headers, links and
+decorative images survive in a form an office suite understands.
+|===
+
+A PDF of your own can be checked with:
+
+----
+pdf-ua-generator verify <file.pdf>
+----

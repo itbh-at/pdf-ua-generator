@@ -1,3 +1,14 @@
 {
-  "items": ["First bullet item", "Second bullet item", "Third bullet item"]
+  "customer": { "name": "Jane Doe" },
+  "items": ["First bullet item", "Second bullet item", "Third bullet item"],
+  "photo": { "alt": "Illustration of green hills under a blue sky with a yellow sun" },
+  "order": {
+    "number": "2026-0042",
+    "positions": [
+      { "name": "Consulting", "quantity": 8, "price": "960.00" },
+      { "name": "Workshop", "quantity": 1, "price": "1,450.00" },
+      { "name": "Travel expenses", "quantity": 1, "price": "84.50" }
+    ],
+    "total": "2,494.50"
+  }
 }
