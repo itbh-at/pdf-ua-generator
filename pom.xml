@@ -44,12 +44,25 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.39.4</quarkus.platform.version>
         <picocli.version>4.7.7</picocli.version>
+        <openhtmltopdf.version>1.1.86</openhtmltopdf.version>
+        <!-- Newer than the versions openhtmltopdf declares; pinned for fixes. -->
+        <pdfbox.version>3.0.8</pdfbox.version>
+        <pdfbox-graphics2d.version>3.0.5</pdfbox-graphics2d.version>
+        <batik.version>1.19</batik.version>
+        <xmlgraphics-commons.version>2.11</xmlgraphics-commons.version>
+        <verapdf.version>1.30.2</verapdf.version>
+        <jmh.version>1.37</jmh.version>
 
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.0</surefire-plugin.version>
         <jar-plugin.version>3.5.1</jar-plugin.version>
         <dependency-plugin.version>3.11.0</dependency-plugin.version>
         <enforcer-plugin.version>3.6.3</enforcer-plugin.version>
+        <assembly-plugin.version>3.8.0</assembly-plugin.version>
+        <antrun-plugin.version>3.2.0</antrun-plugin.version>
+        <license-plugin.version>2.7.1</license-plugin.version>
+        <spotless-plugin.version>3.10.2</spotless-plugin.version>
+        <google-java-format.version>1.36.1</google-java-format.version>
     </properties>
 
     <dependencyManagement>
@@ -71,6 +84,77 @@
                 <groupId>info.picocli</groupId>
                 <artifactId>picocli</artifactId>
                 <version>${picocli.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-core</artifactId>
+                <version>${openhtmltopdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-pdfbox</artifactId>
+                <version>${openhtmltopdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.openhtmltopdf</groupId>
+                <artifactId>openhtmltopdf-svg-support</artifactId>
+                <version>${openhtmltopdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>pdfbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>xmpbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>de.rototor.pdfbox</groupId>
+                <artifactId>graphics2d</artifactId>
+                <version>${pdfbox-graphics2d.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.xmlgraphics</groupId>
+                <artifactId>batik-transcoder</artifactId>
+                <version>${batik.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.xmlgraphics</groupId>
+                <artifactId>batik-codec</artifactId>
+                <version>${batik.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.xmlgraphics</groupId>
+                <artifactId>batik-ext</artifactId>
+                <version>${batik.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.xmlgraphics</groupId>
+                <artifactId>xmlgraphics-commons</artifactId>
+                <version>${xmlgraphics-commons.version}</version>
+            </dependency>
+            <!-- PDFBox and xmlgraphics-commons disagree; take the newer one. -->
+            <dependency>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+                <version>1.4.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.verapdf</groupId>
+                <artifactId>validation-model-jakarta</artifactId>
+                <version>${verapdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-core</artifactId>
+                <version>${jmh.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjdk.jmh</groupId>
+                <artifactId>jmh-generator-annprocess</artifactId>
+                <version>${jmh.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -98,6 +182,39 @@
                     <version>${dependency-plugin.version}</version>
                 </plugin>
                 <plugin>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${assembly-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>${antrun-plugin.version}</version>
+                </plugin>
+                <!-- Lists bundled libraries with their licences and fails the build on a
+                     licence outside the allowed set (see CLAUDE.md, Dependencies). -->
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>license-maven-plugin</artifactId>
+                    <version>${license-plugin.version}</version>
+                    <configuration>
+                        <excludedScopes>test,provided,system</excludedScopes>
+                        <excludedGroups>at\.itbh</excludedGroups>
+                        <force>true</force>
+                        <failOnBlacklist>true</failOnBlacklist>
+                        <failOnMissing>true</failOnMissing>
+                        <licenseMerges>
+                            <licenseMerge>Apache-2.0|The Apache Software License, Version 2.0|The Apache Software License, version 2.0|Apache License, Version 2.0|Apache License 2.0|Apache License version 2.0</licenseMerge>
+                            <licenseMerge>MPL-2.0|Mozilla Public License Version 2.0|Mozilla Public License, Version 2.0|Mozilla Public License 2.0 (MPL-2.0)</licenseMerge>
+                            <licenseMerge>EDL-1.0|Eclipse Distribution License - v 1.0|EDL 1.0</licenseMerge>
+                            <licenseMerge>BSD-3-Clause|BSD 3-Clause License|BSD</licenseMerge>
+                            <licenseMerge>LGPL-2.1-or-later|GNU Lesser General Public License (LGPL), version 2.1 or later</licenseMerge>
+                            <licenseMerge>GPL-3.0|GNU General Public License, version 3 (GPL-3.0)</licenseMerge>
+                            <licenseMerge>W3C|The W3C License</licenseMerge>
+                            <licenseMerge>SAX-PD|The SAX License</licenseMerge>
+                        </licenseMerges>
+                        <includedLicenses>Apache-2.0|MIT|BSD-3-Clause|EDL-1.0|EPL-2.0|MPL-2.0|LGPL-2.1-or-later|W3C|SAX-PD</includedLicenses>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>${quarkus.platform.group-id}</groupId>
                     <artifactId>quarkus-maven-plugin</artifactId>
                     <version>${quarkus.platform.version}</version>
@@ -105,6 +222,32 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <!-- Java formatting: Google Java Style. `mise run fmt` applies it, the build checks it. -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>${spotless-plugin.version}</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>${google-java-format.version}</version>
+                            <style>GOOGLE</style>
+                            <reflowLongStrings>true</reflowLongStrings>
+                        </googleJavaFormat>
+                        <removeUnusedImports/>
+                        <formatAnnotations/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-format</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <version>${enforcer-plugin.version}</version>

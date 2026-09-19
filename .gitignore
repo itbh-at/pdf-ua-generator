@@ -25,3 +25,7 @@ documentation/node_modules/
 
 # Claude Code machine-local files
 .claude/
+
+# Rendered output of the demo template
+demo/*.pdf
+demo/*.rendered.xhtml

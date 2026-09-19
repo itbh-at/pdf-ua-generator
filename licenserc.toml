@@ -17,8 +17,15 @@ includes = [
   "cli/**",
   "server/**",
   "mise.toml",
+  ".githooks/**",
   "licenserc.toml",
   "documentation/build.sh",
   "documentation/*.yml",
   "documentation/modules/**/*.adoc",
+]
+
+excludes = [
+  # Verbatim licence texts and notice fragments shipped in the CLI distribution.
+  "cli/src/dist/licenses/**",
+  "cli/src/dist/notice-bundled.txt",
 ]

@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Refuses a commit whose Java sources are not formatted (Google Java Style,
+# Spotless). Activate once per clone with: mise run setup-hooks
+if ! mise run fmt-check >/dev/null 2>&1; then
+    echo "pre-commit: Java sources are not formatted. Run 'mise run fmt', stage the changes and commit again." >&2
+    exit 1
+fi

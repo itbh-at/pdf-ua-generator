@@ -23,12 +23,13 @@ Diátaxis; licence Apache-2.0 with SPDX headers
 
 |1 Rendering core
 |Current openhtmltopdf and PDFBox; in-memory rendering; JSON data; Qute strict
-and without reflection; resolver for assets, attachments and the host
-allowlist; image limits; SVG in secure mode; caches; PDF 1.7; veraPDF; CLI
-`render` with `--attach`; CLI distribution with generated `NOTICE` and licence
-texts; JMH benchmark
+and without reflection; resolver for assets and attachments, with an interface
+for external URLs (implemented with the host allowlist in phase 3); image
+limits; SVG in secure mode; caches; PDF 1.7; veraPDF; CLI `render` with
+`--attach`; CLI distribution with generated `NOTICE`, licence texts and licence
+check; Spotless formatting; JMH benchmark
 |The demo template renders to PDF/UA confirmed by veraPDF
-|
+|done
 
 |1a Proof of concept
 |Demo template with all building blocks, rendered to PDF, XHTML, email HTML,
@@ -45,7 +46,8 @@ reduced before anything builds on it
 |
 
 |3 Server
-|PostgreSQL with Flyway; revisions; assets stored once per hash and served at
+|PostgreSQL with Flyway; revisions; HTTPS fetcher with host allowlist; assets
+stored once per hash and served at
 `+/assets/{sha256}+`; publish checks; REST API; problem details with URNs; OIDC
 roles; worker pool with 503; warm-up before readiness
 |Create, publish, validate and render work through the API

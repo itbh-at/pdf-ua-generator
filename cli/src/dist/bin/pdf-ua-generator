@@ -1,0 +1,11 @@
+#!/bin/sh
+# Launcher for the pdf-ua-generator command-line tool. Requires Java 25.
+# JAVA_HOME selects the JVM; JAVA_OPTS passes additional JVM options.
+DIR=$(cd "$(dirname "$0")/.." && pwd)
+if [ -n "$JAVA_HOME" ]; then
+    JAVA="$JAVA_HOME/bin/java"
+else
+    JAVA=java
+fi
+# shellcheck disable=SC2086
+exec "$JAVA" -Djava.awt.headless=true $JAVA_OPTS -jar "$DIR/pdf-ua-generator.jar" "$@"

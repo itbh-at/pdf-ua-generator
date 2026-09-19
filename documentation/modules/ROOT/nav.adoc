@@ -6,6 +6,7 @@
 * xref:index.adoc[Start here]
 
 .Reference
+* xref:reference/cli.adoc[Command line]
 * xref:reference/problem-types.adoc[Problem types]
 
 .Explanation

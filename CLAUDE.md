@@ -119,6 +119,14 @@ plain text).
   (HTTPS only, no cross-host redirects, no private address ranges, time and
   size limits) for PDF, DOCX and ODT. Request attachments (`attachment:`) are
   not usable in email HTML.
+- Request attachments (`attachment:<name>`) must be PNG, JPEG or SVG images;
+  fonts, stylesheets and anything else are rejected.
+- Fonts are assets of the layout (stored and versioned with the revision,
+  loaded via `@font-face` from the layout CSS; CLI: template directory or
+  include paths). No fonts in the container image, no shared volume, no system
+  fonts: a font that is not an asset would fall back to a non-embedded standard
+  font and fail PDF/UA. Uploading a font checks its embedding permission (OS/2
+  `fsType`); fonts that forbid embedding are rejected.
 - Every template declares the formats it offers. A request for a format the
   template does not offer is answered with 406 and the problem type
   `urn:itbh:pdf-ua-generator:problem:format-not-supported`.
@@ -211,7 +219,11 @@ old-school senior developer: direct and minimal.
   `documentation/modules/ROOT/pages/`. Put a page in the quadrant that matches
   what it *does*, and do not mix modes on one page — a how-to explains nothing,
   an explanation instructs nobody.
-- Plans, rationale and design live only in the docs, never in this file.
+- Plans, rationale and design live only in the docs, never in this file. Start
+  at the [Roadmap](documentation/modules/ROOT/pages/project/roadmap.adoc)
+  (phases and their status) and the
+  [Architecture](documentation/modules/ROOT/pages/explanation/architecture.adoc).
+  Update the roadmap status when a phase is completed.
 
 ## Branches
 
@@ -235,6 +247,15 @@ old-school senior developer: direct and minimal.
   maintained by hand.
 - LGPL libraries are shipped as separate JARs (CLI: `lib/` directory; server:
   Quarkus fast-jar), never merged into an uber-jar.
+
+## Code style
+
+- Java sources follow Google Java Style, enforced by Spotless
+  (`google-java-format`). Run `mise run fmt` before every commit; the build
+  (`mise run build`) fails on unformatted code.
+- No commit without Spotless formatting: the pre-commit hook in `.githooks/`
+  refuses it. Activate it once per clone with `mise run setup-hooks`; never
+  bypass it (`--no-verify`).
 
 ## Dependencies
 

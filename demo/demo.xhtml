@@ -85,9 +85,9 @@
 
     <h3 id="unordered">Unordered</h3>
     <ul>
-        <li>{item1 ?: "Fallback bullet item 1"}</li>
-        <li>{item2 ?: "Fallback bullet item 2"}</li>
-        <li>{item3 ?: "Fallback bullet item 2"}</li>
+        {#for item in items}
+        <li>{item}</li>
+        {/for}
     </ul>
 
     <h2 id="images">Images</h2>

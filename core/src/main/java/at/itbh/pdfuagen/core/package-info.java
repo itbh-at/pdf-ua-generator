@@ -4,7 +4,7 @@
  */
 
 /**
- * Rendering core: template parsing, schema derivation, validation and rendering.
- * Plain Java without Quarkus, shared by the CLI and the server.
+ * Rendering core: template parsing, schema derivation, validation and rendering. Plain Java without
+ * Quarkus, shared by the CLI and the server.
  */
 package at.itbh.pdfuagen.core;

@@ -1,0 +1,50 @@
+<!--
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright 2026 IT Beratung Hermann GmbH
+
+-->
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <!-- CLI distribution: launcher, executable JAR, libraries as separate JARs (LGPL),
+         NOTICE and licence texts of everything bundled. -->
+    <id>distribution</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <baseDirectory>pdf-ua-generator-${project.version}</baseDirectory>
+    <fileSets>
+        <fileSet>
+            <directory>src/dist/bin</directory>
+            <outputDirectory>bin</outputDirectory>
+            <fileMode>0755</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>${project.build.directory}/lib</directory>
+            <outputDirectory>lib</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>src/dist/licenses</directory>
+            <outputDirectory>licenses</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>${project.build.directory}/dependency-notices</directory>
+            <outputDirectory>licenses/bundled</outputDirectory>
+        </fileSet>
+    </fileSets>
+    <files>
+        <file>
+            <source>${project.build.directory}/${project.build.finalName}.jar</source>
+        </file>
+        <file>
+            <source>../LICENSE</source>
+        </file>
+        <file>
+            <source>${project.build.directory}/NOTICE</source>
+        </file>
+        <file>
+            <source>${project.build.directory}/generated-sources/license/THIRD-PARTY.txt</source>
+        </file>
+    </files>
+</assembly>

@@ -26,7 +26,11 @@ Binary distributions — the CLI with its `lib/` directory and the container
 image — contain third-party JARs. Each ships its own `NOTICE` with the notices
 those libraries require (several Apache-2.0 libraries, such as PDFBox and
 Batik, bring their own `NOTICE` files) together with their licence texts. The
-build assembles these files from the bundled JARs.
+build assembles these files from the bundled JARs: the CLI distribution
+contains `NOTICE` (the project notice followed by the notices of all bundled
+libraries), `THIRD-PARTY.txt` (every library with its licence), the licence
+texts in `licenses/` and the original licence and notice files of each library
+in `licenses/bundled/`.
 
 == Dependencies
 
@@ -35,6 +39,9 @@ MPL-2.0 or LGPL. GPL and AGPL are allowed only for test and build tools. A
 dual-licensed library is used under its permissive option. The current list is
 kept in `THIRD_PARTY_LICENSES.md` in the repository root; it is informational,
 not a legal notice.
+
+The build enforces this: the `license-maven-plugin` lists every bundled library
+with its licence and fails the build on a licence outside the allowed set.
 
 LGPL libraries (openhtmltopdf) are shipped as separate JARs so they can be
 replaced: the CLI keeps them in a `lib/` directory next to its JAR, the server

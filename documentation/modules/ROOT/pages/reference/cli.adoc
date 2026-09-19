@@ -1,0 +1,137 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Command line
+:description: Commands, options and exit codes of the pdf-ua-generator command-line tool.
+
+The command-line tool works only with files, arguments and stdin/stdout. It
+needs no database and never accesses the network.
+
+== Installation
+
+The distribution `pdf-ua-generator-<version>.zip` (built by `mise run build`
+into `cli/target/`) contains:
+
+[cols="1,3",options="header"]
+|===
+|Path |Content
+
+|`bin/pdf-ua-generator`
+|Launcher. Requires Java 25; `JAVA_HOME` selects the JVM, `JAVA_OPTS` passes
+JVM options.
+
+|`pdf-ua-generator.jar`
+|The tool.
+
+|`lib/`
+|The libraries it uses, as separate JARs.
+
+|`LICENSE`, `NOTICE`
+|The licence of the tool and the notices of all bundled libraries.
+
+|`THIRD-PARTY.txt`
+|Every bundled library with its licence.
+
+|`licenses/`
+|Licence texts; `licenses/bundled/` holds the original licence and notice files
+of each library.
+|===
+
+== `render`
+
+Renders a template with JSON data into a document.
+
+----
+pdf-ua-generator render -t <file|dir> [-d <file|->] [-a <name>=<file>]...
+                        [-I <dir>]... [-f pdf|xhtml] [-o <file|->]
+                        [--verify] [-w]
+----
+
+[cols="2,5",options="header"]
+|===
+|Option |Meaning
+
+|`-t`, `--template <file\|dir>`
+|The template: a file, or a directory containing `template.xhtml`. Relative
+resource references (fonts, images, stylesheets) are resolved against its
+directory. Required.
+
+|`-I`, `--include-path <dir>`
+|Additional directory searched for included templates and resources, after the
+template directory. Repeatable.
+
+|`-d`, `--data <file\|->`
+|JSON object with the template data; `-` reads stdin. Default: `{}`.
+
+|`-a`, `--attach <name>=<file>`
+|Image the template references as `attachment:<name>`. PNG, JPEG or SVG only.
+Repeatable.
+
+|`-f`, `--format <format>`
+|`pdf` (default) or `xhtml`. XHTML output is self-contained: images, fonts and
+stylesheets are embedded as data URIs.
+
+|`-o`, `--output <file\|->`
+|Output file; `-` writes to stdout. Default: next to the template, as
+`<name>.pdf` or `<name>.rendered.xhtml`.
+
+|`--verify`
+|Validate the PDF against PDF/UA-1 with veraPDF and fail if it does not
+conform. Only with `--format pdf`.
+
+|`-w`, `--watch`
+|Render once, then again whenever a file in the template directory, an include
+path, or the directory of the data file or an attachment changes. Stops with
+Ctrl+C.
+|===
+
+Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
+`warning: …`, errors as `error: …` with their location.
+
+=== Exit codes
+
+[cols="1,5",options="header"]
+|===
+|Code |Meaning
+
+|`0`
+|Document written.
+
+|`1`
+|Template, data or resources invalid, or `--verify` failed.
+
+|`2`
+|Invalid command line.
+|===
+
+=== Example
+
+----
+pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json --verify
+----
+
+== Resources a template may use
+
+* Files relative to the template directory or an include path. Paths must not
+  leave these directories.
+* Attachments given with `--attach`, referenced as `attachment:<name>`.
+* Nothing else: `file:`, `http:`, `https:`, `data:` and other URIs are
+  rejected. External `https` images are available only in the REST service,
+  from an allowlist of hosts.
+
+Images must be PNG, JPEG or SVG. SVG is rendered without scripts and without
+external resources. Resources larger than 20 MB and raster images larger than
+20,000 pixels per side or 50 megapixels are rejected.
+
+== Template language
+
+Templates are XHTML with https://quarkus.io/guides/qute[Qute] expressions. Data
+values are HTML-escaped. Not available: calling Java methods, `raw` output,
+`+{#eval}+` and `+{#cache}+`. A value the template uses but the data lacks is an
+error, not an empty string.
+
+The template is parsed as XML without loading a DTD, so named entities such as
+`&nbsp;` are not available; use the character itself or a numeric reference
+(`&#160;`).

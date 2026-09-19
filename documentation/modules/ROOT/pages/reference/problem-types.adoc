@@ -46,6 +46,19 @@ lists every violation.
 |The requested output format is not offered by the template, for example DOCX
 for a template with free CSS.
 
+|`urn:itbh:pdf-ua-generator:problem:template-error`
+|422
+|The template cannot be parsed or rendered: a Qute syntax error, a value the
+template uses but the data lacks, or rendered output that is not well-formed
+XHTML.
+
+|`urn:itbh:pdf-ua-generator:problem:resource-rejected`
+|422
+|A resource the template references is not allowed or not available: a
+forbidden URI scheme (`file:`, `http:`, `data:`, …), a path outside the
+template, a missing file, an external URL outside the host allowlist, or a
+resource above the size limit.
+
 |`urn:itbh:pdf-ua-generator:problem:image-rejected`
 |422
 |An image is not PNG, JPEG or SVG, exceeds the size or dimension limits, or

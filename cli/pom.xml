@@ -53,8 +53,36 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>third-party</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>add-third-party</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <executions>
+                    <execution>
+                        <id>dependency-notices</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <excludeGroupIds>at.itbh</excludeGroupIds>
+                            <includes>META-INF/NOTICE*,META-INF/LICENSE*,META-INF/LICENCE*</includes>
+                            <useSubDirectoryPerArtifact>true</useSubDirectoryPerArtifact>
+                            <stripVersion>true</stripVersion>
+                            <outputDirectory>${project.build.directory}/dependency-notices</outputDirectory>
+                        </configuration>
+                    </execution>
                     <execution>
                         <id>copy-lib</id>
                         <phase>package</phase>
@@ -64,6 +92,48 @@
                         <configuration>
                             <includeScope>runtime</includeScope>
                             <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Distribution NOTICE: the project notice followed by the notices of every
+                 bundled library (Apache-2.0, section 4(d)). -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>notice</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <concat destfile="${project.build.directory}/NOTICE" fixlastline="yes" encoding="UTF-8" outputencoding="UTF-8">
+                                    <filelist dir="${project.basedir}/.." files="NOTICE"/>
+                                    <filelist dir="${project.basedir}/src/dist" files="notice-bundled.txt"/>
+                                    <fileset dir="${project.build.directory}/dependency-notices" includes="**/NOTICE*" erroronmissingdir="false"/>
+                                </concat>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>distribution</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <configuration>
+                            <descriptors>
+                                <descriptor>src/assembly/distribution.xml</descriptor>
+                            </descriptors>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <finalName>pdf-ua-generator-${project.version}</finalName>
                         </configuration>
                     </execution>
                 </executions>

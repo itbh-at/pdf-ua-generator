@@ -10,20 +10,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-
 import org.junit.jupiter.api.Test;
-
 import picocli.CommandLine;
 
 class MainTest {
 
-    @Test
-    void helpExitsWithZeroAndPrintsUsage() {
-        StringWriter out = new StringWriter();
-        CommandLine cmd = new CommandLine(new Main());
-        cmd.setOut(new PrintWriter(out));
+  @Test
+  void helpExitsWithZeroAndPrintsUsage() {
+    StringWriter out = new StringWriter();
+    CommandLine cmd = new CommandLine(new Main());
+    cmd.setOut(new PrintWriter(out));
 
-        assertEquals(0, cmd.execute("--help"));
-        assertTrue(out.toString().contains("Usage: pdf-ua-generator"));
-    }
+    assertEquals(0, cmd.execute("--help"));
+    assertTrue(out.toString().contains("Usage: pdf-ua-generator"));
+  }
 }

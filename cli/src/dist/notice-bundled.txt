@@ -1,0 +1,6 @@
+
+This distribution bundles third-party libraries. Their licences are listed in
+THIRD-PARTY.txt; the licence texts are in licenses/, the original licence and
+notice files of each library in licenses/bundled/. The notices the bundled
+libraries require follow.
+

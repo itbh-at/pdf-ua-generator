@@ -8,6 +8,9 @@
 #   mise install            # installs the tools pinned below
 #   mise run build          # compile, test and package all modules
 #   mise run test           # run the tests
+#   mise run fmt            # format the Java sources (Google Java Style)
+#   mise run setup-hooks    # once per clone: pre-commit checks the formatting
+#   mise run bench          # render benchmark (JMH)
 #   mise run docs           # build the Antora docs (documentation/build/site)
 #   mise run docs-watch     # live preview of the docs
 #   mise run headers        # apply the SPDX licence headers
@@ -32,6 +35,28 @@ run = "mvn -B -ntp verify"
 [tasks.test]
 description = "Run the tests of all modules"
 run = "mvn -B -ntp test"
+
+[tasks.fmt]
+description = "Format the Java sources (Google Java Style, Spotless)"
+run = "mvn -B -ntp -q spotless:apply"
+
+[tasks.fmt-check]
+description = "Check the Java formatting without changing files"
+run = "mvn -B -ntp -q spotless:check"
+
+[tasks.setup-hooks]
+description = "Use the checked-in git hooks (pre-commit refuses unformatted Java sources)"
+run = "git config core.hooksPath .githooks"
+
+[tasks.bench]
+description = "Render benchmark (JMH): cold and warm, per format"
+run = '''
+mvn -B -ntp -q -pl core -am test-compile dependency:build-classpath \
+    -Dmdep.outputFile=target/bench.classpath -Dmdep.includeScope=test
+java -Djava.awt.headless=true \
+    -cp "core/target/test-classes:core/target/classes:$(cat core/target/bench.classpath)" \
+    org.openjdk.jmh.Main RenderBenchmark
+'''
 
 [tasks.docs]
 description = "Build the Antora docs"
