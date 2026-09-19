@@ -182,9 +182,9 @@ plain text).
   `values-podman.yaml` for podman. podman consumes the rendered chart:
   `helm template … -f values-podman.yaml | podman kube play -`.
 - The chart renders only plain manifests: no hooks, no subcharts, no lookups,
-  no `hostPort`. PostgreSQL and Keycloak for podman are minimal templates in the
-  chart, enabled only by `values-podman.yaml`; on Kubernetes the database and the
-  OIDC provider are external and configured through values.
+  no `hostPort`. PostgreSQL for podman is a minimal template in the chart,
+  enabled only by `values-podman.yaml`; on Kubernetes the database is external
+  and configured through values.
 - Every chart change is verified by rendering it with both values files.
 
 ## Accessibility

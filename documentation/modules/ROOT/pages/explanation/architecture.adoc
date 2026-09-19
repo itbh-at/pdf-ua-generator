@@ -271,7 +271,7 @@ of requests timing out.
 The service is stateless; all state lives in PostgreSQL. It runs in JVM mode
 only — standalone, as an OCI image under podman, or scaled out in Kubernetes.
 One Helm chart serves both Kubernetes and `podman kube play` (rendered with
-`helm template`); for podman it adds a local PostgreSQL and Keycloak. One
+`helm template`); for podman it adds a local PostgreSQL. One
 deployment serves one tenant; separate tenants are separate deployments.
 
 == Editor

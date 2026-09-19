@@ -70,8 +70,7 @@ shared by many templates held in memory once per hash
 |
 
 |5 Operations
-|OIDC roles (moved from phase 3, which leaves the API open);
-Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
+|Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
 texts in the image; Helm chart for Kubernetes and
 `podman kube play`; `kubeconform`; CI smoke test; load test
 |Several pods render under load and the autoscaler reacts
@@ -106,7 +105,9 @@ mode
 |
 
 |Later
-|QR code and chart components; real-time collaboration
+|Authentication and authorization: OIDC with roles, an OIDC provider
+(Keycloak) in the chart for podman; until then the API is open. QR code and
+chart components; real-time collaboration
 |–
 |
 |===
