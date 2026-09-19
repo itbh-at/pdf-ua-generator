@@ -90,8 +90,9 @@ in bytes, and the least recently used revisions are dropped first.
 
 |Component
 |Developers
-|Reusable blocks as Qute user tags, e.g. columns, box, footnote, signature,
-each with a descriptor (`component.json`) listing its parameters.
+|Reusable blocks as Qute user tags, e.g. columns, box, footnote, signature.
+They belong to a layout, which lists them with their parameters in its
+`layout.json`.
 
 |Content template
 |Editors
@@ -108,6 +109,29 @@ For emergencies a revision can opt into *free CSS* (`styling: free`) if its
 layout allows it. Free CSS works only for PDF and XHTML, keeps hard limits (no
 `@import`, no `!important`, only layout fonts, only template assets or
 attachments in `url()`), and never bypasses the publish checks.
+
+A content template is one `+{#include layout}+` whose blocks fill the layout's
+areas. The layout's files appear to it under `layout/`, so the content cannot
+replace them; a layout is checked and previewed the same way, with its own
+files under `layout/`. One content template can be rendered in any layout that
+offers the areas, styles and components it uses — the demo shows the same
+document in two layouts.
+
+The styling rules of content are checked on its source, not on the rendered
+document. Data is always escaped and there is no `raw`, so markup can only come
+from the literal text of a template: a `<style>`, a `style` attribute or a
+class that is not in the source cannot appear in the output. Class values must
+be literal for the same reason. Layouts are written by developers and are free
+in their markup; their `<style>` may use Qute, so page headers and footers can
+take texts from the layout's message files (`+{msg:page}+`) and the document
+language from `+{doc:lang}+`.
+
+A content revision pins one layout revision (`corporate@3`). A new layout
+revision changes nothing for the content that pins an older one; moving to it
+is a new content revision, which re-runs the publish checks. A layout revision
+that published content pins cannot be deleted, and content can be published
+only with a published layout revision. So a layout change never alters a
+published document unnoticed.
 
 == Language variants
 

@@ -51,6 +51,19 @@ public final class TemplateCheck {
       String templateId,
       Map<String, Object> example,
       Map<String, byte[]> attachments) {
+    return check(renderer, repository, templateId, example, attachments, null);
+  }
+
+  /**
+   * @param publicBaseUrl base of asset URLs in email HTML, or {@code null} for the renderer's
+   */
+  public static Report check(
+      DocumentRenderer renderer,
+      TemplateRepository repository,
+      String templateId,
+      Map<String, Object> example,
+      Map<String, byte[]> attachments,
+      java.net.URI publicBaseUrl) {
     List<Problem> problems = new ArrayList<>();
     try {
       renderer.schema(repository, templateId);
@@ -65,7 +78,8 @@ public final class TemplateCheck {
               + " cannot show");
     }
     for (String variantId : renderer.variants(repository, templateId)) {
-      RenderRequest request = new RenderRequest(variantId, repository, example, attachments);
+      RenderRequest request =
+          new RenderRequest(variantId, repository, example, attachments, publicBaseUrl);
       try {
         Document document = SecureXml.parse(renderer.renderSource(request), variantId);
         checkLanguage(document, renderer.language(repository, variantId), variantId, problems);

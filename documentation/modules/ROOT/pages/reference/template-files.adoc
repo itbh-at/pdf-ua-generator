@@ -20,15 +20,15 @@
 three-letter language, e.g. `invoice.de-AT.xhtml`, `invoice.fr.xhtml`.
 
 |`<name>.json`
-|The descriptor: language of the default variant and field definitions. Shared
-by all variants.
+|The descriptor: language of the default variant, layout, formats and field
+definitions. Shared by all variants.
 
 |`<name>.txt`, `<name>.<tag>.txt`
 |Optional hand-written plain-text version of a variant; replaces the generated
 text.
 
 |`email.css`
-|Stylesheet for email HTML.
+|Stylesheet for email HTML; with a layout, the layout's is used.
 
 |`example.json`, `example/<name>.<ext>`
 |Server bundles only: example data for the publish checks and its attachments
@@ -69,6 +69,15 @@ text.
 |`language`
 |BCP 47 tag of the default variant. Required. Values of the default variant are
 formatted for this language.
+
+|`layout`
+|The layout revision the template fills, e.g. `"corporate@3"`. Optional; see
+xref:reference/layouts.adoc[Layouts]. Without it the template brings its own
+styling (written by developers).
+
+|`styling`
+|`"catalog"` (default) or `"free"` for a template with a layout; see
+xref:reference/layouts.adoc#free-styling[Free styling].
 
 |`formats`
 |The output formats the template offers: `pdf`, `xhtml`, `email-html`, `text`,

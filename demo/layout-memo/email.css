@@ -1,0 +1,22 @@
+/* Styles for email HTML of the memo layout. Inlined into style attributes by the renderer; only
+   element, class and element.class selectors are used. */
+body { margin: 0; padding: 16px; font-family: 'Courier New', Courier, monospace; font-size: 15px; line-height: 1.6; color: #222222; background-color: #ffffff; }
+h1 { font-size: 22px; color: #8b1e1e; text-transform: uppercase; border-bottom: 2px solid #8b1e1e; margin: 0 0 12px 0; }
+h2 { font-size: 18px; color: #8b1e1e; text-transform: uppercase; margin: 24px 0 8px 0; }
+h3 { font-size: 16px; color: #8b1e1e; margin: 16px 0 6px 0; }
+p { margin: 0 0 12px 0; }
+.lead { font-size: 16px; border-left: 4px solid #8b1e1e; padding-left: 12px; }
+.small { font-size: 13px; color: #666666; }
+.highlight { text-decoration: underline; }
+.letterhead { text-align: right; }
+.memo-label { font-size: 12px; letter-spacing: 4px; color: #8b1e1e; }
+a { color: #8b1e1e; }
+table { border-collapse: collapse; width: 100%; margin: 0 0 16px 0; }
+caption { text-align: left; color: #8b1e1e; padding: 0 0 6px 0; }
+th { border-bottom: 2px solid #8b1e1e; padding: 6px 8px; text-align: left; }
+td { border-bottom: 1px solid #222222; padding: 6px 8px; text-align: left; vertical-align: top; }
+td.col { border: 0; padding: 0 12px 0 0; }
+td.box { border: 4px double #8b1e1e; padding: 12px 16px; }
+table.columns { margin: 0 0 12px 0; }
+img { max-width: 100%; height: auto; border: 0; }
+ol.footnotes { font-size: 13px; color: #666666; }

@@ -40,7 +40,10 @@ class TemplateCommandsTest {
 
   @Test
   void printsTheSchema() {
-    assertEquals(0, run("schema", "-t", demo()), err::toString);
+    assertEquals(
+        0,
+        run("schema", "-t", demo(), "--layout", DEMO.resolve("layout").toString()),
+        err::toString);
     assertTrue(
         out.toString().contains("\"$schema\": \"https://json-schema.org/draft/2020-12/schema\""));
     assertTrue(out.toString().contains("\"format\": \"date\""));
@@ -57,7 +60,16 @@ class TemplateCommandsTest {
 
   @Test
   void validatesData() throws Exception {
-    assertEquals(0, run("validate", "-t", demo(), "-d", DEMO.resolve("data.json").toString()));
+    assertEquals(
+        0,
+        run(
+            "validate",
+            "-t",
+            demo(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
+            "-d",
+            DEMO.resolve("data.json").toString()));
     assertEquals("valid\n", out.toString());
 
     Path data = tmp.resolve("data.json");
@@ -67,7 +79,16 @@ class TemplateCommandsTest {
             + " \"date\": \"19.09.2026\", \"positions\": [{\"name\": \"a\", \"price\": 1}],"
             + " \"total\": 1}}",
         StandardCharsets.UTF_8);
-    assertEquals(1, run("validate", "-t", demo(), "-d", data.toString()));
+    assertEquals(
+        1,
+        run(
+            "validate",
+            "-t",
+            demo(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
+            "-d",
+            data.toString()));
     assertEquals(
         "error: must be a date in the form YYYY-MM-DD (#/order/date)\n"
             + "error: is required (#/order/positions/0/quantity)\n",
@@ -81,6 +102,8 @@ class TemplateCommandsTest {
             "check",
             "-t",
             demo(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
             "-d",
             DEMO.resolve("data.json").toString(),
             "-a",
@@ -110,6 +133,15 @@ class TemplateCommandsTest {
     assertEquals(0, exit, err::toString);
     assertTrue(Files.readString(output).contains("bis 31. Dezember 2026."));
 
-    assertEquals(2, run("render", "-t", demo(), "--lang", "de;q=x"));
+    assertEquals(
+        2,
+        run(
+            "render",
+            "-t",
+            demo(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
+            "--lang",
+            "de;q=x"));
   }
 }

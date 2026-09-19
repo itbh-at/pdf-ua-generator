@@ -37,19 +37,55 @@ class ApiTest {
   private static final String DOCX =
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-  static byte[] demoBundle() throws Exception {
+  static byte[] demoBundle(int layoutRevision) throws Exception {
+    return demoBundle("demo-layout@" + layoutRevision);
+  }
+
+  /** The demo content, pinning the given layout revision. */
+  static byte[] demoBundle(String layout) throws Exception {
     Map<String, byte[]> files = new TreeMap<>();
     files.put("template.xhtml", Files.readAllBytes(DEMO.resolve("demo.xhtml")));
-    files.put("template.json", Files.readAllBytes(DEMO.resolve("demo.json")));
+    files.put(
+        "template.json",
+        Files.readString(DEMO.resolve("demo.json"))
+            .replace("demo-layout@1", layout)
+            .getBytes(StandardCharsets.UTF_8));
     files.put("example.json", Files.readAllBytes(DEMO.resolve("data.json")));
     files.put("example/photo.png", Files.readAllBytes(DEMO.resolve("photo.png")));
-    for (String asset :
-        new String[] {
-          "email.css", "logo.svg", "divider.svg", "Roboto.ttf", "SpecialElite-Regular.ttf"
-        }) {
-      files.put(asset, Files.readAllBytes(DEMO.resolve(asset)));
-    }
     return Bundle.write(files);
+  }
+
+  /** The demo layout; {@code header} replaces its page header text. */
+  static byte[] layoutBundle(String header) throws Exception {
+    return layoutBundle("layout", header);
+  }
+
+  static byte[] layoutBundle(String directory, String header) throws Exception {
+    Path layout = DEMO.resolve(directory);
+    Map<String, byte[]> files = new TreeMap<>();
+    try (var paths = Files.walk(layout)) {
+      for (Path file : paths.filter(Files::isRegularFile).toList()) {
+        files.put(layout.relativize(file).toString().replace('\\', '/'), Files.readAllBytes(file));
+      }
+    }
+    files.put(
+        "messages.json",
+        Files.readString(layout.resolve("messages.json"))
+            .replace("Accessible document example", header)
+            .getBytes(StandardCharsets.UTF_8));
+    files.put("example.json", "{}".getBytes(StandardCharsets.UTF_8));
+    return Bundle.write(files);
+  }
+
+  private static String xhtml(String template) throws Exception {
+    return given()
+        .contentType("application/json")
+        .body(data("data-email.json"))
+        .post("/templates/" + template + "/render?format=xhtml")
+        .then()
+        .statusCode(200)
+        .extract()
+        .asString();
   }
 
   private static String data(String file) throws Exception {
@@ -57,11 +93,30 @@ class ApiTest {
   }
 
   @Test
+  @Order(0)
+  void publishesALayout() throws Exception {
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("Accessible document example"))
+        .post("/templates/demo-layout/revisions")
+        .then()
+        .statusCode(201)
+        .body("kind", equalTo("layout"))
+        .body("problems.size()", equalTo(0));
+    given()
+        .post("/templates/demo-layout/revisions/1/publish")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(200);
+  }
+
+  @Test
   @Order(1)
   void createsADraft() throws Exception {
     given()
         .contentType("application/zip")
-        .body(demoBundle())
+        .body(demoBundle(1))
         .post("/templates/demo/revisions")
         .then()
         .statusCode(201)
@@ -69,6 +124,8 @@ class ApiTest {
         .body("revision", equalTo(1))
         .body("status", equalTo("draft"))
         .body("language", equalTo("en"))
+        .body("kind", equalTo("content"))
+        .body("layout", equalTo("demo-layout@1"))
         .body("formats", hasItem("docx"))
         .body("problems.size()", equalTo(0));
 
@@ -241,6 +298,109 @@ class ApiTest {
 
   @Test
   @Order(8)
+  void aLayoutChangeReachesContentOnlyWhenItMovesToTheNewRevision() throws Exception {
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("Changed header"))
+        .post("/templates/demo-layout/revisions")
+        .then()
+        .statusCode(201)
+        .body("revision", equalTo(2));
+    given().post("/templates/demo-layout/revisions/2/publish").then().statusCode(200);
+
+    // demo still pins revision 1 of the layout.
+    String before = xhtml("demo");
+    assertTrue(before.contains("Accessible document example"), before);
+    assertTrue(!before.contains("Changed header"));
+
+    given()
+        .contentType("application/zip")
+        .body(demoBundle(2))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(201)
+        .body("revision", equalTo(2))
+        .body("layout", equalTo("demo-layout@2"));
+    given().post("/templates/demo/revisions/2/publish").then().statusCode(200);
+    assertTrue(xhtml("demo").contains("Changed header"));
+
+    given()
+        .get("/templates/demo-layout")
+        .then()
+        .statusCode(200)
+        .body("kind", equalTo("layout"))
+        .body("usedBy.find { it.revision == 1 }.layoutRevision", equalTo(1))
+        .body("usedBy.find { it.revision == 2 }.layoutRevision", equalTo(2));
+    given()
+        .delete("/templates/demo-layout")
+        .then()
+        .statusCode(409)
+        .body("type", equalTo(PROBLEM + "conflict"));
+    given().delete("/templates/demo-layout/revisions/1").then().statusCode(409);
+  }
+
+  @Test
+  @Order(9)
+  void contentPinsOnlyPublishedLayouts() throws Exception {
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("Draft header"))
+        .post("/templates/demo-layout/revisions")
+        .then()
+        .statusCode(201)
+        .body("revision", equalTo(3));
+    given()
+        .contentType("application/zip")
+        .body(demoBundle(3))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(201);
+    given()
+        .post("/templates/demo/revisions/3/publish")
+        .then()
+        .statusCode(422)
+        .body("type", equalTo(PROBLEM + "publish-rejected"))
+        .body("errors[0].detail", containsString("demo-layout@3 is not published"));
+    // A template keeps its kind.
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("x"))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(409);
+  }
+
+  @Test
+  @Order(10)
+  void rendersTheSameDocumentInAnotherLayout() throws Exception {
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("layout-memo", "Internal memo"))
+        .post("/templates/memo-layout/revisions")
+        .then()
+        .statusCode(201);
+    given().post("/templates/memo-layout/revisions/1/publish").then().statusCode(200);
+    given()
+        .contentType("application/zip")
+        .body(demoBundle("memo-layout@1"))
+        .post("/templates/demo-memo/revisions")
+        .then()
+        .statusCode(201);
+    given()
+        .post("/templates/demo-memo/revisions/1/publish")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(200);
+
+    String memo = xhtml("demo-memo");
+    String plain = xhtml("demo");
+    assertTrue(memo.contains("MEMORANDUM") && memo.contains("Hello Jane Doe."), memo);
+    assertTrue(!plain.contains("MEMORANDUM") && plain.contains("Hello Jane Doe."), plain);
+  }
+
+  @Test
+  @Order(11)
   void rejectsBadInput() {
     given()
         .contentType("application/zip")
@@ -261,7 +421,7 @@ class ApiTest {
   }
 
   @Test
-  @Order(9)
+  @Order(12)
   void reportsReady() {
     given().get("/q/health/ready").then().statusCode(200);
     given().get("/q/health/live").then().statusCode(200);

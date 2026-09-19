@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 IT Beratung Hermann GmbH
 
-# Renders the demo template in every format and checks each result:
+# Renders the demo template in every format, in each demo layout, and checks each result:
 #   PDF         veraPDF, PDF/UA-1
 #   XHTML/email axe-core (WCAG 2.2 A/AA and best practices) in jsdom
 #   ODT         ODF validator, extended conformance
@@ -26,46 +26,61 @@ fail=0
 step() { echo; echo "== $1"; }
 check() { "$@" || fail=1; }
 
+# The same document in every demo layout: layout/ and layout-memo/.
+layouts=(layout layout-memo)
+
 step "Rendering"
-demo=(-t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png)
-for format in pdf xhtml text docx odt; do
-  ext=$format; [ "$format" = text ] && ext=txt
-  check cli render "${demo[@]}" -f "$format" -o "$out/demo.$ext"
+for layout in "${layouts[@]}"; do
+  dir="$out/$layout" && mkdir -p "$dir"
+  demo=(-t demo/demo.xhtml --layout "demo/$layout" -d demo/data.json -a photo=demo/photo.png)
+  for format in pdf xhtml text docx odt; do
+    ext=$format; [ "$format" = text ] && ext=txt
+    check cli render "${demo[@]}" -f "$format" -o "$dir/demo.$ext"
+  done
+  # Email HTML cannot use request attachments, so it is rendered without the photo.
+  check cli render -t demo/demo.xhtml --layout "demo/$layout" -d demo/data-email.json -f email-html \
+    --public-base-url https://assets.example.invalid -o "$dir/demo.email.html"
 done
-# Email HTML cannot use request attachments, so it is rendered without the photo.
-check cli render -t demo/demo.xhtml -d demo/data-email.json -f email-html \
-  --public-base-url https://assets.example.invalid -o "$out/demo.email.html"
 
 step "PDF/UA (veraPDF)"
-check cli verify "$out/demo.pdf"
+for layout in "${layouts[@]}"; do
+  check cli verify "$out/$layout/demo.pdf"
+done
 
 step "HTML accessibility (axe-core)"
 axe=$(find "$(mise where npm:axe-core)" -name axe.min.js | head -1)
 jsdom=$(find "$(mise where npm:jsdom)" -maxdepth 6 -type d -path '*node_modules/jsdom' | head -1)
-check env AXE_SCRIPT="$axe" JSDOM_MODULE="$jsdom" node scripts/axe-check.mjs "$out/demo.xhtml" "$out/demo.email.html"
+for layout in "${layouts[@]}"; do
+  check env AXE_SCRIPT="$axe" JSDOM_MODULE="$jsdom" node scripts/axe-check.mjs \
+    "$out/$layout/demo.xhtml" "$out/$layout/demo.email.html"
+done
 
 step "ODF schema (odfvalidator, extended conformance)"
 if [ ! -f "$validator" ]; then
   mvn -B -ntp -q dependency:copy -Dartifact=org.odftoolkit:odfvalidator:0.13.0:jar:jar-with-dependencies \
     -DoutputDirectory=target/tools || exit 1
 fi
-report=$(java -jar "$validator" -e "$out/demo.odt" 2>&1)
-if echo "$report" | grep -q "Error"; then
-  echo "$report"
-  fail=1
-else
-  echo "$out/demo.odt: valid"
-fi
+for layout in "${layouts[@]}"; do
+  report=$(java -jar "$validator" -e "$out/$layout/demo.odt" 2>&1)
+  if echo "$report" | grep -q "Error"; then
+    echo "$report"
+    fail=1
+  else
+    echo "$out/$layout/demo.odt: valid"
+  fi
+done
 
 step "DOCX and ODT exported as PDF/UA by LibreOffice (veraPDF)"
 if ! podman image exists "$image"; then
   podman build -q -t "$image" -f scripts/libreoffice/Containerfile scripts/libreoffice || exit 1
 fi
 filter='pdf:writer_pdf_Export:{"PDFUACompliance":{"type":"boolean","value":"true"}}'
-for format in docx odt; do
-  podman run --rm -v "$PWD/$out:/work:Z" -w /work "$image" \
-    --convert-to "$filter" --outdir "lo-$format" "demo.$format" >/dev/null 2>&1
-  check cli verify "$out/lo-$format/demo.pdf"
+for layout in "${layouts[@]}"; do
+  for format in docx odt; do
+    podman run --rm -v "$PWD/$out/$layout:/work:Z" -w /work "$image" \
+      --convert-to "$filter" --outdir "lo-$format" "demo.$format" >/dev/null 2>&1
+    check cli verify "$out/$layout/lo-$format/demo.pdf"
+  done
 done
 
 echo

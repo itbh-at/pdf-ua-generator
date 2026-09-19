@@ -5,10 +5,13 @@
 
 package at.itbh.pdfuagen.cli;
 
+import at.itbh.pdfuagen.core.ComposedTemplateRepository;
 import at.itbh.pdfuagen.core.DirectoryTemplateRepository;
 import at.itbh.pdfuagen.core.JsonData;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
+import at.itbh.pdfuagen.core.TemplateRepository;
+import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -38,6 +41,14 @@ final class TemplateOptions {
       description = "Additional directory for included templates and resources. Repeatable.")
   List<Path> includePaths = new ArrayList<>();
 
+  @Option(
+      names = {"-L", "--layout"},
+      paramLabel = "<dir>",
+      description =
+          "Layout directory for a template whose descriptor names a layout; its files appear under"
+              + " layout/.")
+  Path layout;
+
   /** The directory the template is resolved in. */
   Path root() {
     return Files.isDirectory(template) ? template : template.toAbsolutePath().getParent();
@@ -50,8 +61,21 @@ final class TemplateOptions {
         : template.getFileName().toString();
   }
 
-  DirectoryTemplateRepository repository() {
-    return new DirectoryTemplateRepository(root(), includePaths);
+  /**
+   * The template's files; with {@code --layout}, the layout's under {@code layout/}. A layout on
+   * its own (a directory with layout.json) appears under {@code layout/} too, as for a template
+   * that fills it.
+   */
+  TemplateRepository repository() {
+    DirectoryTemplateRepository files = new DirectoryTemplateRepository(root(), includePaths);
+    if (layout != null) {
+      return new ComposedTemplateRepository(
+          files, new DirectoryTemplateRepository(layout, List.of()));
+    }
+    if (Files.isRegularFile(root().resolve(LayoutDescriptor.FILE))) {
+      return new ComposedTemplateRepository(files, files);
+    }
+    return files;
   }
 
   /** Reads a JSON object from a file, or stdin for {@code -}; {@code null} gives {@code {}}. */

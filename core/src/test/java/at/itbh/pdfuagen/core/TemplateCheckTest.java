@@ -43,7 +43,7 @@ class TemplateCheckTest {
     TemplateCheck.Report report =
         TemplateCheck.check(
             renderer,
-            new DirectoryTemplateRepository(DEMO, List.of()),
+            Demo.repository(),
             "demo.xhtml",
             data,
             Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));

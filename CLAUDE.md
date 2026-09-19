@@ -85,9 +85,18 @@ plain text).
 
 ## Template styling
 
+- A layout is a template with `layout.json` (style catalog, internal classes,
+  areas, components with their parameters, fonts, free-styling permission,
+  fields), `template.xhtml` with `{#insert}` areas, `components/<name>.xhtml`,
+  `messages.json` plus `messages.<tag>.json`, `email.css`, and optionally
+  `layout.dotx` and `layout.ott`.
+- A content template's descriptor pins one layout revision
+  (`"layout": "corporate@3"`); the content is one `{#include layout}` filling
+  declared areas. The layout's files appear under `layout/`.
 - Default: content templates are styled only through the style catalog (named
   CSS classes) and the components (Qute user tags) of their layout. No `style`
-  attribute, no `<style>` block, no font declarations.
+  attribute, no `<style>` block, no `<link>`, no font declarations; class
+  values are literal. These rules are checked on the template source.
 - Fallback: free CSS (`<style>` blocks and `style` attributes) is an explicit
   per-revision opt-in (`styling: free`), allowed only if the layout permits it.
   The flag is visible in the API and the UI.

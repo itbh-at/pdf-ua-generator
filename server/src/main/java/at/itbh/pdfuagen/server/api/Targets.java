@@ -5,6 +5,7 @@
 
 package at.itbh.pdfuagen.server.api;
 
+import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import at.itbh.pdfuagen.server.render.RenderService;
 import at.itbh.pdfuagen.server.store.TemplateStore;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -23,12 +24,27 @@ class Targets {
         .orElseThrow(() -> Problems.notFound("template '" + id + "' does not exist"));
   }
 
+  /**
+   * A revision ready to render; content is composed with the layout revision it pins. If that does
+   * not exist, the content stands alone and its checks report the missing layout.
+   */
   Views.Target revision(String id, int n) {
     TemplateStore.Revision revision =
         store
             .revision(checkId(id), n)
             .orElseThrow(() -> Problems.notFound("template '" + id + "' has no revision " + n));
-    return new Views.Target(revision, service.repository(revision));
+    TemplateStore.Revision layout = layout(revision).orElse(null);
+    return new Views.Target(revision, layout, service.repository(revision, layout));
+  }
+
+  /** The layout revision a content revision pins, if it exists and is a layout. */
+  java.util.Optional<TemplateStore.Revision> layout(TemplateStore.Revision revision) {
+    if (revision.layoutId() == null) {
+      return java.util.Optional.empty();
+    }
+    return store
+        .revision(revision.layoutId(), revision.layoutRevision())
+        .filter(l -> l.files().containsKey(LayoutDescriptor.FILE));
   }
 
   /** The latest published revision. */

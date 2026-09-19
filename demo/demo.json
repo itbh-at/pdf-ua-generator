@@ -1,17 +1,24 @@
 {
   "language": "en",
+  "layout": "demo-layout@1",
   "fields": {
     "customer": {
       "type": "object",
       "label": "Customer",
       "fields": {
-        "name": { "type": "text", "label": "Name", "description": "Used in the greeting." }
+        "name": {
+          "type": "text",
+          "label": "Name",
+          "description": "Used in the greeting."
+        }
       }
     },
     "items": {
       "type": "list",
       "label": "Bullet items",
-      "items": { "type": "text" }
+      "items": {
+        "type": "text"
+      }
     },
     "photo": {
       "type": "image",
@@ -22,21 +29,39 @@
       "type": "object",
       "label": "Order",
       "fields": {
-        "number": { "type": "text", "label": "Order number" },
-        "date": { "type": "date", "label": "Order date" },
+        "number": {
+          "type": "text",
+          "label": "Order number"
+        },
+        "date": {
+          "type": "date",
+          "label": "Order date"
+        },
         "positions": {
           "type": "list",
           "label": "Positions",
           "items": {
             "type": "object",
             "fields": {
-              "name": { "type": "text", "label": "Item" },
-              "quantity": { "type": "number", "label": "Quantity" },
-              "price": { "type": "number", "label": "Price in EUR" }
+              "name": {
+                "type": "text",
+                "label": "Item"
+              },
+              "quantity": {
+                "type": "number",
+                "label": "Quantity"
+              },
+              "price": {
+                "type": "number",
+                "label": "Price in EUR"
+              }
             }
           }
         },
-        "total": { "type": "number", "label": "Total in EUR" }
+        "total": {
+          "type": "number",
+          "label": "Total in EUR"
+        }
       }
     }
   }

@@ -62,12 +62,13 @@ template (406)
 |done
 
 |4 Layouts
-|`+{#insert}+` areas; style catalog; components as user tags with
-`component.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
+|`+{#insert}+` areas; style catalog; components as user tags, described in
+`layout.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
 `email.css` per layout; message files per language for layout texts; fonts
-shared by many templates held in memory once per hash
+shared by many templates held in memory once per hash; content pins a layout
+revision; a second demo layout for the same document
 |A layout change never alters a published template unnoticed
-|
+|done
 
 |5 Operations
 |Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
@@ -110,16 +111,4 @@ mode
 chart components; real-time collaboration
 |–
 |
-|===
-
-== Open decisions
-
-[cols="3,1,2",options="header"]
-|===
-|Decision |Before |Recommendation
-
-|Does a content template pin a specific layout revision?
-|Phase 4
-|Yes; moving to a newer layout revision is explicit and re-runs the publish
-checks
 |===

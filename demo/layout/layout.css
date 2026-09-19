@@ -1,0 +1,73 @@
+/* Print CSS of the demo layout. Page boxes are in template.xhtml, for their translated texts. */
+
+@font-face {
+    font-family: 'Special Elite';
+    src: url('fonts/SpecialElite-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Roboto';
+    src: url('fonts/Roboto.ttf') format('truetype');
+}
+
+body {
+    margin: 0;
+    font-family: 'Roboto';
+    font-size: 10.5pt;
+    line-height: 1.4;
+    color: #1d1d1b;
+}
+
+h1, h2, h3 {
+    font-family: 'Special Elite';
+    color: #0069b4;
+    margin: 1.2em 0 0.4em 0;
+    page-break-after: avoid;
+}
+
+h1 { font-size: 22pt; margin-top: 0; }
+h2 { font-size: 15pt; }
+h3 { font-size: 12pt; }
+
+/* Style catalog (layout.json "styles") */
+.lead { font-size: 12.5pt; }
+.small { font-size: 8.5pt; color: #555555; }
+.highlight { background-color: #fff3b0; }
+
+a { color: #0056a0; }
+
+.logo { width: 50mm; }
+.photo { width: 80mm; }
+.divider { width: 100%; margin: 4mm 0; }
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 2mm 0 4mm 0;
+    -fs-table-paginate: paginate;
+}
+caption { text-align: left; font-weight: bold; padding-bottom: 2mm; }
+th, td { border: 0.5pt solid #808080; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+thead th { background-color: #e6eff7; }
+td.number, th.number { text-align: right; }
+tfoot td { font-weight: bold; }
+
+.columns { overflow: hidden; margin: 2mm 0; }
+.col { float: left; width: 48%; }
+.col + .col { margin-left: 4%; }
+
+.box {
+    border: 0.75pt solid #0069b4;
+    background-color: #eef4fa;
+    padding: 3mm 4mm;
+    margin: 4mm 0;
+    page-break-inside: avoid;
+}
+
+.footnote { float: footnote; font-size: 8.5pt; }
+::footnote-call { counter-increment: footnote; content: counter(footnote); vertical-align: super; font-size: 7pt; }
+::footnote-marker { content: counter(footnote) ". "; }
+
+.page-break { page-break-after: always; }
+
+.box-title { margin: 0 0 1mm 0; }

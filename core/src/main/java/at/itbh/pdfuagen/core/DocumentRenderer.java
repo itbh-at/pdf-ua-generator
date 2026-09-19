@@ -374,13 +374,15 @@ public final class DocumentRenderer {
 
   private Rendered renderEmail(RenderRequest request, Document document, ResourceResolver resolver)
       throws RenderException {
-    Optional<byte[]> cssBytes = request.repository().resource(EMAIL_CSS);
+    // With a layout, email.css is the layout's; the content cannot bring its own.
+    String cssPath = Layouts.prefix(request.repository()).orElse("") + EMAIL_CSS;
+    Optional<byte[]> cssBytes = request.repository().resource(cssPath);
     if (cssBytes.isEmpty()) {
       throw new RenderException(
           List.of(
               new Problem(
                   Problem.TEMPLATE_ERROR,
-                  "the template provides no " + EMAIL_CSS + " for email HTML",
+                  "the template provides no " + cssPath + " for email HTML",
                   request.templateId())));
     }
     DocumentModel model = model(document, resolver);

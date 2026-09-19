@@ -51,6 +51,10 @@ final class SelfContainedXhtml {
         dataUri(ResourceResolver.BASE, src).ifPresent(uri -> img.setAttribute("src", uri));
       }
     }
+    // Before the links become <style> elements, whose URLs are already rewritten.
+    for (Element style : elements(document, "style")) {
+      style.setTextContent(rewriteCss(style.getTextContent(), ResourceResolver.BASE));
+    }
     for (Element link : elements(document, "link")) {
       if (!"stylesheet".equalsIgnoreCase(link.getAttribute("rel").strip())) {
         continue;
@@ -68,9 +72,6 @@ final class SelfContainedXhtml {
                     rewriteCss(new String(css.bytes(), StandardCharsets.UTF_8), href));
                 link.getParentNode().replaceChild(style, link);
               });
-    }
-    for (Element style : elements(document, "style")) {
-      style.setTextContent(rewriteCss(style.getTextContent(), ResourceResolver.BASE));
     }
     NodeList all = document.getElementsByTagName("*");
     for (int i = 0; i < all.getLength(); i++) {

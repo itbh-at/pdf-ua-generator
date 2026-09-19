@@ -11,15 +11,16 @@ command-line tool and as a REST service.
 ## Usage
 
 ```bash
-pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png --verify
-pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png -f docx
-pdf-ua-generator schema -t demo/demo.xhtml
-pdf-ua-generator check -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png
+pdf-ua-generator render -t demo/demo.xhtml -L demo/layout -d demo/data.json -a photo=demo/photo.png --verify
+pdf-ua-generator render -t demo/demo.xhtml -L demo/layout-memo -d demo/data.json -a photo=demo/photo.png -f docx
+pdf-ua-generator schema -t demo/demo.xhtml -L demo/layout
+pdf-ua-generator check -t demo/demo.xhtml -L demo/layout -d demo/data.json -a photo=demo/photo.png
 ```
 
-The first command renders `demo/demo.xhtml` with the data from
-`demo/data.json` and the attached photo into `demo/demo.pdf` and checks it
-against PDF/UA-1; the second writes `demo/demo.docx`. Formats: `pdf`, `xhtml`,
+The first command renders the content template `demo/demo.xhtml` in the layout
+`demo/layout` with the data from `demo/data.json` and the attached photo into
+`demo/demo.pdf` and checks it against PDF/UA-1; the second writes the same
+document as `demo/demo.docx` in the memo layout. Formats: `pdf`, `xhtml`,
 `email-html`, `text`, `docx`, `odt`. `schema` prints the JSON Schema of the
 data the template needs, derived from the template and its field definitions
 in `demo/demo.json`; `check` runs the checks a template must pass before it is

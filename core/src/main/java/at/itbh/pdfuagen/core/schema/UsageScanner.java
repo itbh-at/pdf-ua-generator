@@ -15,6 +15,7 @@ import io.quarkus.qute.SectionNode;
 import io.quarkus.qute.SetSectionHelper;
 import io.quarkus.qute.Template;
 import io.quarkus.qute.TemplateNode;
+import io.quarkus.qute.UserTagSectionHelper;
 import io.quarkus.qute.WhenSectionHelper;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -66,7 +67,18 @@ final class UsageScanner {
    */
   record Usage(List<Step> steps, boolean optional, List<Guard> guards, String location) {}
 
-  record Result(List<Usage> usages, List<Problem> problems) {}
+  /**
+   * A component call, {@code {#box title='…'}…{/box}}.
+   *
+   * @param parameters the names of the parameters passed
+   */
+  record Call(String component, List<String> parameters, String location) {}
+
+  /** A layout text read with {@code {msg:key}}. */
+  record MessageUse(String key, String location) {}
+
+  record Result(
+      List<Usage> usages, List<Problem> problems, List<Call> calls, List<MessageUse> messages) {}
 
   private static final List<String> DEFAULT_METHODS = List.of("or", "?:");
   private static final String OR_EMPTY = "orEmpty";
@@ -77,6 +89,8 @@ final class UsageScanner {
   private final Function<String, Optional<Template>> includes;
   private final List<Usage> usages = new ArrayList<>();
   private final List<Problem> problems = new ArrayList<>();
+  private final List<Call> calls = new ArrayList<>();
+  private final List<MessageUse> messages = new ArrayList<>();
   private final Deque<Map<String, Binding>> scopes = new ArrayDeque<>();
   private final Deque<Guard> guards = new ArrayDeque<>();
   private final Deque<String> includeStack = new ArrayDeque<>();
@@ -92,7 +106,11 @@ final class UsageScanner {
     UsageScanner scanner = new UsageScanner(includes);
     scanner.includeStack.push(template.getId());
     scanner.nodes(template.getNodes());
-    return new Result(List.copyOf(scanner.usages), List.copyOf(scanner.problems));
+    return new Result(
+        List.copyOf(scanner.usages),
+        List.copyOf(scanner.problems),
+        List.copyOf(scanner.calls),
+        List.copyOf(scanner.messages));
   }
 
   private void nodes(List<TemplateNode> nodes) {
@@ -111,6 +129,8 @@ final class UsageScanner {
       case IfSectionHelper _ -> conditional(section);
       case WhenSectionHelper _ -> when(section);
       case SetSectionHelper _ -> let(section);
+      // Before IncludeSectionHelper, which it extends.
+      case UserTagSectionHelper _ -> component(section);
       case IncludeSectionHelper _ -> include(section);
       default -> {
         // #insert, #fragment and other sections without own data semantics.
@@ -195,6 +215,26 @@ final class UsageScanner {
     scopes.pop();
   }
 
+  /**
+   * A component: its parameters are read in the caller's scope, its nested content too. The
+   * component's own template reads only its parameters and is checked on its own.
+   */
+  private void component(SectionNode section) {
+    SectionBlock main = section.getBlocks().getFirst();
+    List<String> parameters = new ArrayList<>();
+    main.parameters.forEach(
+        (key, value) -> {
+          if (!key.startsWith("_") && !(key.equals("it") && value.equals("it"))) {
+            parameters.add(key);
+          }
+        });
+    calls.add(new Call(section.getName(), List.copyOf(parameters), location(section.getOrigin())));
+    main.expressions.values().forEach(e -> expression(e, false));
+    for (SectionBlock block : section.getBlocks()) {
+      nodes(block.nodes);
+    }
+  }
+
   private void include(SectionNode section) {
     SectionBlock main = section.getBlocks().getFirst();
     String id = main.parameters.get("template");
@@ -239,6 +279,13 @@ final class UsageScanner {
     List<Step> steps;
     int start;
     if (expression.hasNamespace()) {
+      if (expression.getNamespace().equals(at.itbh.pdfuagen.core.Messages.NAMESPACE)) {
+        messages.add(new MessageUse(parts.getFirst().getName(), location));
+        return null;
+      }
+      if (expression.getNamespace().equals("doc")) {
+        return null;
+      }
       if (!expression.getNamespace().equals("data")) {
         problems.add(
             new Problem(

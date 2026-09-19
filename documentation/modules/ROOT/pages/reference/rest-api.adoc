@@ -49,14 +49,25 @@ corrected — and `warnings`.
 Template ids consist of lower-case letters, digits and `-`, at most 64
 characters.
 
+Templates and layouts share these endpoints. A bundle with `layout.json` is a
+layout; a template keeps the kind of its first revision (409 otherwise). A
+layout is previewed with the render endpoints like any template.
+
+A content revision pins the layout revision named in its `template.json`. It
+can be published only if that layout revision is published. A layout that
+content pins cannot be deleted, nor can a pinned layout revision (409).
+`+GET /templates/{id}+` of a layout lists the pinning revisions in `usedBy`.
+
 A revision:
 
 [source,json]
 ----
 {
   "template": "invoice",
+  "kind": "content",
   "revision": 3,
   "status": "draft",
+  "layout": "corporate@2",
   "sha256": "854ba28b…",
   "createdAt": "2026-09-19T20:30:08.206936Z",
   "publishedAt": null,
@@ -97,6 +108,10 @@ variant in every offered format.
 |anything else
 |Assets: stylesheets, fonts, images, `email.css`, `template.txt`.
 |===
+
+A layout bundle holds the files described under
+xref:reference/layouts.adoc[Layouts], plus `example.json` for its publish
+checks, which render the layout on its own.
 
 Limits: 50 MB uncompressed, 1000 files (see
 xref:reference/configuration.adoc[Configuration]).

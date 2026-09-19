@@ -37,7 +37,21 @@ public class TemplateStore {
   public static final String DRAFT = "draft";
   public static final String PUBLISHED = "published";
 
+  public static final String CONTENT = "content";
+  public static final String LAYOUT = "layout";
+
+  /** A new revision is of another kind than the template's earlier revisions. */
+  public static final class KindMismatchException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    KindMismatchException(String message) {
+      super(message);
+    }
+  }
+
   /**
+   * @param layoutId the layout this content revision pins, or {@code null}
+   * @param layoutRevision the pinned layout revision, or {@code null}
    * @param files content hash by path
    */
   public record Revision(
@@ -47,6 +61,8 @@ public class TemplateStore {
       String sha256,
       OffsetDateTime createdAt,
       OffsetDateTime publishedAt,
+      String layoutId,
+      Integer layoutRevision,
       Map<String, String> files) {
 
     public boolean published() {
@@ -59,7 +75,10 @@ public class TemplateStore {
    * @param latest number of the latest revision
    */
   public record Template(
-      String id, OffsetDateTime createdAt, Integer latestPublished, int latest) {}
+      String id, String kind, OffsetDateTime createdAt, Integer latestPublished, int latest) {}
+
+  /** A content revision that pins a layout revision. */
+  public record Dependent(String templateId, int number, String status, int layoutRevision) {}
 
   /** A stored file, served publicly if it is an image. */
   public record Asset(String sha256, String mediaType, byte[] content) {}
@@ -68,7 +87,7 @@ public class TemplateStore {
 
   public List<Template> list() {
     return query(
-        "select t.id, t.created_at,"
+        "select t.id, t.kind, t.created_at,"
             + " (select max(number) from revision r where r.template_id = t.id"
             + "  and r.status = 'published') as latest_published,"
             + " (select coalesce(max(number), 0) from revision r where r.template_id = t.id)"
@@ -80,7 +99,7 @@ public class TemplateStore {
 
   public Optional<Template> find(String id) {
     return query(
-            "select t.id, t.created_at,"
+            "select t.id, t.kind, t.created_at,"
                 + " (select max(number) from revision r where r.template_id = t.id"
                 + "  and r.status = 'published') as latest_published,"
                 + " (select coalesce(max(number), 0) from revision r where r.template_id = t.id)"
@@ -92,16 +111,41 @@ public class TemplateStore {
         .findFirst();
   }
 
-  /** Stores the files as a new draft revision, creating the template if needed. */
-  public Revision createRevision(String templateId, Map<String, byte[]> files) {
+  /**
+   * Stores the files as a new draft revision, creating the template if needed.
+   *
+   * @param kind {@link #CONTENT} or {@link #LAYOUT}; must match the template's earlier revisions
+   * @param layoutId the layout a content revision pins, or {@code null}
+   * @throws KindMismatchException if the template is of the other kind
+   */
+  public Revision createRevision(
+      String templateId,
+      Map<String, byte[]> files,
+      String kind,
+      String layoutId,
+      Integer layoutRevision) {
     return transaction(
         c -> {
-          update(c, "insert into template (id) values (?) on conflict do nothing", templateId);
+          update(
+              c,
+              "insert into template (id, kind) values (?, ?) on conflict do nothing",
+              templateId,
+              kind);
           // Serializes revision numbers per template.
           try (PreparedStatement s =
               c.prepareStatement("select 1 from template where id = ? for update")) {
             s.setString(1, templateId);
             s.executeQuery().close();
+          }
+          try (PreparedStatement s = c.prepareStatement("select kind from template where id = ?")) {
+            s.setString(1, templateId);
+            try (ResultSet r = s.executeQuery()) {
+              r.next();
+              if (!r.getString(1).equals(kind)) {
+                throw new KindMismatchException(
+                    "'" + templateId + "' is a " + r.getString(1) + " template, not a " + kind);
+              }
+            }
           }
           int number;
           try (PreparedStatement s =
@@ -130,11 +174,14 @@ public class TemplateStore {
           }
           update(
               c,
-              "insert into revision (template_id, number, status, sha256) values (?, ?, ?, ?)",
+              "insert into revision (template_id, number, status, sha256, layout_id,"
+                  + " layout_revision) values (?, ?, ?, ?, ?, ?)",
               templateId,
               number,
               DRAFT,
-              manifestHash(hashes));
+              manifestHash(hashes),
+              layoutId,
+              layoutRevision);
           try (PreparedStatement s =
               c.prepareStatement(
                   "insert into revision_file (template_id, number, path, asset_sha256)"
@@ -220,6 +267,15 @@ public class TemplateStore {
         == 1;
   }
 
+  /** The content revisions that pin a revision of a layout. */
+  public List<Dependent> dependents(String layoutId) {
+    return query(
+        "select template_id, number, status, layout_revision from revision where layout_id = ?"
+            + " order by template_id, number",
+        List.of(layoutId),
+        r -> new Dependent(r.getString(1), r.getInt(2), r.getString(3), r.getInt(4)));
+  }
+
   public Optional<Asset> asset(String sha256) {
     return query(
             "select sha256, media_type, content from asset where sha256 = ?",
@@ -260,7 +316,8 @@ public class TemplateStore {
     }
     try (PreparedStatement s =
         c.prepareStatement(
-            "select status, sha256, created_at, published_at from revision"
+            "select status, sha256, created_at, published_at, layout_id, layout_revision"
+                + " from revision"
                 + " where template_id = ? and number = ?")) {
       s.setString(1, templateId);
       s.setInt(2, number);
@@ -276,18 +333,22 @@ public class TemplateStore {
                 r.getString(2),
                 r.getObject(3, OffsetDateTime.class),
                 r.getObject(4, OffsetDateTime.class),
+                r.getString(5),
+                (Integer) r.getObject(6),
                 java.util.Collections.unmodifiableMap(files)));
       }
     }
   }
 
   private static Template template(ResultSet r) throws SQLException {
-    int published = r.getInt(3);
+    int published = r.getInt(4);
+    boolean none = r.wasNull();
     return new Template(
         r.getString(1),
-        r.getObject(2, OffsetDateTime.class),
-        r.wasNull() ? null : published,
-        r.getInt(4));
+        r.getString(2),
+        r.getObject(3, OffsetDateTime.class),
+        none ? null : published,
+        r.getInt(5));
   }
 
   // ---------------------------------------------------------------------------------------------

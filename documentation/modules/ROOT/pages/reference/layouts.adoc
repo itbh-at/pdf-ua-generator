@@ -1,0 +1,175 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Layouts
+:description: The files of a layout, layout.json, components, texts per language, and the rules for content templates that fill a layout.
+
+A layout gives content templates their page format, stylesheets, fonts, running
+headers and footers, style catalog and components. `demo/layout/` and
+`demo/layout-memo/` are two layouts for the same demo document.
+
+== Files
+
+[cols="2,5",options="header"]
+|===
+|File |Content
+
+|`layout.json`
+|The layout descriptor, see below. Its presence makes a template a layout.
+
+|`template.xhtml`
+|The page skeleton with an `+{#insert}+` for every area. May contain `<style>`,
+e.g. for `@page` boxes with translated texts.
+
+|`components/<name>.xhtml`
+|One file per component.
+
+|`messages.json`, `messages.<tag>.json`
+|Texts of the layout: default and per language.
+
+|`email.css`
+|Stylesheet for email HTML.
+
+|`layout.dotx`, `layout.ott`
+|Optional Word and ODF templates; every catalog style must exist in them by
+name.
+
+|anything else
+|Stylesheets, fonts, images of the layout.
+|===
+
+To content — and to the layout itself — the layout's files appear under
+`layout/`: the skeleton links `layout/layout.css`, shows `layout/logo.svg`.
+Paths inside a stylesheet are relative to it (`url('fonts/Roboto.ttf')`).
+
+== layout.json
+
+[source,json]
+----
+{
+  "language": "en",
+  "styles": {
+    "lead": { "label": "Lead paragraph" },
+    "highlight": { "label": "Highlight", "kind": "character" }
+  },
+  "classes": ["logo", "columns", "col", "box"],
+  "areas": {
+    "title": { "label": "Title", "required": true },
+    "body": { "label": "Content", "required": true }
+  },
+  "components": {
+    "box": { "label": "Box", "parameters": { "title": { "label": "Title" } } }
+  },
+  "fonts": ["Roboto"],
+  "freeStyling": false,
+  "fields": { "recipient": { "type": "text" } }
+}
+----
+
+[cols="1,4",options="header"]
+|===
+|Key |Meaning
+
+|`language`
+|Language of `messages.json`. Required.
+
+|`styles`
+|The style catalog: CSS classes content may use. `kind` is `paragraph`
+(default: `p`, headings, list items, table cells, images) or `character`
+(`span`, `strong`, `em`, `a`, …). Each must be defined in the layout's
+stylesheets.
+
+|`classes`
+|Further classes of the skeleton and the components; not for content.
+
+|`areas`
+|The areas content fills, by `+{#insert}+` name. `required` areas must be
+filled. At least one.
+
+|`components`
+|Components with their `parameters`; `required` parameters must be passed.
+
+|`fonts`
+|Font families free CSS may name.
+
+|`freeStyling`
+|Whether content may opt into free styling. Default `false`.
+
+|`fields`
+|Data the layout reads, e.g. a recipient in the letterhead, as in the template
+descriptor. They join the content's fields in one schema; a name may be defined
+only once.
+|===
+
+== Components
+
+`components/box.xhtml`:
+
+[source,html]
+----
+<div data-block="box" class="box">{#if title??}<p><strong>{title}</strong></p>{/if}{nested-content}</div>
+----
+
+Used in content:
+
+----
+{#box title="Note"}<p>Kept together on one page.</p>{/box}
+----
+
+A component reads only its parameters, `it` and `+{nested-content}+`, never
+template data. Blocks of the document model are marked with `data-block`, see
+xref:reference/building-blocks.adoc[Template building blocks]. A component
+cannot take a name Qute reserves (`if`, `for`, `include`, …).
+
+== Texts and language
+
+`+{msg:page}+` is the text `page`: from `messages.<tag>.json` for the language of
+the rendered variant, shortened step by step (`de-AT`, then `de`), otherwise
+from `messages.json`. Every text the layout uses must be in `messages.json`;
+a translation file must not have other keys. Missing translations are
+warnings.
+
+`+{doc:lang}+` is the language tag of the rendered variant, for
+`<html lang="{doc:lang}">`.
+
+== Previewing a layout
+
+A layout renders on its own, with the default content of its `+{#insert}+`
+areas — give them a preview text:
+
+----
+pdf-ua-generator render -t demo/layout -f pdf
+pdf-ua-generator check -t demo/layout -d example.json
+----
+
+[[content-rules]]
+== Rules for content
+
+A content template with a layout:
+
+* consists of one `+{#include layout}+` whose blocks fill declared areas:
++
+----
+{#include layout}
+{#title}Invoice{/title}
+{#body}<p class="lead">…</p>{/body}
+{/include}
+----
+* has no `<style>`, no `style` attributes and no `<link>`;
+* uses only classes of the style catalog, each on elements of its kind, and
+  writes them literally, not computed from data;
+* passes only declared parameters to components, and every required one.
+
+These rules are checked on the template source, with line and column.
+
+[[free-styling]]
+== Free styling
+
+With `"styling": "free"` in its descriptor, a content template may use `<style>`
+and `style` attributes and any class — if the layout allows it
+(`"freeStyling": true`). It is rendered to PDF and XHTML only. Hard limits
+stay: no `@import`, no `!important`, no `@font-face`, no `font` shorthand,
+`font-family` only from the layout's `fonts`, `url()` only to template assets
+and attachments. All other publish checks apply unchanged.

@@ -39,6 +39,8 @@ class RenderCommandTest {
             "render",
             "-t",
             DEMO.resolve("demo.xhtml").toString(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
             "-d",
             DEMO.resolve("data-email.json").toString(),
             "-o",
@@ -59,6 +61,8 @@ class RenderCommandTest {
             "render",
             "-t",
             DEMO.resolve("demo.xhtml").toString(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
             "-d",
             DEMO.resolve("data-email.json").toString(),
             "-f",
@@ -91,6 +95,8 @@ class RenderCommandTest {
             "render",
             "-t",
             DEMO.resolve("demo.xhtml").toString(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
             "-o",
             tmp.resolve("x.pdf").toString()));
     // The data is validated against the schema before Qute runs.
@@ -106,6 +112,8 @@ class RenderCommandTest {
               "render",
               "-t",
               DEMO.resolve("demo.xhtml").toString(),
+              "--layout",
+              DEMO.resolve("layout").toString(),
               "-d",
               DEMO.resolve("data.json").toString(),
               "-a",
@@ -125,6 +133,8 @@ class RenderCommandTest {
       "render",
       "-t",
       DEMO.resolve("demo.xhtml").toString(),
+      "--layout",
+      DEMO.resolve("layout").toString(),
       "-d",
       DEMO.resolve("data-email.json").toString(),
       "-f",
@@ -143,6 +153,8 @@ class RenderCommandTest {
         "render",
         "-t",
         DEMO.resolve("demo.xhtml").toString(),
+        "--layout",
+        DEMO.resolve("layout").toString(),
         "-d",
         DEMO.resolve("data-email.json").toString(),
         "-o",
@@ -153,6 +165,15 @@ class RenderCommandTest {
   @Test
   void verifyRequiresPdf() {
     assertEquals(
-        2, run("render", "-t", DEMO.resolve("demo.xhtml").toString(), "-f", "xhtml", "--verify"));
+        2,
+        run(
+            "render",
+            "-t",
+            DEMO.resolve("demo.xhtml").toString(),
+            "--layout",
+            DEMO.resolve("layout").toString(),
+            "-f",
+            "xhtml",
+            "--verify"));
   }
 }

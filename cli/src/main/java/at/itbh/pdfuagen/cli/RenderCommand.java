@@ -5,7 +5,6 @@
 
 package at.itbh.pdfuagen.cli;
 
-import at.itbh.pdfuagen.core.DirectoryTemplateRepository;
 import at.itbh.pdfuagen.core.DocumentRenderer;
 import at.itbh.pdfuagen.core.LanguageVariants;
 import at.itbh.pdfuagen.core.OutputFormat;
@@ -15,6 +14,7 @@ import at.itbh.pdfuagen.core.RenderRequest;
 import at.itbh.pdfuagen.core.Rendered;
 import at.itbh.pdfuagen.core.ResourceFetcher;
 import at.itbh.pdfuagen.core.ResourceLimits;
+import at.itbh.pdfuagen.core.TemplateRepository;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -181,7 +181,7 @@ final class RenderCommand implements Callable<Integer> {
     PrintWriter err = spec.commandLine().getErr();
     Path root = template.root();
     try {
-      DirectoryTemplateRepository repository = template.repository();
+      TemplateRepository repository = template.repository();
       String templateId =
           lang == null
               ? template.templateId()
@@ -237,6 +237,9 @@ final class RenderCommand implements Callable<Integer> {
     Set<Path> dirs = new LinkedHashSet<>();
     dirs.add(template.root().toAbsolutePath());
     template.includePaths.forEach(p -> dirs.add(p.toAbsolutePath()));
+    if (template.layout != null) {
+      dirs.add(template.layout.toAbsolutePath());
+    }
     if (data != null && !"-".equals(data)) {
       dirs.add(Path.of(data).toAbsolutePath().getParent());
     }

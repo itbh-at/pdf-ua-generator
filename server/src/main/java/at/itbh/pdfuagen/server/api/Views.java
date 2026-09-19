@@ -9,6 +9,7 @@ import at.itbh.pdfuagen.core.OutputFormat;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
 import at.itbh.pdfuagen.core.TemplateRepository;
+import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import at.itbh.pdfuagen.server.render.RenderService;
 import at.itbh.pdfuagen.server.store.Bundle;
 import at.itbh.pdfuagen.server.store.TemplateStore;
@@ -24,18 +25,38 @@ final class Views {
 
   private Views() {}
 
-  /** A stored revision with its files ready to render. */
-  record Target(TemplateStore.Revision revision, TemplateRepository repository) {}
+  /**
+   * A stored revision with its files ready to render.
+   *
+   * @param layout the layout revision the content pins, or {@code null}
+   */
+  record Target(
+      TemplateStore.Revision revision,
+      TemplateStore.Revision layout,
+      TemplateRepository repository) {}
 
+  /**
+   * @param usedBy for a layout: the content revisions that pin one of its revisions
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record TemplateView(
       String id,
+      String kind,
       OffsetDateTime createdAt,
       Integer publishedRevision,
       int latestRevision,
-      List<RevisionSummary> revisions) {}
+      List<RevisionSummary> revisions,
+      List<UsedBy> usedBy) {}
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record RevisionSummary(
-      int revision, String status, OffsetDateTime createdAt, OffsetDateTime publishedAt) {}
+      int revision,
+      String status,
+      String layout,
+      OffsetDateTime createdAt,
+      OffsetDateTime publishedAt) {}
+
+  record UsedBy(String template, int revision, String status, int layoutRevision) {}
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record ProblemView(String type, String detail, String pointer, String location) {
@@ -55,10 +76,13 @@ final class Views {
    * @param problems template errors that prevent rendering; empty for a usable revision
    * @param warnings findings that do not
    */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record RevisionView(
       String template,
+      String kind,
       int revision,
       String status,
+      String layout,
       String sha256,
       OffsetDateTime createdAt,
       OffsetDateTime publishedAt,
@@ -69,15 +93,33 @@ final class Views {
       List<ProblemView> problems,
       List<String> warnings) {}
 
-  static TemplateView template(TemplateStore.Template t, List<TemplateStore.Revision> revisions) {
+  static TemplateView template(
+      TemplateStore.Template t,
+      List<TemplateStore.Revision> revisions,
+      List<TemplateStore.Dependent> dependents) {
     return new TemplateView(
         t.id(),
+        t.kind(),
         t.createdAt(),
         t.latestPublished(),
         t.latest(),
-        revisions.stream()
-            .map(r -> new RevisionSummary(r.number(), r.status(), r.createdAt(), r.publishedAt()))
-            .toList());
+        revisions == null
+            ? null
+            : revisions.stream()
+                .map(
+                    r ->
+                        new RevisionSummary(
+                            r.number(), r.status(), layout(r), r.createdAt(), r.publishedAt()))
+                .toList(),
+        dependents == null
+            ? null
+            : dependents.stream()
+                .map(d -> new UsedBy(d.templateId(), d.number(), d.status(), d.layoutRevision()))
+                .toList());
+  }
+
+  static String layout(TemplateStore.Revision r) {
+    return r.layoutId() == null ? null : r.layoutId() + "@" + r.layoutRevision();
   }
 
   static RevisionView revision(Target target, RenderService service) {
@@ -93,8 +135,12 @@ final class Views {
     var language = renderer.language(repository, Bundle.TEMPLATE);
     return new RevisionView(
         revision.templateId(),
+        revision.files().containsKey(LayoutDescriptor.FILE)
+            ? TemplateStore.LAYOUT
+            : TemplateStore.CONTENT,
         revision.number(),
         revision.status(),
+        layout(revision),
         revision.sha256(),
         revision.createdAt(),
         revision.publishedAt(),

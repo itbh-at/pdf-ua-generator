@@ -18,7 +18,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -43,8 +42,7 @@ class FormatsTest {
     }
     Map<String, byte[]> attachments =
         photo ? Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))) : Map.of();
-    return new RenderRequest(
-        "demo.xhtml", new DirectoryTemplateRepository(DEMO, List.of()), values, attachments);
+    return new RenderRequest("demo.xhtml", Demo.repository(), values, attachments);
   }
 
   private static Map<String, String> unzip(byte[] zip) throws Exception {
@@ -99,7 +97,7 @@ class FormatsTest {
         new String(
             renderer.render(request("data-email.json", false), OutputFormat.EMAIL_HTML).content(),
             StandardCharsets.UTF_8);
-    String logoHash = DocumentRenderer.sha256(Files.readAllBytes(DEMO.resolve("logo.svg")));
+    String logoHash = DocumentRenderer.sha256(Files.readAllBytes(DEMO.resolve("layout/logo.svg")));
 
     assertTrue(html.contains("src=\"https://assets.example.invalid/assets/" + logoHash + ".png\""));
     assertTrue(html.contains("role=\"article\""));
@@ -124,7 +122,9 @@ class FormatsTest {
             renderer.render(request("data.json", true), OutputFormat.TEXT).content(),
             StandardCharsets.UTF_8);
 
-    assertTrue(text.startsWith("All-in-one accessible document example\n=========="));
+    // The layout's logo comes first, as its alt text.
+    assertTrue(text.startsWith("[Logo of IT Beratung Hermann GmbH]\n\nAll-in-one accessible"));
+    assertTrue(text.contains("All-in-one accessible document example\n=========="));
     assertTrue(text.contains("homepage <https://www.itbh.at/>"));
     assertTrue(text.contains("[1] Footnotes are real footnotes"));
     assertTrue(text.lines().allMatch(line -> line.length() <= 72), text);

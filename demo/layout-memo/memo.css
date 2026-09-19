@@ -1,0 +1,70 @@
+/* Print CSS of the memo layout: a typewriter memo in one font. */
+
+@font-face {
+    font-family: 'Special Elite';
+    src: url('fonts/SpecialElite-Regular.ttf') format('truetype');
+}
+
+body {
+    margin: 0;
+    font-family: 'Special Elite';
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: #222222;
+}
+
+h1, h2, h3 {
+    font-family: 'Special Elite';
+    color: #8b1e1e;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 1.4em 0 0.5em 0;
+    page-break-after: avoid;
+}
+
+h1 { font-size: 18pt; margin-top: 2mm; border-bottom: 1.5pt solid #8b1e1e; padding-bottom: 2mm; }
+h2 { font-size: 13pt; }
+h3 { font-size: 11pt; }
+
+/* Style catalog (layout.json "styles") */
+.lead { font-size: 11.5pt; border-left: 3pt solid #8b1e1e; padding-left: 4mm; }
+.small { font-size: 8.5pt; color: #666666; }
+.highlight { text-decoration: underline; }
+
+a { color: #8b1e1e; }
+
+.letterhead { text-align: right; margin: 0; }
+.logo { width: 35mm; }
+.memo-label { font-size: 9pt; letter-spacing: 0.3em; color: #8b1e1e; margin: 0; }
+.photo { width: 60mm; border: 0.75pt solid #222222; }
+.divider { width: 100%; margin: 3mm 0; }
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 2mm 0 4mm 0;
+    -fs-table-paginate: paginate;
+}
+caption { text-align: left; color: #8b1e1e; padding-bottom: 2mm; }
+th, td { border-bottom: 0.5pt solid #222222; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
+thead th { border-bottom: 1.5pt solid #8b1e1e; }
+td.number, th.number { text-align: right; }
+tfoot td { border-top: 1.5pt solid #222222; border-bottom: 0; }
+
+.columns { overflow: hidden; margin: 2mm 0; }
+.col { float: left; width: 46%; }
+.col + .col { margin-left: 3%; padding-left: 3%; border-left: 0.5pt dashed #8b1e1e; }
+
+.box {
+    border: 2.25pt double #8b1e1e;
+    padding: 3mm 4mm;
+    margin: 4mm 0;
+    page-break-inside: avoid;
+}
+.box-title { margin: 0 0 1mm 0; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.footnote { float: footnote; font-size: 8.5pt; }
+::footnote-call { counter-increment: footnote; content: "[" counter(footnote) "]"; font-size: 8pt; }
+::footnote-marker { content: "[" counter(footnote) "] "; }
+
+.page-break { page-break-after: always; }

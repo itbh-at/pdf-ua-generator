@@ -1,9 +1,9 @@
-<html lang="en">
+{#include layout}
 
-<head>
-    <title>All-in-one accessible document example</title>
+{#title}All-in-one accessible document example{/title}
+
+{#head}
     <meta name="subject" content="Accessible documents from one template" />
-    <meta name="author" content="IT Beratung Hermann GmbH" />
     <meta name="description" content="One template with every building block, rendered to PDF/UA, XHTML, email HTML, DOCX, ODT and plain text." />
 
     <bookmarks>
@@ -14,108 +14,10 @@
         <bookmark name="Layout" href="#layout" />
         <bookmark name="Conclusion" href="#conclusion" />
     </bookmarks>
+{/head}
 
-    <style>
-        @font-face {
-            font-family: 'Special Elite';
-            src: url('SpecialElite-Regular.ttf') format('truetype');
-        }
-
-        @font-face {
-            font-family: 'Roboto';
-            src: url('Roboto.ttf') format('truetype');
-        }
-
-        @page {
-            size: A4;
-            margin: 25mm 20mm 20mm 20mm;
-
-            @top-left {
-                font-family: 'Roboto';
-                font-size: 9pt;
-                color: #555555;
-                content: "Accessible document example";
-            }
-
-            @bottom-right {
-                font-family: 'Roboto';
-                font-size: 9pt;
-                color: #555555;
-                content: counter(page) " / " counter(pages);
-            }
-
-            @footnote {
-                border-top: 0.5pt solid #555555;
-                padding-top: 2mm;
-            }
-        }
-
-        body {
-            margin: 0;
-            font-family: 'Roboto';
-            font-size: 10.5pt;
-            line-height: 1.4;
-            color: #1d1d1b;
-        }
-
-        h1, h2, h3 {
-            font-family: 'Special Elite';
-            color: #0069b4;
-            margin: 1.2em 0 0.4em 0;
-            page-break-after: avoid;
-        }
-
-        h1 { font-size: 22pt; margin-top: 0; }
-        h2 { font-size: 15pt; }
-        h3 { font-size: 12pt; }
-
-        /* Style catalog */
-        .lead { font-size: 12.5pt; }
-        .small { font-size: 8.5pt; color: #555555; }
-        .highlight { background-color: #fff3b0; }
-
-        a { color: #0056a0; }
-
-        .logo { width: 50mm; }
-        .photo { width: 80mm; }
-        .divider { width: 100%; margin: 4mm 0; }
-
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 2mm 0 4mm 0;
-            -fs-table-paginate: paginate;
-        }
-        caption { text-align: left; font-weight: bold; padding-bottom: 2mm; }
-        th, td { border: 0.5pt solid #808080; padding: 1.5mm 2mm; text-align: left; vertical-align: top; }
-        thead th { background-color: #e6eff7; }
-        td.number, th.number { text-align: right; }
-        tfoot td { font-weight: bold; }
-
-        .columns { overflow: hidden; margin: 2mm 0; }
-        .col { float: left; width: 48%; }
-        .col + .col { margin-left: 4%; }
-
-        .box {
-            border: 0.75pt solid #0069b4;
-            background-color: #eef4fa;
-            padding: 3mm 4mm;
-            margin: 4mm 0;
-            page-break-inside: avoid;
-        }
-
-        .footnote { float: footnote; font-size: 8.5pt; }
-        ::footnote-call { content: counter(footnote); vertical-align: super; font-size: 7pt; }
-        ::footnote-marker { content: counter(footnote) ". "; }
-
-        .page-break { page-break-after: always; }
-    </style>
-</head>
-
-<body>
-    <h1 id="top">All-in-one accessible document example</h1>
-
-    <p class="lead">One template, one set of data, six formats: this document is rendered to
+{#body}
+    <p class="lead">One layout, one template, one set of data, six formats: this document is rendered to
         <strong>PDF/UA</strong>, <em>self-contained XHTML</em>, email HTML, DOCX, ODT and plain text,
         and it is accessible in every one of them.</p>
 
@@ -123,8 +25,8 @@
     <p>Hello {customer.name}. Text can be <strong>strong</strong>, <em>emphasised</em> or use a
         <span class="highlight">catalog character style</span>. A phrase in another language is
         marked as such, so screen readers pronounce it correctly: the German word for accessibility
-        is <span lang="de-AT">Barrierefreiheit</span>.<span data-block="footnote" class="footnote">Footnotes
-        are real footnotes in PDF, DOCX and ODT, and a linked list at the end in HTML and text.</span></p>
+        is <span lang="de-AT">Barrierefreiheit</span>.{#footnote}Footnotes
+        are real footnotes in PDF, DOCX and ODT, and a linked list at the end in HTML and text.{/footnote}</p>
     <p class="small">This paragraph uses the catalog style <em>small</em>.</p>
 
     <h2 id="lists">Lists</h2>
@@ -145,13 +47,12 @@
     </ol>
 
     <h2 id="images">Images</h2>
-    <p><img class="logo" src="logo.svg" alt="Logo of IT Beratung Hermann GmbH" /></p>
-    <img class="divider" src="divider.svg" alt="" role="presentation" />
+    {#divider /}
     {#if photo??}
     <p><img class="photo" src="{photo.src}" alt="{photo.alt}" /></p>
     {/if}
-    <p>The logo is a template asset (SVG), the line above is decorative and skipped by screen readers,
-        and the photo is an attachment sent with the request.</p>
+    <p>The logo at the top belongs to the layout (SVG), the line above is decorative and skipped by
+        screen readers, and the photo is an attachment sent with the request.</p>
 
     <h2 id="tables">Tables</h2>
     <table>
@@ -181,27 +82,28 @@
     </table>
 
     <h2 id="layout">Layout</h2>
-    <div data-block="columns" class="columns">
-        <div data-block="col" class="col">
+    {#columns}
+        {#col}
             <h3>Left column</h3>
             <p>Columns are read in order: first the left column, then the right one.</p>
-        </div>
-        <div data-block="col" class="col">
+        {/col}
+        {#col}
             <h3>Right column</h3>
             <p>In DOCX and ODT they become a layout table; in email HTML a table with
                 <em>role="presentation"</em>.</p>
-        </div>
-    </div>
-    <div data-block="box" class="box">
+        {/col}
+    {/columns}
+    {#box title="Note"}
         <p>A framed box keeps related content together and is never split across pages.</p>
-    </div>
+    {/box}
     <p>Links work inside the document — back to the <a href="#top">top</a> — and to the outside,
         e.g. to the <a href="https://www.itbh.at/">IT Beratung Hermann GmbH homepage</a>.</p>
 
-    <div data-block="page-break" class="page-break"></div>
+    {#pagebreak /}
 
     <h2 id="conclusion">Conclusion</h2>
-    <p>Everything on the previous page came from one template and one JSON document.</p>
-</body>
+    <p>Everything on the previous page came from one template and one JSON document; the layout
+        adds the logo, the fonts, the page header and footer and the components.</p>
+{/body}
 
-</html>
+{/include}

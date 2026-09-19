@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +29,7 @@ class DemoTemplateTest {
     }
     return new RenderRequest(
         "demo.xhtml",
-        new DirectoryTemplateRepository(DEMO, List.of()),
+        Demo.repository(),
         data,
         Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));
   }

@@ -6,7 +6,6 @@
 package at.itbh.pdfuagen.core.bench;
 
 import at.itbh.pdfuagen.core.CachingTemplateRepository;
-import at.itbh.pdfuagen.core.DirectoryTemplateRepository;
 import at.itbh.pdfuagen.core.DocumentRenderer;
 import at.itbh.pdfuagen.core.JsonData;
 import at.itbh.pdfuagen.core.OutputFormat;
@@ -17,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -55,8 +53,7 @@ public class RenderBenchmark {
     try (InputStream in = Files.newInputStream(DEMO.resolve("data.json"))) {
       data = JsonData.parse(in);
     }
-    warmRepository =
-        new CachingTemplateRepository(new DirectoryTemplateRepository(DEMO, List.of()));
+    warmRepository = new CachingTemplateRepository(at.itbh.pdfuagen.core.Demo.repository());
   }
 
   private RenderRequest request(TemplateRepository repository) {
@@ -80,7 +77,7 @@ public class RenderBenchmark {
 
   @Benchmark
   public byte[] pdfCold() throws RenderException {
-    TemplateRepository fresh = new DirectoryTemplateRepository(DEMO, List.of());
+    TemplateRepository fresh = at.itbh.pdfuagen.core.Demo.repository();
     return renderer.render(request(fresh), OutputFormat.PDF).content();
   }
 }

@@ -1,0 +1,81 @@
+{
+  "language": "en",
+  "styles": {
+    "lead": {
+      "label": "Lead paragraph",
+      "description": "Larger introduction below the title."
+    },
+    "small": {
+      "label": "Small print"
+    },
+    "highlight": {
+      "label": "Highlight",
+      "kind": "character"
+    },
+    "number": {
+      "label": "Number column",
+      "description": "Right-aligned table cells."
+    },
+    "photo": {
+      "label": "Photo",
+      "description": "Image 80 mm wide."
+    }
+  },
+  "classes": [
+    "letterhead",
+    "memo-label",
+    "logo",
+    "divider",
+    "columns",
+    "col",
+    "box",
+    "box-title",
+    "footnote",
+    "page-break"
+  ],
+  "areas": {
+    "title": {
+      "label": "Title",
+      "required": true
+    },
+    "head": {
+      "label": "Document metadata",
+      "description": "meta elements and bookmarks"
+    },
+    "body": {
+      "label": "Content",
+      "required": true
+    }
+  },
+  "components": {
+    "columns": {
+      "label": "Columns",
+      "description": "Holds col components side by side."
+    },
+    "col": {
+      "label": "Column"
+    },
+    "box": {
+      "label": "Box",
+      "description": "Framed, never split across pages.",
+      "parameters": {
+        "title": {
+          "label": "Title"
+        }
+      }
+    },
+    "footnote": {
+      "label": "Footnote"
+    },
+    "divider": {
+      "label": "Divider",
+      "description": "Decorative line."
+    },
+    "pagebreak": {
+      "label": "Page break"
+    }
+  },
+  "fonts": [
+    "Special Elite"
+  ]
+}

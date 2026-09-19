@@ -6,9 +6,12 @@
 package at.itbh.pdfuagen.server.api;
 
 import at.itbh.pdfuagen.core.JsonData;
+import at.itbh.pdfuagen.core.LanguageVariants;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
 import at.itbh.pdfuagen.core.TemplateCheck;
+import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
+import at.itbh.pdfuagen.core.schema.TemplateDescriptor;
 import at.itbh.pdfuagen.server.ServerConfig;
 import at.itbh.pdfuagen.server.render.RenderService;
 import at.itbh.pdfuagen.server.store.Bundle;
@@ -48,20 +51,33 @@ public class TemplateResource {
 
   @GET
   public List<Views.TemplateView> list() {
-    return store.list().stream().map(t -> Views.template(t, List.of())).toList();
+    return store.list().stream().map(t -> Views.template(t, null, null)).toList();
   }
 
   @GET
   @Path("/{id}")
   public Views.TemplateView get(@PathParam("id") String id) {
     TemplateStore.Template template = targets.template(id);
-    return Views.template(template, store.revisions(id));
+    return Views.template(
+        template,
+        store.revisions(id),
+        TemplateStore.LAYOUT.equals(template.kind()) ? store.dependents(id) : null);
   }
 
   @DELETE
   @Path("/{id}")
   public Response delete(@PathParam("id") String id) {
-    if (!store.deleteTemplate(Targets.checkId(id))) {
+    List<String> users =
+        store.dependents(Targets.checkId(id)).stream()
+            .filter(d -> !d.templateId().equals(id))
+            .map(d -> d.templateId() + "@" + d.number())
+            .distinct()
+            .toList();
+    if (!users.isEmpty()) {
+      throw Problems.conflict(
+          "layout '" + id + "' is used by " + String.join(", ", users) + "; delete those first");
+    }
+    if (!store.deleteTemplate(id)) {
       throw Problems.notFound("template '" + id + "' does not exist");
     }
     return Response.noContent().build();
@@ -84,7 +100,29 @@ public class TemplateResource {
     } catch (Bundle.InvalidBundleException e) {
       throw Problems.of(Problems.INVALID_BUNDLE, 400, "Invalid bundle", e.getMessage());
     }
-    TemplateStore.Revision revision = store.createRevision(id, files);
+    String kind =
+        files.containsKey(LayoutDescriptor.FILE) ? TemplateStore.LAYOUT : TemplateStore.CONTENT;
+    TemplateDescriptor.LayoutRef layout = null;
+    byte[] descriptor = files.get(LanguageVariants.descriptorPath(Bundle.TEMPLATE));
+    if (kind.equals(TemplateStore.CONTENT) && descriptor != null) {
+      try {
+        layout = TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE).layout();
+      } catch (RenderException e) {
+        // Reported with the revision's problems.
+      }
+    }
+    TemplateStore.Revision revision;
+    try {
+      revision =
+          store.createRevision(
+              id,
+              files,
+              kind,
+              layout == null ? null : layout.id(),
+              layout == null ? null : layout.revision());
+    } catch (TemplateStore.KindMismatchException e) {
+      throw Problems.conflict(e.getMessage());
+    }
     Views.Target loaded = targets.revision(id, revision.number());
     return Response.created(
             uri.getBaseUriBuilder()
@@ -114,6 +152,14 @@ public class TemplateResource {
   @Path("/{id}/revisions/{n}")
   public Response deleteRevision(@PathParam("id") String id, @PathParam("n") int n) {
     Views.Target loaded = targets.revision(id, n);
+    List<String> users =
+        store.dependents(id).stream()
+            .filter(d -> d.layoutRevision() == n)
+            .map(d -> d.templateId() + "@" + d.number())
+            .toList();
+    if (!users.isEmpty()) {
+      throw Problems.conflict("revision " + n + " is used by " + String.join(", ", users));
+    }
     if (loaded.revision().published() || !store.deleteDraft(id, n)) {
       throw Problems.conflict("revision " + n + " is published; published revisions are kept");
     }
@@ -128,10 +174,26 @@ public class TemplateResource {
   @Path("/{id}/revisions/{n}/publish")
   @Blocking
   public CompletionStage<Views.RevisionView> publish(
-      @PathParam("id") String id, @PathParam("n") int n) {
+      @PathParam("id") String id, @PathParam("n") int n, @Context UriInfo uri) {
+    java.net.URI publicBase = config.publicBaseUrl().orElse(uri.getBaseUri());
     Views.Target loaded = targets.revision(id, n);
     if (loaded.revision().published()) {
       throw Problems.conflict("revision " + n + " is already published");
+    }
+    if (loaded.revision().layoutId() != null) {
+      String pinned = Views.layout(loaded.revision());
+      String problem =
+          loaded.layout() == null
+              ? "the layout " + pinned + " does not exist"
+              : loaded.layout().published() ? null : "the layout " + pinned + " is not published";
+      if (problem != null) {
+        throw Problems.publishRejected(
+            List.of(
+                new Problem(
+                    Problem.TEMPLATE_ERROR,
+                    problem + "; publish it first, or pin a published one",
+                    LanguageVariants.descriptorPath(Bundle.TEMPLATE) + "#/layout")));
+      }
     }
     return Problems.submit(
         service,
@@ -161,7 +223,7 @@ public class TemplateResource {
                   loaded.revision().files().keySet(), p -> repository.resource(p).orElseThrow());
           TemplateCheck.Report report =
               TemplateCheck.check(
-                  service.renderer(), repository, Bundle.TEMPLATE, data, attachments);
+                  service.renderer(), repository, Bundle.TEMPLATE, data, attachments, publicBase);
           if (!report.passed()) {
             throw Problems.publishRejected(report.problems());
           }

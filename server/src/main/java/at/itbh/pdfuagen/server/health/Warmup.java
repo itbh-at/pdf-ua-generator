@@ -64,7 +64,11 @@ public class Warmup implements HealthCheck {
   }
 
   private void warm(TemplateStore.Revision revision) {
-    TemplateRepository repository = service.repository(revision);
+    TemplateStore.Revision layout =
+        revision.layoutId() == null
+            ? null
+            : store.revision(revision.layoutId(), revision.layoutRevision()).orElse(null);
+    TemplateRepository repository = service.repository(revision, layout);
     Optional<byte[]> example = repository.resource(Bundle.EXAMPLE);
     if (example.isEmpty()) {
       return;

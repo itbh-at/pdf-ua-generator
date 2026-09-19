@@ -1,0 +1,43 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="{doc:lang}">
+
+<head>
+    <title>{#insert title}Demo layout{/insert}</title>
+    <meta name="author" content="IT Beratung Hermann GmbH" />
+    {#insert head}<meta name="description" content="Preview of the layout with its default content." />{/insert}
+    <link rel="stylesheet" href="layout/layout.css" />
+    <style>
+        @page {
+            size: A4;
+            margin: 25mm 20mm 20mm 20mm;
+
+            @top-left {
+                font-family: 'Roboto';
+                font-size: 9pt;
+                color: #555555;
+                content: "{msg:header}";
+            }
+
+            @bottom-right {
+                font-family: 'Roboto';
+                font-size: 9pt;
+                color: #555555;
+                content: "{msg:page} " counter(page) " / " counter(pages);
+            }
+
+            @footnote {
+                border-top: 0.5pt solid #555555;
+                padding-top: 2mm;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <p><img class="logo" src="layout/logo.svg" alt="{msg:logo}" /></p>
+    <h1 id="top">{#insert title}Demo layout{/insert}</h1>
+    {#insert body}
+    <p>Content templates fill this area. The layout alone shows this text as a preview.</p>
+    {/insert}
+</body>
+
+</html>

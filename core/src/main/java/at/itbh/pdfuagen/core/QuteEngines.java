@@ -6,14 +6,19 @@
 package at.itbh.pdfuagen.core;
 
 import io.quarkus.qute.Engine;
+import io.quarkus.qute.EngineBuilder;
 import io.quarkus.qute.FragmentSectionHelper;
 import io.quarkus.qute.HtmlEscaper;
 import io.quarkus.qute.IfSectionHelper;
 import io.quarkus.qute.IncludeSectionHelper;
 import io.quarkus.qute.InsertSectionHelper;
 import io.quarkus.qute.LoopSectionHelper;
+import io.quarkus.qute.NamespaceResolver;
+import io.quarkus.qute.Results;
 import io.quarkus.qute.SetSectionHelper;
+import io.quarkus.qute.TemplateInstance;
 import io.quarkus.qute.TemplateLocator;
+import io.quarkus.qute.UserTagSectionHelper;
 import io.quarkus.qute.ValueResolver;
 import io.quarkus.qute.ValueResolvers;
 import io.quarkus.qute.Variant;
@@ -22,7 +27,9 @@ import java.io.StringReader;
 import java.lang.ref.WeakReference;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * The one place where the Qute engine is configured, so the CLI and the server render identically.
@@ -38,10 +45,32 @@ final class QuteEngines {
   static final Variant XHTML_VARIANT = Variant.forContentType(XHTML);
   static final Variant TEXT_VARIANT = Variant.forContentType(Variant.TEXT_PLAIN);
 
+  /** Namespace of facts about the rendered document: {@code {doc:lang}}. */
+  public static final String DOCUMENT = "doc";
+
+  /** Directory of a layout's components. */
+  static final String COMPONENTS = "components/";
+
   private QuteEngines() {}
 
   static Engine create(TemplateRepository repository, Duration timeout) {
-    return Engine.builder()
+    EngineBuilder builder = Engine.builder();
+    // Components of the layout: {#box title='…'}…{/box} renders layout/components/box.xhtml.
+    String prefix = Layouts.prefix(repository).orElse("");
+    Layouts.descriptor(repository)
+        .ifPresent(
+            layout ->
+                layout
+                    .components()
+                    .keySet()
+                    .forEach(
+                        name ->
+                            builder.addSectionHelper(
+                                new UserTagSectionHelper.Factory(
+                                    name, prefix + COMPONENTS + name + ".xhtml"))));
+    return builder
+        .addNamespaceResolver(Messages.resolver(repository, prefix))
+        .addNamespaceResolver(document())
         .addSectionHelpers(
             new IfSectionHelper.Factory(),
             new LoopSectionHelper.Factory(),
@@ -74,6 +103,24 @@ final class QuteEngines {
         .strictRendering(true)
         .removeStandaloneLines(true)
         .timeout(timeout.toMillis())
+        .build();
+  }
+
+  /** {@code {doc:lang}}: the BCP 47 tag of the rendered variant, e.g. for {@code <html lang>}. */
+  private static NamespaceResolver document() {
+    return NamespaceResolver.builder(DOCUMENT)
+        .resolveAsync(
+            ctx -> {
+              if (!ctx.getName().equals("lang")) {
+                return Results.notFound(ctx);
+              }
+              Object locale = ctx.getAttribute(TemplateInstance.LOCALE);
+              String tag =
+                  locale instanceof Locale l
+                      ? l.toLanguageTag()
+                      : locale == null ? "und" : locale.toString();
+              return CompletableFuture.completedFuture(tag);
+            })
         .build();
   }
 
