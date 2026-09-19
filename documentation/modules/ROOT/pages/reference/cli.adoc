@@ -180,7 +180,9 @@ pdf-ua-generator check -t <file|dir> [-I <dir>]... -d <file|-> [-a <name>=<file>
 . The example data given with `-d` is valid.
 . Every variant renders to well-formed XHTML whose `lang` matches the language
   of the variant.
-. Every variant renders to a PDF that veraPDF confirms as PDF/UA-1.
+. Every variant renders in every format the template offers; veraPDF confirms
+  the PDF as PDF/UA-1. Email HTML is skipped, with a warning, when the example
+  uses attachments, which email HTML cannot show.
 
 Prints `passed` and exits with `0`, or prints every problem and exits with `1`.
 

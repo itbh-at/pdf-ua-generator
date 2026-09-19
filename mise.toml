@@ -8,6 +8,7 @@
 #   mise install            # installs the tools pinned below
 #   mise run build          # compile, test and package all modules
 #   mise run test           # run the tests
+#   mise run dev            # REST service in dev mode on http://localhost:8080
 #   mise run fmt            # format the Java sources (Google Java Style)
 #   mise run setup-hooks    # once per clone: pre-commit checks the formatting
 #   mise run bench          # render benchmark (JMH)
@@ -33,6 +34,14 @@ watchexec = "2.5.1"         # file-event watcher for `docs-watch`
 "npm:axe-core" = "4.13.0"
 "npm:jsdom" = "30.1.0"
 
+[env]
+# The server tests start PostgreSQL through Quarkus Dev Services (Testcontainers)
+# on podman. Host prerequisite: systemctl --user enable --now podman.socket
+DOCKER_HOST = "unix://{{env.XDG_RUNTIME_DIR}}/podman/podman.sock"
+# Ryuk, the Testcontainers reaper, needs a privileged container under podman;
+# Quarkus removes its containers itself.
+TESTCONTAINERS_RYUK_DISABLED = "true"
+
 [tasks.build]
 description = "Compile, test and package all modules"
 run = "mvn -B -ntp verify"
@@ -52,6 +61,13 @@ run = "mvn -B -ntp -q spotless:check"
 [tasks.setup-hooks]
 description = "Use the checked-in git hooks (pre-commit refuses unformatted Java sources)"
 run = "git config core.hooksPath .githooks"
+
+[tasks.dev]
+description = "Run the REST service in Quarkus dev mode (PostgreSQL via Dev Services)"
+run = '''
+mvn -B -ntp -q -pl core -am install -DskipTests
+mvn -B -ntp -f server/pom.xml quarkus:dev
+'''
 
 [tasks.check-formats]
 description = "Render the demo in every format and check each (veraPDF, axe-core, ODF validator, LibreOffice)"

@@ -18,17 +18,22 @@ Validation errors carry an `errors` member with one entry per violation:
 ----
 {
   "type": "urn:itbh:pdf-ua-generator:problem:invalid-data",
-  "title": "Data does not match template schema",
   "status": 422,
-  "instance": "/documents/invoice",
+  "title": "Invalid data",
+  "detail": "2 problems; see errors",
+  "instance": "/templates/invoice/validate",
   "errors": [
-    { "detail": "expected number, got string", "pointer": "#/items/2/price" },
-    { "detail": "required property missing", "pointer": "#/customer/name" }
+    { "detail": "must be a number", "pointer": "#/items/2/price" },
+    { "detail": "is required", "pointer": "#/customer/name" }
   ]
 }
 ----
 
-`pointer` is a JSON Pointer to the offending value, written as a URI fragment.
+Every problem found is one entry of `errors`. `pointer` is a JSON Pointer to
+the offending value in the request data, written as a URI fragment; `location`
+names a place in the template instead (`template.xhtml, line 12, column 5`, or
+`template.json#/fields/total` in the descriptor). When the entries have
+different types, as for `publish-rejected`, each carries its own `type`.
 
 == Types
 
@@ -37,14 +42,14 @@ Validation errors carry an `errors` member with one entry per violation:
 |Type |Status |Meaning
 
 |`urn:itbh:pdf-ua-generator:problem:invalid-data`
-|422
-|The data does not match the JSON Schema of the template revision. `errors`
-lists every violation.
+|422, 400
+|The data does not match the JSON Schema of the template revision; `errors`
+lists every violation (422). 400 if the data is not a JSON object at all.
 
 |`urn:itbh:pdf-ua-generator:problem:format-not-supported`
 |406
-|The requested output format is not offered by the template, for example DOCX
-for a template with free CSS.
+|The requested output format is not offered by the template (its descriptor
+lists `formats`), or none of the media types in `Accept` is an output format.
 
 |`urn:itbh:pdf-ua-generator:problem:template-error`
 |422
@@ -74,4 +79,35 @@ comes from a host that is not allowed.
 |`urn:itbh:pdf-ua-generator:problem:attachment-missing`
 |422
 |The data refers to a request attachment that was not sent.
+
+|`urn:itbh:pdf-ua-generator:problem:publish-rejected`
+|422
+|A revision failed the publish checks. `errors` lists every problem with its
+own type: template errors, invalid example data, accessibility violations.
+
+|`urn:itbh:pdf-ua-generator:problem:not-found`
+|404
+|The template, revision or asset does not exist, or the template has no
+published revision yet.
+
+|`urn:itbh:pdf-ua-generator:problem:conflict`
+|409
+|The request contradicts the state of a revision: publishing a revision that
+is already published, or deleting a published revision.
+
+|`urn:itbh:pdf-ua-generator:problem:invalid-bundle`
+|400
+|The uploaded archive is not a ZIP file, contains a path that leaves the
+bundle or occurs twice, exceeds the size or file limits, or lacks
+`template.xhtml`.
+
+|`urn:itbh:pdf-ua-generator:problem:invalid-request`
+|400
+|The request itself is malformed: an invalid template id, a malformed `lang`
+parameter, or a multipart render request without a `data` part.
+
+|`urn:itbh:pdf-ua-generator:problem:overloaded`
+|503
+|Every rendering thread is busy and the queue is full. The response carries
+`Retry-After`; retry after that many seconds.
 |===

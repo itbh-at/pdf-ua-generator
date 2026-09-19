@@ -41,14 +41,19 @@ public final class DirectoryTemplateRepository implements TemplateRepository {
     if (path.isEmpty()) {
       return Optional.empty();
     }
-    for (String candidate :
-        List.of(path.get(), path.get() + ".xhtml", path.get() + "/" + DEFAULT_TEMPLATE_FILE)) {
+    for (String candidate : candidates(path.get())) {
       Optional<byte[]> bytes = read(candidate);
       if (bytes.isPresent()) {
         return Optional.of(new String(bytes.get(), StandardCharsets.UTF_8));
       }
     }
     return Optional.empty();
+  }
+
+  /** The paths a template id may denote, in lookup order: as is, with .xhtml, as a directory. */
+  static List<String> candidates(String normalizedId) {
+    return List.of(
+        normalizedId, normalizedId + ".xhtml", normalizedId + "/" + DEFAULT_TEMPLATE_FILE);
   }
 
   @Override

@@ -19,6 +19,7 @@ import io.quarkus.qute.ValueResolvers;
 import io.quarkus.qute.Variant;
 import io.quarkus.qute.WhenSectionHelper;
 import java.io.StringReader;
+import java.lang.ref.WeakReference;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
@@ -77,9 +78,11 @@ final class QuteEngines {
   }
 
   private static TemplateLocator locator(TemplateRepository repository) {
+    // Weak: the engine is cached per repository in a WeakHashMap and must not keep it alive.
+    WeakReference<TemplateRepository> reference = new WeakReference<>(repository);
     return id ->
-        repository
-            .template(id)
+        Optional.ofNullable(reference.get())
+            .flatMap(r -> r.template(id))
             .map(
                 source ->
                     new TemplateLocator.TemplateLocation() {

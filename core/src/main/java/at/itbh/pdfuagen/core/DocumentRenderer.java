@@ -38,11 +38,13 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -176,6 +178,14 @@ public final class DocumentRenderer {
     return inspection.schema();
   }
 
+  /** The formats a template offers: those of its descriptor, or all without a descriptor. */
+  public Set<OutputFormat> formats(TemplateRepository repository, String templateId) {
+    TemplateInspection inspection = inspection(repository, templateId);
+    return inspection.descriptor() == null
+        ? EnumSet.allOf(OutputFormat.class)
+        : inspection.descriptor().formats();
+  }
+
   /** Fields the template defines but never reads; empty if the template cannot be inspected. */
   public List<String> schemaWarnings(TemplateRepository repository, String templateId) {
     return inspection(repository, templateId).warnings();
@@ -238,7 +248,25 @@ public final class DocumentRenderer {
         .computeIfAbsent(baseId, id -> TemplateInspection.inspect(state.engine(), repository, id));
   }
 
+  /**
+   * Renders a template into one format.
+   *
+   * @throws RenderException with {@link Problem#FORMAT_NOT_SUPPORTED} if the template's descriptor
+   *     does not offer the format, or any problem of {@link #renderSource}
+   */
   public Rendered render(RenderRequest request, OutputFormat format) throws RenderException {
+    Set<OutputFormat> offered = formats(request.repository(), request.templateId());
+    if (!offered.contains(format)) {
+      throw new RenderException(
+          List.of(
+              new Problem(
+                  Problem.FORMAT_NOT_SUPPORTED,
+                  "the template does not offer "
+                      + format.id()
+                      + "; it offers "
+                      + String.join(", ", offered.stream().map(OutputFormat::id).toList()),
+                  request.templateId())));
+    }
     String source = renderSource(request);
     Document document = SecureXml.parse(source, request.templateId());
     ResourceResolver resolver = new ResourceResolver(request, fetcher, limits);
@@ -363,7 +391,7 @@ public final class DocumentRenderer {
           EmailHtmlWriter.write(
               model,
               CssRules.parse(new String(cssBytes.get(), StandardCharsets.UTF_8)),
-              image -> publicUrl(image, problems));
+              image -> publicUrl(image, request.publicBaseUrl(), problems));
     } catch (IOException e) {
       throw new RenderException(
           new Problem(
@@ -379,7 +407,8 @@ public final class DocumentRenderer {
    * a PNG rendition, {@code .png}, since many mail clients do not show SVG), external URLs
    * unchanged. Request attachments have no public URL.
    */
-  private String publicUrl(DocumentModel.Image image, List<Problem> problems) {
+  private String publicUrl(DocumentModel.Image image, URI requestBase, List<Problem> problems) {
+    URI base = requestBase != null ? requestBase : publicBaseUrl;
     String source = image.source();
     if (source.startsWith("https:")) {
       return source;
@@ -392,7 +421,7 @@ public final class DocumentRenderer {
               source));
       return "";
     }
-    if (publicBaseUrl == null) {
+    if (base == null) {
       problems.add(
           new Problem(
               Problem.RESOURCE_REJECTED,
@@ -400,9 +429,9 @@ public final class DocumentRenderer {
               source));
       return "";
     }
-    String base = publicBaseUrl.toString().replaceAll("/+$", "");
+    String prefix = base.toString().replaceAll("/+$", "");
     String suffix = "image/svg+xml".equals(image.mediaType()) ? ".png" : "";
-    return base + "/assets/" + sha256(image.bytes()) + suffix;
+    return prefix + "/assets/" + sha256(image.bytes()) + suffix;
   }
 
   static String sha256(byte[] bytes) {

@@ -54,21 +54,24 @@ Pointer
 |3 Server
 |PostgreSQL with Flyway; revisions; HTTPS fetcher with host allowlist; assets
 stored once per hash and served at
-`+/assets/{sha256}+`; publish checks; REST API; problem details with URNs; OIDC
-roles; worker pool with 503; warm-up before readiness; `Accept-Language` and
-`lang` parameter, `Content-Language`, `Vary: Accept-Language`
+`+/assets/{sha256}+`; publish checks; REST API; problem details with URNs;
+worker pool with 503; warm-up before readiness; `Accept-Language` and
+`lang` parameter, `Content-Language`, `Vary: Accept-Language`; formats per
+template (406)
 |Create, publish, validate and render work through the API
-|
+|done
 
 |4 Layouts
 |`+{#insert}+` areas; style catalog; components as user tags with
 `component.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
-`email.css` per layout; message files per language for layout texts
+`email.css` per layout; message files per language for layout texts; fonts
+shared by many templates held in memory once per hash
 |A layout change never alters a published template unnoticed
 |
 
 |5 Operations
-|Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
+|OIDC roles (moved from phase 3, which leaves the API open);
+Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
 texts in the image; Helm chart for Kubernetes and
 `podman kube play`; `kubeconform`; CI smoke test; load test
 |Several pods render under load and the autoscaler reacts

@@ -10,6 +10,7 @@ import at.itbh.pdfuagen.core.ResourceFetcher;
 import at.itbh.pdfuagen.core.ResourceLimits;
 import at.itbh.pdfuagen.core.TemplateCheck;
 import java.io.PrintWriter;
+import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -27,7 +28,8 @@ import picocli.CommandLine.Spec;
     description = {
       "Runs the publish checks of a template: every language variant parses, the field",
       "definitions are valid and match what the template reads, all variants need the same",
-      "data, the example data is valid, and every variant renders to a PDF/UA-1 document."
+      "data, the example data is valid, and every variant renders in every format the",
+      "template offers, the PDF conforming to PDF/UA-1."
     },
     exitCodeListHeading = "%nExit codes:%n",
     exitCodeList = {
@@ -62,8 +64,12 @@ final class CheckCommand implements Callable<Integer> {
     try {
       report =
           TemplateCheck.check(
+              // Email HTML needs a base for asset URLs; the check discards the output.
               new DocumentRenderer(
-                  ResourceFetcher.NONE, ResourceLimits.DEFAULT, Duration.ofSeconds(30)),
+                  ResourceFetcher.NONE,
+                  ResourceLimits.DEFAULT,
+                  Duration.ofSeconds(30),
+                  URI.create("https://assets.invalid/")),
               template.repository(),
               template.templateId(),
               TemplateOptions.readData(data),

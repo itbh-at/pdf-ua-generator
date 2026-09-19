@@ -16,7 +16,7 @@ import org.apache.batik.transcoder.TranscoderOutput;
 import org.apache.batik.transcoder.image.PNGTranscoder;
 
 /** Raster versions and sizes of images for the office formats. */
-final class Images {
+public final class Images {
 
   /** A raster image ready to embed. */
   record Raster(byte[] bytes, String mediaType, String extension, int width, int height) {}
@@ -45,7 +45,11 @@ final class Images {
         svg ? Math.round(size[1] / SVG_SCALE) : size[1]);
   }
 
-  private static byte[] svgToPng(byte[] svg) throws IOException {
+  /**
+   * Rasterizes an SVG to PNG at twice its intrinsic size, without scripts or external resources;
+   * e.g. for email clients that do not show SVG.
+   */
+  public static byte[] svgToPng(byte[] svg) throws IOException {
     PNGTranscoder transcoder = new PNGTranscoder();
     transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_ALLOW_EXTERNAL_RESOURCES, false);
     transcoder.addTranscodingHint(SVGAbstractTranscoder.KEY_EXECUTE_ONLOAD, false);

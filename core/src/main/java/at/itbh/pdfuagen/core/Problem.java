@@ -22,6 +22,7 @@ public record Problem(String type, String detail, String location) {
   public static final String ATTACHMENT_MISSING = "attachment-missing";
   public static final String INVALID_DATA = "invalid-data";
   public static final String ACCESSIBILITY = "accessibility";
+  public static final String FORMAT_NOT_SUPPORTED = "format-not-supported";
 
   @Override
   public String toString() {

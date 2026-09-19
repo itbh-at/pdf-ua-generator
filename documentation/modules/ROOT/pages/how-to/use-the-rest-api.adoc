@@ -1,0 +1,63 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Publish and render a template through the API
+:description: Upload the demo template, publish it, validate data and render documents with curl.
+
+Prerequisites: `podman` with its user socket
+(`systemctl --user enable --now podman.socket`) and the toolchain from
+`mise install`.
+
+. Start the service in dev mode; it starts PostgreSQL in a container:
++
+----
+mise run dev
+----
+
+. Pack the demo as a bundle:
++
+----
+mkdir -p /tmp/demo/example
+cp demo/demo.xhtml /tmp/demo/template.xhtml
+cp demo/demo.json /tmp/demo/template.json
+cp demo/data.json /tmp/demo/example.json
+cp demo/photo.png /tmp/demo/example/
+cp demo/email.css demo/*.svg demo/*.ttf /tmp/demo/
+(cd /tmp/demo && zip -r ../demo.zip .)
+----
+
+. Upload it as the first revision of the template `demo`:
++
+----
+curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/demo.zip \
+  http://localhost:8080/templates/demo/revisions
+----
+
+. Publish revision 1:
++
+----
+curl -X POST http://localhost:8080/templates/demo/revisions/1/publish
+----
+
+. Validate data:
++
+----
+curl -H 'Content-Type: application/json' -d @demo/data.json \
+  http://localhost:8080/templates/demo/validate
+----
+
+. Render a PDF with the photo as attachment:
++
+----
+curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pdf' \
+  -o demo.pdf http://localhost:8080/templates/demo/render
+----
+
+. Render other formats with `format`, and email HTML without attachments:
++
+----
+curl -H 'Content-Type: application/json' -d @demo/data-email.json \
+  'http://localhost:8080/templates/demo/render?format=email-html' -o demo.html
+----

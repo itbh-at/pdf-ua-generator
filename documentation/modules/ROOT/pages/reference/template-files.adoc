@@ -29,6 +29,10 @@ text.
 
 |`email.css`
 |Stylesheet for email HTML.
+
+|`example.json`, `example/<name>.<ext>`
+|Server bundles only: example data for the publish checks and its attachments
+(`attachment:<name>`).
 |===
 
 == Descriptor
@@ -65,6 +69,12 @@ text.
 |`language`
 |BCP 47 tag of the default variant. Required. Values of the default variant are
 formatted for this language.
+
+|`formats`
+|The output formats the template offers: `pdf`, `xhtml`, `email-html`, `text`,
+`docx`, `odt`. Optional; default: all. Rendering another format is refused
+with `format-not-supported`, and the publish checks render every offered
+format.
 
 |`fields`
 |The top-level fields. Required.

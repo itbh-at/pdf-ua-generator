@@ -5,6 +5,7 @@
 
 package at.itbh.pdfuagen.core;
 
+import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
 
@@ -15,12 +16,23 @@ import java.util.Objects;
  * @param repository source of templates and resources
  * @param data the template data, as parsed by {@link JsonData}
  * @param attachments request attachments by name, referenced as {@code attachment:<name>}
+ * @param publicBaseUrl base of the public asset URLs in email HTML for this request, or {@code
+ *     null} for the renderer's default
  */
 public record RenderRequest(
     String templateId,
     TemplateRepository repository,
     Map<String, Object> data,
-    Map<String, byte[]> attachments) {
+    Map<String, byte[]> attachments,
+    URI publicBaseUrl) {
+
+  public RenderRequest(
+      String templateId,
+      TemplateRepository repository,
+      Map<String, Object> data,
+      Map<String, byte[]> attachments) {
+    this(templateId, repository, data, attachments, null);
+  }
 
   public RenderRequest {
     Objects.requireNonNull(templateId, "templateId");

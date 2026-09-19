@@ -44,6 +44,7 @@
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.39.4</quarkus.platform.version>
         <picocli.version>4.7.7</picocli.version>
+        <quarkus-http-problem.version>3.38.2</quarkus-http-problem.version>
         <openhtmltopdf.version>1.1.86</openhtmltopdf.version>
         <!-- Newer than the versions openhtmltopdf declares; pinned for fixes. -->
         <pdfbox.version>3.0.8</pdfbox.version>
@@ -80,6 +81,11 @@
                 <groupId>at.itbh</groupId>
                 <artifactId>pdf-ua-generator-core</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.httpproblem</groupId>
+                <artifactId>quarkus-http-problem</artifactId>
+                <version>${quarkus-http-problem.version}</version>
             </dependency>
             <dependency>
                 <groupId>info.picocli</groupId>

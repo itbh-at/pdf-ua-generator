@@ -1,0 +1,181 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= REST API
+:description: Endpoints, request and response formats, headers and status codes of the REST service.
+
+The API is open: there is no authentication yet. Errors are RFC 9457 problem
+details (`application/problem+json`) with the types listed under
+xref:reference/problem-types.adoc[Problem types].
+
+== Templates and revisions
+
+[cols="3,5",options="header"]
+|===
+|Request |Response
+
+|`GET /templates`
+|All templates: `id`, `createdAt`, `publishedRevision`, `latestRevision`.
+
+|`+GET /templates/{id}+`
+|One template with the list of its revisions.
+
+|`+DELETE /templates/{id}+`
+|204. Deletes the template with all revisions.
+
+|`+POST /templates/{id}/revisions+` +
+`Content-Type: application/zip`
+|201 with `Location` and the revision. Stores the archive as a new draft
+revision; the first revision creates the template. The body lists `problems`
+found when parsing — a draft with problems is stored anyway, so it can be
+corrected — and `warnings`.
+
+|`+GET /templates/{id}/revisions/{n}+`
+|The revision (see below).
+
+|`+GET /templates/{id}/revisions/{n}/bundle+`
+|The files of the revision as a ZIP archive.
+
+|`+DELETE /templates/{id}/revisions/{n}+`
+|204. Only drafts; a published revision gives 409.
+
+|`+POST /templates/{id}/revisions/{n}/publish+`
+|The published revision, after the publish checks passed; 422
+`publish-rejected` with every problem otherwise, 409 if already published.
+|===
+
+Template ids consist of lower-case letters, digits and `-`, at most 64
+characters.
+
+A revision:
+
+[source,json]
+----
+{
+  "template": "invoice",
+  "revision": 3,
+  "status": "draft",
+  "sha256": "854ba28b…",
+  "createdAt": "2026-09-19T20:30:08.206936Z",
+  "publishedAt": null,
+  "language": "en",
+  "languages": ["de-AT"],
+  "formats": ["pdf", "docx", "text"],
+  "files": { "template.xhtml": "e3b0c442…", "template.json": "…" },
+  "problems": [],
+  "warnings": ["field 'notes' is defined but not used by the template"]
+}
+----
+
+=== Bundle
+
+The archive is laid out like a template directory of the command line, see
+xref:reference/template-files.adoc[Template files]:
+
+[cols="2,5",options="header"]
+|===
+|Path |Content
+
+|`template.xhtml`
+|The template. Required.
+
+|`template.<tag>.xhtml`
+|Language variants.
+
+|`template.json`
+|Descriptor with language, formats and field definitions.
+
+|`example.json`
+|Example data. Required for publishing: the publish checks render it with every
+variant in every offered format.
+
+|`example/<name>.<ext>`
+|Attachments of the example data, referred to as `attachment:<name>`.
+
+|anything else
+|Assets: stylesheets, fonts, images, `email.css`, `template.txt`.
+|===
+
+Limits: 50 MB uncompressed, 1000 files (see
+xref:reference/configuration.adoc[Configuration]).
+
+== Schema and validation
+
+[cols="3,5",options="header"]
+|===
+|Request |Response
+
+|`+GET /templates/{id}/schema+`
+|The JSON Schema (`application/schema+json`) of the latest published revision.
+
+|`+GET /templates/{id}/revisions/{n}/schema+`
+|The same for any revision.
+
+|`+POST /templates/{id}/validate+` +
+`Content-Type: application/json`
+|204 if the data is valid, otherwise 422 `invalid-data` with one entry per
+violation. Against the latest published revision.
+
+|`+POST /templates/{id}/revisions/{n}/validate+`
+|The same against any revision.
+|===
+
+== Rendering
+
+[cols="3,5",options="header"]
+|===
+|Request |Response
+
+|`+POST /templates/{id}/render+`
+|The document, rendered with the latest published revision.
+
+|`+POST /templates/{id}/revisions/{n}/render+`
+|The document, rendered with any revision, also a draft (preview).
+|===
+
+The data is sent either as `application/json`, or as `multipart/form-data`
+with the JSON in the part `data` and each attachment in a part named after it:
+the part `photo` is `attachment:photo`.
+
+Format:: The query parameter `format` (`pdf`, `xhtml`, `email-html`, `text`,
+`docx`, `odt`), otherwise the first media type in `Accept` that the template
+offers. `*/*` or no `Accept` gives the first offered format, PDF if offered.
++
+[cols="1,3",options="header"]
+|===
+|Format |Media type
+
+|`pdf` |`application/pdf`
+|`xhtml` |`application/xhtml+xml`
+|`email-html` |`text/html`
+|`text` |`text/plain`
+|`docx` |`application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+|`odt` |`application/vnd.oasis.opendocument.text`
+|===
+
+Language:: The query parameter `lang`, otherwise `Accept-Language`, both as
+language ranges (`de-AT, en;q=0.8`). The variant is chosen by RFC 4647 lookup;
+without a match, the default variant is rendered. A malformed
+`Accept-Language` is ignored, a malformed `lang` gives 400.
+
+Response headers:: `Content-Type`; `Content-Language` with the language of the
+rendered variant; `Vary: Accept, Accept-Language`; `Content-Disposition:
+inline` with a file name; `Template-Revision` with the revision number.
+
+Rendering runs in a pool of worker threads with a bounded queue. When the queue
+is full, the service answers 503 `overloaded` with `Retry-After` at once.
+
+== Assets
+
+`+GET /assets/{sha256}+` returns a template image (PNG, JPEG, SVG) by the SHA-256
+of its content; `+GET /assets/{sha256}.png+` returns an SVG as PNG. Both are
+public and cached as immutable. Email HTML refers to images this way. Only
+images are served — templates, descriptors, fonts and example data are not.
+
+== Health
+
+`GET /q/health/live` and `GET /q/health/ready`. Readiness waits for the
+warm-up: after start, the instance renders the example data of the latest
+published revision of every template in every format before it reports ready.

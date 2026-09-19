@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -21,7 +22,8 @@ import org.w3c.dom.Element;
  *       and is the same for every variant
  *   <li>the example data is valid
  *   <li>every variant renders to well-formed XHTML whose {@code lang} matches the variant
- *   <li>every variant renders to a PDF that veraPDF confirms as PDF/UA-1
+ *   <li>every variant renders in every format the template offers; veraPDF confirms the PDF as
+ *       PDF/UA-1. Email HTML is skipped when the example uses attachments, which it cannot show.
  * </ol>
  */
 public final class TemplateCheck {
@@ -55,20 +57,39 @@ public final class TemplateCheck {
     } catch (RenderException e) {
       return new Report(e.problems(), List.of());
     }
-    List<String> warnings = renderer.schemaWarnings(repository, templateId);
+    List<String> warnings = new ArrayList<>(renderer.schemaWarnings(repository, templateId));
+    Set<OutputFormat> formats = renderer.formats(repository, templateId);
+    if (formats.contains(OutputFormat.EMAIL_HTML) && !attachments.isEmpty()) {
+      warnings.add(
+          "email-html not checked: the example data uses attachments, which email HTML"
+              + " cannot show");
+    }
     for (String variantId : renderer.variants(repository, templateId)) {
       RenderRequest request = new RenderRequest(variantId, repository, example, attachments);
       try {
         Document document = SecureXml.parse(renderer.renderSource(request), variantId);
         checkLanguage(document, renderer.language(repository, variantId), variantId, problems);
-        Rendered pdf = renderer.render(request, OutputFormat.PDF);
-        PdfUaValidator.Report report = PdfUaValidator.validate(pdf.content());
-        report
-            .failures()
-            .forEach(
-                f -> problems.add(new Problem(Problem.ACCESSIBILITY, "PDF/UA: " + f, variantId)));
       } catch (RenderException e) {
         problems.addAll(e.problems());
+        continue;
+      }
+      for (OutputFormat format : formats) {
+        if (format == OutputFormat.EMAIL_HTML && !attachments.isEmpty()) {
+          continue;
+        }
+        try {
+          Rendered rendered = renderer.render(request, format);
+          if (format == OutputFormat.PDF) {
+            PdfUaValidator.validate(rendered.content())
+                .failures()
+                .forEach(
+                    f ->
+                        problems.add(
+                            new Problem(Problem.ACCESSIBILITY, "PDF/UA: " + f, variantId)));
+          }
+        } catch (RenderException e) {
+          problems.addAll(e.problems());
+        }
       }
     }
     return new Report(problems.stream().distinct().toList(), warnings);

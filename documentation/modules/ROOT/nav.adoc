@@ -6,11 +6,14 @@
 * xref:index.adoc[Start here]
 
 .How-to
+* xref:how-to/use-the-rest-api.adoc[Publish and render through the API]
 * xref:how-to/check-output-formats.adoc[Check the output formats]
 
 .Reference
 * xref:reference/cli.adoc[Command line]
 * xref:reference/template-files.adoc[Template files]
+* xref:reference/rest-api.adoc[REST API]
+* xref:reference/configuration.adoc[Configuration]
 * xref:reference/building-blocks.adoc[Template building blocks]
 * xref:reference/problem-types.adoc[Problem types]
 

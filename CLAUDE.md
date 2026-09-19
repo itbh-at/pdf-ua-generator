@@ -77,6 +77,11 @@ plain text).
   Every URN is explained on the problem-types reference page of the docs; a new
   URN is not used before it is documented there.
 - Template data is JSON. No `Map<String, String>` or other flattening of the data.
+- A server template revision is a bundle laid out like a CLI template
+  directory (`template.xhtml`, `template.json`, variants, assets) plus
+  `example.json` and `example/` for the publish checks. Revisions are
+  immutable; in-memory caches are keyed by content hash, and status is always
+  read from the database.
 
 ## Template styling
 
@@ -235,7 +240,10 @@ old-school senior developer: direct and minimal.
   `mise exec -- <cmd>`.
 - Use mise inside container images too (same `mise.toml`), not an
   `eclipse-temurin:`/`maven:` base image.
-- Not managed by mise, and therefore a host prerequisite: `podman`. LibreOffice
+- Not managed by mise, and therefore a host prerequisite: `podman`, with its
+  user socket active (`systemctl --user enable --now podman.socket`); the
+  server tests and dev mode start PostgreSQL through it (`DOCKER_HOST` is set
+  in `mise.toml`). LibreOffice
   for the format check runs in a podman image
   (`scripts/libreoffice/Containerfile`), never from the host.
 

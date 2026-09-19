@@ -21,7 +21,8 @@ class TemplateCheckTest {
 
   private static final Path DEMO = Path.of("..", "demo");
   private static final String DESCRIPTOR =
-      "{\"language\": \"en\", \"fields\": {\"name\": {\"type\": \"text\"}}}";
+      "{\"language\": \"en\", \"formats\": [\"pdf\", \"text\"],"
+          + " \"fields\": {\"name\": {\"type\": \"text\"}}}";
 
   private final DocumentRenderer renderer = new DocumentRenderer();
 
@@ -47,7 +48,11 @@ class TemplateCheckTest {
             data,
             Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));
     assertTrue(report.passed(), report.problems()::toString);
-    assertEquals(List.of(), report.warnings());
+    assertEquals(
+        List.of(
+            "email-html not checked: the example data uses attachments, which email HTML cannot"
+                + " show"),
+        report.warnings());
   }
 
   @Test
@@ -75,6 +80,28 @@ class TemplateCheckTest {
                 "the html element declares lang=\"en\", but the variant is written in de",
                 "t.de.xhtml")),
         report.problems());
+  }
+
+  @Test
+  void refusesFormatsTheTemplateDoesNotOffer() {
+    MapTemplateRepository repository =
+        new MapTemplateRepository()
+            .template("t.xhtml", page("en", "{name}"))
+            .resource("t.json", DESCRIPTOR);
+    RenderException e =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            RenderException.class,
+            () ->
+                renderer.render(
+                    new RenderRequest("t.xhtml", repository, Map.of("name", "x"), Map.of()),
+                    OutputFormat.DOCX));
+    assertEquals(
+        List.of(
+            new Problem(
+                Problem.FORMAT_NOT_SUPPORTED,
+                "the template does not offer docx; it offers pdf, text",
+                "t.xhtml")),
+        e.problems());
   }
 
   @Test

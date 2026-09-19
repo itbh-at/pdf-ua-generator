@@ -6,6 +6,7 @@
 package at.itbh.pdfuagen.core.schema;
 
 import at.itbh.pdfuagen.core.LanguageVariants;
+import at.itbh.pdfuagen.core.OutputFormat;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
 import com.fasterxml.jackson.core.JsonParser;
@@ -15,6 +16,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,11 +29,12 @@ import java.util.regex.Pattern;
 
 /**
  * The descriptor of a template ({@code <name>.json} next to {@code <name>.xhtml}): the language of
- * the default variant and the field definitions.
+ * the default variant, the output formats it offers and the field definitions.
  *
  * <pre>{@code
  * {
  *   "language": "en",
+ *   "formats": ["pdf", "docx"],
  *   "fields": {
  *     "customer": { "type": "object", "label": "Customer", "fields": {
  *       "name": { "type": "text" } } },
@@ -40,9 +45,11 @@ import java.util.regex.Pattern;
  * }</pre>
  *
  * @param language language of the default variant
+ * @param formats the output formats the template offers; all formats if the descriptor names none
  * @param fields the top-level fields, in definition order
  */
-public record TemplateDescriptor(Locale language, Map<String, Field> fields) {
+public record TemplateDescriptor(
+    Locale language, Set<OutputFormat> formats, Map<String, Field> fields) {
 
   /** Field names must be usable in Qute expressions ({@code {order.total}}). */
   private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
@@ -100,7 +107,7 @@ public record TemplateDescriptor(Locale language, Map<String, Field> fields) {
         problem("#", "the descriptor must be a JSON object");
         return null;
       }
-      onlyKeys(root, "#", Set.of("language", "fields"));
+      onlyKeys(root, "#", Set.of("language", "formats", "fields"));
       Locale language = null;
       JsonNode lang = root.get("language");
       if (lang == null) {
@@ -111,6 +118,11 @@ public record TemplateDescriptor(Locale language, Map<String, Field> fields) {
       } else {
         language = Locale.forLanguageTag(lang.asText());
       }
+      Set<OutputFormat> formats = EnumSet.allOf(OutputFormat.class);
+      JsonNode formatsNode = root.get("formats");
+      if (formatsNode != null) {
+        formats = formats(formatsNode);
+      }
       Map<String, Field> fields = Map.of();
       JsonNode fieldsNode = root.get("fields");
       if (fieldsNode == null) {
@@ -118,7 +130,26 @@ public record TemplateDescriptor(Locale language, Map<String, Field> fields) {
       } else {
         fields = fields(fieldsNode, "#/fields");
       }
-      return new TemplateDescriptor(language, fields);
+      return new TemplateDescriptor(language, Collections.unmodifiableSet(formats), fields);
+    }
+
+    private Set<OutputFormat> formats(JsonNode node) {
+      Set<OutputFormat> formats = EnumSet.noneOf(OutputFormat.class);
+      String allowed =
+          String.join(", ", Arrays.stream(OutputFormat.values()).map(OutputFormat::id).toList());
+      if (!node.isArray() || node.isEmpty()) {
+        problem("#/formats", "'formats' must be a non-empty list of: " + allowed);
+        return formats;
+      }
+      for (int i = 0; i < node.size(); i++) {
+        var format = OutputFormat.of(node.get(i).asText());
+        if (format.isPresent()) {
+          formats.add(format.get());
+        } else {
+          problem("#/formats/" + i, "unknown format; use one of: " + allowed);
+        }
+      }
+      return formats;
     }
 
     private Map<String, Field> fields(JsonNode node, String pointer) {

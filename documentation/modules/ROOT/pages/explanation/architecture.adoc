@@ -39,7 +39,8 @@ no interactive features.
 
 |`server`
 |Quarkus REST service on top of `core`: template store in PostgreSQL, REST API,
-security and the editor UI.
+security and the editor UI. Until OIDC is added (see the roadmap), every
+endpoint is open; run it only where that is acceptable.
 |===
 
 Keeping `core` free of Quarkus keeps the CLI small and fast to start, and makes
@@ -63,9 +64,17 @@ replacement for the build-time checks, not an optional extra.
 
 Every save creates an immutable revision, either a draft or published. Rendering
 uses the latest published revision unless a request names a specific one
-(`id@revision`), which makes a document reproducible later. The SHA-256 of a
-revision's content is the key for all caches (parsed template, compiled schema,
-fonts, assets).
+(`+/templates/{id}/revisions/{n}/render+`), which makes a document reproducible
+later and lets editors preview drafts. A revision is a bundle laid out like a
+template directory of the CLI, so the same files work in both.
+
+Files are stored once per SHA-256 of their content. A revision's hash covers
+its paths and file hashes and is the key of the in-memory cache: a cached
+revision can never be stale, and identical revisions share one entry. The
+cache holds only the immutable files and what is derived from them (parsed
+templates, schema, font metrics); status and other metadata are always read
+from the database, so every instance sees the same state. Its size is limited
+in bytes, and the least recently used revisions are dropped first.
 
 === Layouts, components and content templates
 

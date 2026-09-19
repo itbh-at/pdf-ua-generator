@@ -1,0 +1,69 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Configuration
+:description: Settings of the REST service and their environment variables.
+
+Every setting is a MicroProfile Config property and can be overridden by an
+environment variable: upper case, `.` and `-` replaced by `_`
+(`pdfuagen.render.threads` → `PDFUAGEN_RENDER_THREADS`).
+
+[cols="3,1,4",options="header"]
+|===
+|Property |Default |Meaning
+
+|`quarkus.datasource.jdbc.url`
+|–
+|PostgreSQL, e.g. `jdbc:postgresql://db:5432/pdfuagen`. In dev and test mode a
+PostgreSQL container is started instead (podman).
+
+|`quarkus.datasource.username`, `quarkus.datasource.password`
+|–
+|Database credentials. The schema is migrated at start (Flyway).
+
+|`pdfuagen.public-base-url`
+|base URL of the request
+|Base of the public image URLs in email HTML: `<base>/assets/<sha256>`. Set it
+when the service is reached through a proxy under another name.
+
+|`pdfuagen.render.threads`
+|CPU cores
+|Rendering threads.
+
+|`pdfuagen.render.queue`
+|2 × threads
+|Render requests waiting for a thread; beyond that the service answers 503.
+
+|`pdfuagen.render.timeout`
+|`30s`
+|Maximum time Qute may spend on one template.
+
+|`pdfuagen.render.cache-size`
+|`268435456` (256 MB)
+|Memory for template revisions kept parsed, in bytes of their files. The least
+recently used are dropped first and reloaded from the database when needed.
+
+|`pdfuagen.fetch.allowed-hosts`
+|none
+|Comma-separated hosts external images may be fetched from; `*.example.org`
+matches every subdomain. Fetching uses HTTPS only, follows no redirects and
+refuses hosts that resolve to private, loopback or link-local addresses.
+
+|`pdfuagen.fetch.timeout`
+|`10s`
+|Connect and read timeout for external images.
+
+|`pdfuagen.bundle.max-size`
+|`52428800` (50 MB)
+|Maximum total size of the files of one revision, uncompressed.
+
+|`pdfuagen.bundle.max-files`
+|`1000`
+|Maximum number of files in one revision.
+
+|`quarkus.http.limits.max-body-size`
+|`60M`
+|Maximum request size: bundles and render requests with attachments.
+|===
