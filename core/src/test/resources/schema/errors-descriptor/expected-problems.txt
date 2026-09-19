@@ -1,0 +1,7 @@
+unknown key 'colour'; allowed: fields, language (template.json#/colour)
+'language' must be a BCP 47 language tag such as "en" or "de-AT" (template.json#/language)
+'type' must be one of text, number, date, boolean, image, list, object (template.json#/fields/a/type)
+field name 'b-c' is not usable in templates; use letters, digits and '_', not starting with a digit, and not 'it' (template.json#/fields/b-c)
+a list field needs 'items', the definition of its elements (template.json#/fields/d)
+unknown key 'items'; allowed: description, label, type (template.json#/fields/e/fields/f/items)
+'label' must be a string (template.json#/fields/g/label)

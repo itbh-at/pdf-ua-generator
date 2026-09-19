@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "customer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Full name",
+          "type": "string"
+        },
+        "address": {
+          "type": "object",
+          "properties": {
+            "city": {
+              "type": "string"
+            },
+            "zip": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "city"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "address"
+      ]
+    }
+  },
+  "required": [
+    "title",
+    "customer"
+  ]
+}

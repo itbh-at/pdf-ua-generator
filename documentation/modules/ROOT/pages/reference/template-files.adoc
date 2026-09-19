@@ -1,0 +1,216 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Template files
+:description: The files that make up a template, the field definitions, how the JSON Schema is derived from them, the language variants and the formatting functions.
+
+== Files
+
+[cols="2,5",options="header"]
+|===
+|File |Content
+
+|`<name>.xhtml`
+|The template, default language variant.
+
+|`<name>.<tag>.xhtml`
+|Optional language variant; `<tag>` is a BCP 47 language tag with a two- or
+three-letter language, e.g. `invoice.de-AT.xhtml`, `invoice.fr.xhtml`.
+
+|`<name>.json`
+|The descriptor: language of the default variant and field definitions. Shared
+by all variants.
+
+|`<name>.txt`, `<name>.<tag>.txt`
+|Optional hand-written plain-text version of a variant; replaces the generated
+text.
+
+|`email.css`
+|Stylesheet for email HTML.
+|===
+
+== Descriptor
+
+[source,json]
+----
+{
+  "language": "en",
+  "fields": {
+    "customer": {
+      "type": "object",
+      "label": "Customer",
+      "fields": {
+        "name": { "type": "text", "label": "Name", "description": "Used in the greeting." }
+      }
+    },
+    "positions": {
+      "type": "list",
+      "items": {
+        "type": "object",
+        "fields": {
+          "price": { "type": "number", "label": "Price in EUR" }
+        }
+      }
+    }
+  }
+}
+----
+
+[cols="1,4",options="header"]
+|===
+|Key |Meaning
+
+|`language`
+|BCP 47 tag of the default variant. Required. Values of the default variant are
+formatted for this language.
+
+|`fields`
+|The top-level fields. Required.
+|===
+
+A field definition has these keys; any other key is an error.
+
+[cols="1,4",options="header"]
+|===
+|Key |Meaning
+
+|`type`
+|Required; see <<field-types>>.
+
+|`label`
+|Short name for editors; becomes `title` in the schema.
+
+|`description`
+|Longer explanation; becomes `description` in the schema.
+
+|`fields`
+|The properties of an `object`. Required for `object`, not allowed otherwise.
+
+|`items`
+|The definition of the elements of a `list`. Required for `list`, not allowed
+otherwise.
+|===
+
+Field names consist of letters, digits and `_` and do not start with a digit,
+so they can be written in Qute expressions. `it` is reserved for
+`+{#each}+`.
+
+[[field-types]]
+== Field types
+
+[cols="1,2,3",options="header"]
+|===
+|Type |JSON value |JSON Schema
+
+|`text`
+|string
+|`"type": "string"`
+
+|`number`
+|number
+|`"type": "number"`
+
+|`date`
+|ISO 8601 date as string, `2026-09-19`
+|`"type": "string", "format": "date"`
+
+|`boolean`
+|`true` or `false`
+|`"type": "boolean"`
+
+|`image`
+|`{"src": "attachment:<name>" \| "https://…", "alt": "…"}`; an empty `alt`
+marks the image as decorative
+|object with required `src` (pattern) and `alt`
+
+|`list`
+|array
+|`"type": "array"` with `items`
+
+|`object`
+|object
+|`"type": "object"` with `properties`
+|===
+
+== Derived schema
+
+The schema combines the field definitions with what the template reads.
+
+* A field is *required* in its parent object if the template reads it without
+  a default wherever the parent exists. `+{customer.name}+` makes `customer`
+  required and `name` required within `customer`.
+* A field is *optional* if it has a default — `+{nickname ?: name}+`,
+  `+{greeting.or('Hello')}+`, `+{#if photo??}+`, `+{#for x in notes.orEmpty}+`
+  — or is read only under a condition that tests something other than its
+  parent: in an `+{#if}+` branch, an `+{#else}+`, a `+{#when}+` branch, or the
+  `+{#else}+` of a loop. Inside `+{#if photo??}+`, `+{photo.alt}+` is required
+  within `photo`, since the condition tests `photo` itself.
+* Fields of list elements read in a loop (`+{#for p in positions}{p.price}+`)
+  are required in every element. Fields read through one element
+  (`+{positions.0.name}+`, `+{positions.first.name}+`) are optional.
+* Optional fields also accept `null`.
+* Properties the schema does not name are allowed, so callers can send their
+  existing data objects unchanged.
+* Defined fields the template never reads stay in the schema as optional
+  fields and are reported as warnings.
+
+These are errors:
+
+* The template reads a field the definitions lack.
+* A read does not fit the type: a property of a `text` field, iterating an
+  `object`, `.date` on a `number`.
+* The language variants need different data: a field required in one variant
+  and optional or unused in another.
+
+Paths through `+{#let}+`, `+{#set}+`, `+{#for}+`, `+{#each}+`,
+`+{#include}+` and the `data:` namespace are resolved to the fields they stand
+for; iteration metadata such as `+{item_index}+` is not data.
+
+[[formatting]]
+== Formatting functions
+
+Values are formatted for the language of the rendered variant.
+
+[cols="2,2,3",options="header"]
+|===
+|Expression |On type |`en` / `de-AT`
+
+|`+{amount.number}+`
+|`number`
+|`1,234.56` / `1 234,56` — the decimals of the value
+
+|`+{amount.number(1)}+`
+|`number`
+|`1,234.6` / `1 234,6` — rounded half up
+
+|`+{amount.currency('EUR')}+`
+|`number`
+|`€1,234.56` / `€ 1.234,56` — ISO 4217 code, decimals of the currency
+
+|`+{day.date}+`
+|`date`
+|`Sep 19, 2026` / `19.09.2026`
+
+|`+{day.date('long')}+`
+|`date`
+|`September 19, 2026` / `19. September 2026`; also `short`, `medium`, `full`
+|===
+
+== Language variants
+
+A template may exist in several languages. Each variant is a complete template
+with its own texts; all variants read the same data. Which variant is rendered
+is decided per request:
+
+* CLI: `--lang` with language ranges, e.g. `--lang "de-AT, en;q=0.8"`.
+* REST API: the `lang` query parameter, otherwise `Accept-Language`.
+
+The variant is chosen by RFC 4647 lookup: the range is shortened from the
+right until it matches a variant (`de-AT-x-foo` → `de-AT` → `de`), ranges in
+order of their weight. A range never matches a more specific tag: `de` does not
+select `de-AT`. Without a match, the default variant is rendered.
+
+The `lang` attribute of the `<html>` element must match the language of the
+variant; `check` verifies it.

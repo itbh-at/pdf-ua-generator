@@ -1,0 +1,12 @@
+<!--
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright 2026 IT Beratung Hermann GmbH
+
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title>Let</title></head>
+<body>
+{#let c=invoice.customer label='Customer'}<p>{label}: {c.name}</p>{/let}
+{#include partial /}
+<p>{data:invoice.number}</p>
+</body></html>

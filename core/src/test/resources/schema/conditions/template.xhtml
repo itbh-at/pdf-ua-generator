@@ -1,0 +1,15 @@
+<!--
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright 2026 IT Beratung Hermann GmbH
+
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title>Conditions</title></head>
+<body>
+{#if photo??}<img src="{photo.src}" alt="{photo.alt}" />{/if}
+<p>{nickname ?: name}</p>
+<p>{greeting.or('Hello')}</p>
+{#if vip}<p>{discount}</p>{#else}<p>{standardText}</p>{/if}
+{#if address??}<p>{address.street}</p><p>{address.city ?: 'unknown'}</p>{/if}
+{#when status}{#is 'open'}<p>{openText}</p>{/when}
+</body></html>

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "total": {
+      "type": "number"
+    },
+    "count": {
+      "type": "number"
+    },
+    "rate": {
+      "type": "number"
+    },
+    "due": {
+      "type": "string",
+      "format": "date"
+    },
+    "paid": {
+      "type": "boolean"
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "logo": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "type": "string",
+          "pattern": "^(attachment:\\S+|https://\\S+)$"
+        },
+        "alt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "alt"
+      ]
+    },
+    "unused": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "total",
+    "count",
+    "rate",
+    "due",
+    "paid",
+    "positions",
+    "notes",
+    "logo"
+  ]
+}

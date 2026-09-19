@@ -6,6 +6,7 @@
 package at.itbh.pdfuagen.core;
 
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Source of templates and their resources (fonts, images, stylesheets).
@@ -21,4 +22,12 @@ public interface TemplateRepository {
 
   /** The bytes of a resource at the given normalized relative path. */
   Optional<byte[]> resource(String path);
+
+  /**
+   * The language tags of the variants of a template ({@code de-AT} for {@code
+   * invoice.de-AT.xhtml}), without the default variant. See {@link LanguageVariants}.
+   */
+  default Set<String> languages(String templateId) {
+    return Set.of();
+  }
 }

@@ -7,17 +7,15 @@ package at.itbh.pdfuagen.cli;
 
 import at.itbh.pdfuagen.core.DirectoryTemplateRepository;
 import at.itbh.pdfuagen.core.DocumentRenderer;
-import at.itbh.pdfuagen.core.JsonData;
+import at.itbh.pdfuagen.core.LanguageVariants;
 import at.itbh.pdfuagen.core.OutputFormat;
 import at.itbh.pdfuagen.core.PdfUaValidator;
-import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
 import at.itbh.pdfuagen.core.RenderRequest;
 import at.itbh.pdfuagen.core.Rendered;
 import at.itbh.pdfuagen.core.ResourceFetcher;
 import at.itbh.pdfuagen.core.ResourceLimits;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URI;
@@ -29,16 +27,17 @@ import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
@@ -57,20 +56,7 @@ final class RenderCommand implements Callable<Integer> {
 
   @Spec CommandSpec spec;
 
-  @Option(
-      names = {"-t", "--template"},
-      required = true,
-      paramLabel = "<file|dir>",
-      description =
-          "Template file, or a directory containing template.xhtml. Resources are resolved relative"
-              + " to it.")
-  Path template;
-
-  @Option(
-      names = {"-I", "--include-path"},
-      paramLabel = "<dir>",
-      description = "Additional directory for included templates and resources. Repeatable.")
-  List<Path> includePaths = new ArrayList<>();
+  @Mixin TemplateOptions template;
 
   @Option(
       names = {"-d", "--data"},
@@ -114,6 +100,14 @@ final class RenderCommand implements Callable<Integer> {
   boolean verify;
 
   @Option(
+      names = {"-l", "--lang"},
+      paramLabel = "<ranges>",
+      description =
+          "Accepted languages as in Accept-Language, e.g. 'de-AT, en;q=0.8'. Renders the best"
+              + " matching language variant (<name>.<tag>.xhtml), or the default variant.")
+  String lang;
+
+  @Option(
       names = {"-w", "--watch"},
       description = "Render again whenever the template, data or a resource changes.")
   boolean watch;
@@ -153,6 +147,7 @@ final class RenderCommand implements Callable<Integer> {
   }
 
   private DocumentRenderer renderer;
+  private List<Locale.LanguageRange> ranges = List.of();
 
   @Override
   public Integer call() throws Exception {
@@ -163,6 +158,14 @@ final class RenderCommand implements Callable<Integer> {
     if (watch && "-".equals(output)) {
       throw new picocli.CommandLine.ParameterException(
           spec.commandLine(), "--watch cannot write to stdout");
+    }
+    if (lang != null) {
+      try {
+        ranges = LanguageVariants.ranges(lang);
+      } catch (IllegalArgumentException e) {
+        throw new CommandLine.ParameterException(
+            spec.commandLine(), "--lang: not a language range list: " + lang);
+      }
     }
     renderer =
         new DocumentRenderer(
@@ -176,18 +179,19 @@ final class RenderCommand implements Callable<Integer> {
 
   private int renderOnce() throws IOException {
     PrintWriter err = spec.commandLine().getErr();
-    Path root = Files.isDirectory(template) ? template : template.toAbsolutePath().getParent();
-    String templateId =
-        Files.isDirectory(template)
-            ? DirectoryTemplateRepository.DEFAULT_TEMPLATE_FILE
-            : template.getFileName().toString();
+    Path root = template.root();
     try {
+      DirectoryTemplateRepository repository = template.repository();
+      String templateId =
+          lang == null
+              ? template.templateId()
+              : renderer.selectVariant(repository, template.templateId(), ranges);
       RenderRequest request =
           new RenderRequest(
               templateId,
-              new DirectoryTemplateRepository(root, includePaths),
-              readData(),
-              readAttachments());
+              repository,
+              TemplateOptions.readData(data),
+              TemplateOptions.readAttachments(attachments));
       Rendered rendered = renderer.render(request, format.outputFormat);
       rendered.warnings().forEach(w -> err.println("warning: " + w));
       if (verify) {
@@ -202,32 +206,9 @@ final class RenderCommand implements Callable<Integer> {
       err.flush();
       return 0;
     } catch (RenderException e) {
-      for (Problem problem : e.problems()) {
-        err.println(
-            "error: "
-                + problem.detail()
-                + (problem.location() == null ? "" : " (" + problem.location() + ")"));
-      }
-      err.flush();
+      TemplateOptions.print(err, e.problems());
       return 1;
     }
-  }
-
-  private Map<String, Object> readData() throws IOException, RenderException {
-    if (data == null) {
-      return Map.of();
-    }
-    try (InputStream in = "-".equals(data) ? System.in : Files.newInputStream(Path.of(data))) {
-      return JsonData.parse(in);
-    }
-  }
-
-  private Map<String, byte[]> readAttachments() throws IOException {
-    Map<String, byte[]> result = new LinkedHashMap<>();
-    for (Map.Entry<String, Path> entry : attachments.entrySet()) {
-      result.put(entry.getKey(), Files.readAllBytes(entry.getValue()));
-    }
-    return result;
   }
 
   private Path outputPath(Path root, String templateId) {
@@ -254,19 +235,17 @@ final class RenderCommand implements Callable<Integer> {
   private void watchAndRender() throws IOException, InterruptedException {
     PrintWriter out = spec.commandLine().getOut();
     Set<Path> dirs = new LinkedHashSet<>();
-    dirs.add(
-        (Files.isDirectory(template) ? template : template.toAbsolutePath().getParent())
-            .toAbsolutePath());
-    includePaths.forEach(p -> dirs.add(p.toAbsolutePath()));
+    dirs.add(template.root().toAbsolutePath());
+    template.includePaths.forEach(p -> dirs.add(p.toAbsolutePath()));
     if (data != null && !"-".equals(data)) {
       dirs.add(Path.of(data).toAbsolutePath().getParent());
     }
     attachments.values().forEach(p -> dirs.add(p.toAbsolutePath().getParent()));
     Path root = dirs.iterator().next();
     String templateId =
-        Files.isDirectory(template)
-            ? DirectoryTemplateRepository.DEFAULT_TEMPLATE_FILE
-            : template.getFileName().toString();
+        lang == null
+            ? template.templateId()
+            : renderer.selectVariant(template.repository(), template.templateId(), ranges);
     Path outputFile = outputPath(root, templateId).toAbsolutePath();
 
     try (WatchService watcher = FileSystems.getDefault().newWatchService()) {

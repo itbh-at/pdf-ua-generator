@@ -120,14 +120,23 @@ language.
 
 == Data and schema
 
-Data is JSON, read into maps and lists that Qute resolves directly. The schema
-is derived from the template's syntax tree: a `+{#for}+` over a value makes it an
-array, `+{a.b}+` makes `a` an object, a value used only inside `+{#if}+` or with a
-default is optional. The syntax tree says nothing about types, so every
-template also carries *field definitions* with types (text, number, date,
-boolean, image, list, object). Deriving and comparing the two gives a real
-JSON Schema (draft 2020-12) and catches fields the template uses but does not
-define.
+Data is JSON, read into maps and lists that Qute resolves directly. The
+syntax tree of a template shows which data it reads and where: a `+{#for}+`
+over a value needs a list, `+{a.b}+` needs an object `a`, a value with a default
+or read only under a condition is optional. The syntax tree says nothing about
+types, so every template also carries *field definitions* with types (text,
+number, date, boolean, image, list, object) in its descriptor. Combining the
+two gives a real JSON Schema (draft 2020-12) and catches fields the template
+reads but does not define, and reads that do not fit the type. The exact rules
+are on xref:reference/template-files.adoc[Template files].
+
+Names are resolved statically through `+{#let}+`, loops and includes. `+{#with}+`
+is not available: inside it, a name can mean a property of the object or a
+top-level value, which only the data decides.
+
+Numbers are JSON numbers, dates ISO 8601 strings. They are formatted in the
+template (`+{total.currency('EUR')}+`, `+{due.date('long')}+`) for the language
+of the rendered variant, so the data stays language-neutral.
 
 Validation reports every violation with a JSON Pointer to the offending value.
 Properties the template does not use are allowed, so callers can send their
@@ -139,7 +148,7 @@ existing data objects unchanged.
 Qute + JSON → XHTML ─┬─ openhtmltopdf → PDF/UA
                      ├─ XHTML (self-contained)
                      ├─ email HTML
-                     └─ document model ─┬─ DOCX (docx4j-core)
+                     └─ document model ─┬─ DOCX (StAX + ZIP)
                                         ├─ ODT (StAX + ZIP)
                                         └─ plain text
 ----
@@ -169,6 +178,36 @@ translation from the model is our own code in any case. `docx4j-core` would add
 about 25 libraries and a slow start of its XML binding; `docx4j-ImportXHTML` is
 tied to an old openhtmltopdf release and says nothing about headings, alt texts
 or table headers.
+
+=== Why the writers do not use Qute
+
+Qute is the template engine of the project, so it seems natural to write the
+output formats with it as well. It was considered and rejected; the writers are
+Java code.
+
+* *Build-time checking is not available where the writers live.* Type-safe
+  templates (`@CheckedTemplate`) are checked by the Quarkus build, not by Qute
+  itself. The writers belong to `core`, which runs without Quarkus so the CLI
+  and the server produce identical output. Moving them to `server` would take
+  the formats away from the CLI; making `core` a Quarkus artefact would force
+  Quarkus onto the CLI.
+* *The compiler already checks more.* The writers switch over the sealed
+  building blocks of the document model: a new building block is a compile
+  error in every writer that does not handle it. A template would check that
+  properties exist, but not that every building block is handled.
+* *The work is logic, not markup.* Wrapping text at 72 characters, aligning
+  table columns, numbering footnotes, inlining CSS per element and choosing
+  image URLs stay Java code either way; templates would hold only the thin
+  markup between them, plus a recursive dispatch over the building blocks and
+  a value resolver for every model type, because the reflection resolver is
+  switched off.
+* *XML needs guarantees a text template cannot give.* DOCX, ODT and email HTML
+  are written through a StAX writer, which escapes every value and cannot
+  produce a document that is not well-formed. A template for WordprocessingML
+  would be string assembly again, without that guarantee.
+
+Plain text is the one output that is assembled as a string, because it has no
+markup to get wrong.
 
 Running headers and footers with page numbers come from the `@page` margin
 boxes of the template CSS (`content: counter(page) " / " counter(pages)`), so

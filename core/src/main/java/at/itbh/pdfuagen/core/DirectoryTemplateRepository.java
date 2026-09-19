@@ -13,6 +13,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Stream;
 
 /**
  * Template repository on the file system: a root directory plus include paths searched in order.
@@ -51,6 +54,38 @@ public final class DirectoryTemplateRepository implements TemplateRepository {
   @Override
   public Optional<byte[]> resource(String path) {
     return ResourcePaths.normalize(path).flatMap(this::read);
+  }
+
+  /** Variants {@code <name>.<tag>.xhtml} next to {@code <name>.xhtml}, in any root. */
+  @Override
+  public Set<String> languages(String templateId) {
+    Optional<String> path = ResourcePaths.normalize(templateId);
+    if (path.isEmpty() || !path.get().endsWith(LanguageVariants.EXTENSION)) {
+      return Set.of();
+    }
+    Set<String> tags = new TreeSet<>();
+    for (Path root : roots) {
+      Path file = root.resolve(path.get()).normalize();
+      Path dir = file.getParent();
+      if (dir == null || !Files.isDirectory(dir)) {
+        continue;
+      }
+      try (Stream<Path> siblings = Files.list(dir)) {
+        siblings.forEach(
+            sibling -> {
+              String id = root.relativize(sibling).toString().replace('\\', '/');
+              LanguageVariants.Variant variant = LanguageVariants.parse(id);
+              if (variant.tag() != null
+                  && variant.baseId().equals(path.get())
+                  && Files.isRegularFile(sibling)) {
+                tags.add(variant.tag());
+              }
+            });
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+    return java.util.Collections.unmodifiableSet(tags);
   }
 
   private Optional<byte[]> read(String normalized) {

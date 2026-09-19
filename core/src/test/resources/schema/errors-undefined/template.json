@@ -1,0 +1,7 @@
+{
+  "language": "en",
+  "fields": {
+    "customer": { "type": "object", "fields": { "name": { "type": "text" } } },
+    "positions": { "type": "list", "items": { "type": "object", "fields": { "name": { "type": "text" } } } }
+  }
+}

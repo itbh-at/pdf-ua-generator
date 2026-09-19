@@ -1,0 +1,11 @@
+{
+  "language": "en",
+  "fields": {
+    "title": { "type": "text", "label": "Title" },
+    "customer": { "type": "object", "fields": {
+      "name": { "type": "text", "description": "Full name" },
+      "address": { "type": "object", "fields": {
+        "city": { "type": "text" },
+        "zip": { "type": "text" } } } } }
+  }
+}

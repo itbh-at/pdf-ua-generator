@@ -1,0 +1,14 @@
+{
+  "language": "de-AT",
+  "fields": {
+    "total": { "type": "number" },
+    "count": { "type": "number" },
+    "rate": { "type": "number" },
+    "due": { "type": "date" },
+    "paid": { "type": "boolean" },
+    "positions": { "type": "list", "items": { "type": "object", "fields": { "name": { "type": "text" } } } },
+    "notes": { "type": "list", "items": { "type": "text" } },
+    "logo": { "type": "image" },
+    "unused": { "type": "text" }
+  }
+}

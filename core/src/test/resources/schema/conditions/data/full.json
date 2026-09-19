@@ -1,0 +1,1 @@
+{"vip": true, "status": "open", "photo": {"src": "https://example.org/a.png", "alt": ""}, "address": {"street": "Main St"}, "discount": 5, "extra": {"anything": [1, 2]}}

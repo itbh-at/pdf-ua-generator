@@ -1,0 +1,43 @@
+{
+  "language": "en",
+  "fields": {
+    "customer": {
+      "type": "object",
+      "label": "Customer",
+      "fields": {
+        "name": { "type": "text", "label": "Name", "description": "Used in the greeting." }
+      }
+    },
+    "items": {
+      "type": "list",
+      "label": "Bullet items",
+      "items": { "type": "text" }
+    },
+    "photo": {
+      "type": "image",
+      "label": "Photo",
+      "description": "Optional. Not usable in email HTML, which cannot show request attachments."
+    },
+    "order": {
+      "type": "object",
+      "label": "Order",
+      "fields": {
+        "number": { "type": "text", "label": "Order number" },
+        "date": { "type": "date", "label": "Order date" },
+        "positions": {
+          "type": "list",
+          "label": "Positions",
+          "items": {
+            "type": "object",
+            "fields": {
+              "name": { "type": "text", "label": "Item" },
+              "quantity": { "type": "number", "label": "Quantity" },
+              "price": { "type": "number", "label": "Price in EUR" }
+            }
+          }
+        },
+        "total": { "type": "number", "label": "Total in EUR" }
+      }
+    }
+  }
+}

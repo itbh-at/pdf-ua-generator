@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "photo": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "src": {
+          "type": "string",
+          "pattern": "^(attachment:\\S+|https://\\S+)$"
+        },
+        "alt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "alt"
+      ]
+    },
+    "nickname": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "greeting": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "vip": {
+      "type": "boolean"
+    },
+    "discount": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "standardText": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "address": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "street": {
+          "type": "string"
+        },
+        "city": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "street"
+      ]
+    },
+    "status": {
+      "type": "string"
+    },
+    "openText": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "vip",
+    "status"
+  ]
+}

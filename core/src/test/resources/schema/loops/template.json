@@ -1,0 +1,11 @@
+{
+  "language": "en",
+  "fields": {
+    "orders": { "type": "list", "items": { "type": "object", "fields": {
+      "number": { "type": "text" },
+      "positions": { "type": "list", "items": { "type": "object", "fields": {
+        "name": { "type": "text" } } } } } } },
+    "emptyText": { "type": "text" },
+    "tags": { "type": "list", "items": { "type": "text" } }
+  }
+}

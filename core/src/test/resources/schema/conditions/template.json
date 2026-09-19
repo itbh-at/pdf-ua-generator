@@ -1,0 +1,17 @@
+{
+  "language": "en",
+  "fields": {
+    "photo": { "type": "image" },
+    "nickname": { "type": "text" },
+    "name": { "type": "text" },
+    "greeting": { "type": "text" },
+    "vip": { "type": "boolean" },
+    "discount": { "type": "number" },
+    "standardText": { "type": "text" },
+    "address": { "type": "object", "fields": {
+      "street": { "type": "text" },
+      "city": { "type": "text" } } },
+    "status": { "type": "text" },
+    "openText": { "type": "text" }
+  }
+}

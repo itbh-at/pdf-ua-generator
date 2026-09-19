@@ -1,0 +1,9 @@
+{
+  "language": "en",
+  "fields": {
+    "name": { "type": "text" },
+    "total": { "type": "number" },
+    "customer": { "type": "object", "fields": { "name": { "type": "text" } } },
+    "items": { "type": "list", "items": { "type": "text" } }
+  }
+}

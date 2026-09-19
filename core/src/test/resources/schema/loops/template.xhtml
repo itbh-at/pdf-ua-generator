@@ -1,0 +1,16 @@
+<!--
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright 2026 IT Beratung Hermann GmbH
+
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><title>Loops</title></head>
+<body>
+{#for order in orders}
+  <h2>{order.number} ({order_index})</h2>
+  {#for p in order.positions}<p>{p.name}{#if p_hasNext}, {/if}</p>{/for}
+{#else}
+  <p>{emptyText}</p>
+{/for}
+{#each tags}<span>{it}</span>{/each}
+</body></html>

@@ -45,9 +45,13 @@ Renders a template with JSON data into a document.
 
 ----
 pdf-ua-generator render -t <file|dir> [-d <file|->] [-a <name>=<file>]...
-                        [-I <dir>]... [-f <format>] [-o <file|->]
+                        [-I <dir>]... [-f <format>] [-o <file|->] [-l <ranges>]
                         [--public-base-url <url>] [--verify] [-w]
 ----
+
+If the template has field definitions (`<name>.json`), the data is validated
+against its schema first; see xref:reference/template-files.adoc[Template
+files].
 
 [cols="2,5",options="header"]
 |===
@@ -86,6 +90,12 @@ xref:reference/building-blocks.adoc[building blocks].
 |Output file; `-` writes to stdout. Default: next to the template, as
 `<name>.pdf`, `.rendered.xhtml`, `.email.html`, `.rendered.txt`, `.docx` or
 `.odt`.
+
+|`-l`, `--lang <ranges>`
+|Accepted languages in the form of an `Accept-Language` header, e.g.
+`de-AT, en;q=0.8`. Renders the language variant chosen by RFC 4647 lookup, or
+the default variant if none matches. The default output name follows the
+variant (`<name>.de-AT.pdf`).
 
 |`--public-base-url <url>`
 |Base of the public URLs of template assets in email HTML:
@@ -126,6 +136,54 @@ Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
 pdf-ua-generator render -t demo/demo.xhtml -d demo/data.json -a photo=demo/photo.png --verify
 ----
 
+== `schema`
+
+Prints the JSON Schema (draft 2020-12) of the data a template needs, derived
+from the template and its field definitions.
+
+----
+pdf-ua-generator schema -t <file|dir> [-I <dir>]... [-o <file>]
+----
+
+Fields that are defined but never used are reported as `warning: …`. Exit code
+`0` if the schema was written, `1` if the template, a language variant or the
+field definitions have errors — each printed with its location (template, line
+and column, or a JSON Pointer into the descriptor).
+
+== `validate`
+
+Validates data against the schema of a template, without rendering.
+
+----
+pdf-ua-generator validate -t <file|dir> [-I <dir>]... -d <file|->
+----
+
+Prints `valid` and exits with `0`, or prints every violation with a JSON Pointer
+to the offending value and exits with `1`:
+
+----
+error: must be a date in the form YYYY-MM-DD (#/order/date)
+error: is required (#/order/positions/0/quantity)
+----
+
+== `check`
+
+Runs the checks a template must pass before it is published.
+
+----
+pdf-ua-generator check -t <file|dir> [-I <dir>]... -d <file|-> [-a <name>=<file>]...
+----
+
+. Every language variant parses, the field definitions are valid, every field
+  the template reads is defined with a fitting type, and all variants need the
+  same data.
+. The example data given with `-d` is valid.
+. Every variant renders to well-formed XHTML whose `lang` matches the language
+  of the variant.
+. Every variant renders to a PDF that veraPDF confirms as PDF/UA-1.
+
+Prints `passed` and exits with `0`, or prints every problem and exits with `1`.
+
 == `verify`
 
 Validates PDF files against PDF/UA-1 with veraPDF.
@@ -154,8 +212,10 @@ external resources. Resources larger than 20 MB and raster images larger than
 
 Templates are XHTML with https://quarkus.io/guides/qute[Qute] expressions. Data
 values are HTML-escaped. Not available: calling Java methods, `raw` output,
-`+{#eval}+` and `+{#cache}+`. A value the template uses but the data lacks is an
-error, not an empty string.
+`+{#eval}+`, `+{#cache}+` and `+{#with}+` (use `+{#let}+`). A value the template
+uses but the data lacks is an error, not an empty string. Formatting functions
+for numbers, amounts and dates are listed under
+xref:reference/template-files.adoc#formatting[Template files].
 
 The template is parsed as XML without loading a DTD, so named entities such as
 `&nbsp;` are not available; use the character itself or a numeric reference

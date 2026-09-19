@@ -52,6 +52,7 @@
         <xmlgraphics-commons.version>2.11</xmlgraphics-commons.version>
         <verapdf.version>1.30.2</verapdf.version>
         <jmh.version>1.37</jmh.version>
+        <json-schema-validator.version>2.0.7</json-schema-validator.version>
 
         <compiler-plugin.version>3.16.0</compiler-plugin.version>
         <surefire-plugin.version>3.6.0</surefire-plugin.version>
@@ -145,6 +146,11 @@
                 <groupId>org.verapdf</groupId>
                 <artifactId>validation-model-jakarta</artifactId>
                 <version>${verapdf.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>json-schema-validator</artifactId>
+                <version>${json-schema-validator.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.openjdk.jmh</groupId>

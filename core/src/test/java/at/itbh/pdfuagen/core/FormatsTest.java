@@ -67,7 +67,7 @@ class FormatsTest {
     assertTrue(document.contains("descr=\"Logo of IT Beratung Hermann GmbH\""));
     assertTrue(document.contains("adec:decorative"), "decorative image flagged");
     assertTrue(document.contains("<w:tblHeader"));
-    assertTrue(document.contains("<w:tblCaption w:val=\"Order 2026-0042\""));
+    assertTrue(document.contains("<w:tblCaption w:val=\"Order 2026-0042 of September 19, 2026\""));
     assertTrue(document.contains("<w:footnoteReference"));
     assertTrue(document.contains("<w:lang w:val=\"de-AT\""));
     assertTrue(parts.get("word/footer1.xml").contains("NUMPAGES"));

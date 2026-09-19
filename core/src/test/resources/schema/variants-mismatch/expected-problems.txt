@@ -1,0 +1,1 @@
+language variant 'de' reads different data than the default variant; every variant must use the same fields, required in the same places. Differs in: name, due (template.de.xhtml)

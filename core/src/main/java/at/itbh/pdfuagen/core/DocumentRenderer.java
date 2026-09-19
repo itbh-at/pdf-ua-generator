@@ -9,6 +9,7 @@ import at.itbh.pdfuagen.core.model.AccessibilityChecker;
 import at.itbh.pdfuagen.core.model.DocumentModel;
 import at.itbh.pdfuagen.core.model.ModelBuilder;
 import at.itbh.pdfuagen.core.model.PageBoxes;
+import at.itbh.pdfuagen.core.schema.DataSchema;
 import at.itbh.pdfuagen.core.writer.CssRules;
 import at.itbh.pdfuagen.core.writer.DocxWriter;
 import at.itbh.pdfuagen.core.writer.EmailHtmlWriter;
@@ -39,9 +40,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import org.w3c.dom.Document;
 
@@ -80,7 +84,10 @@ public final class DocumentRenderer {
         });
   }
 
-  private record RepositoryState(Engine engine, FSCacheEx<String, FSCacheValue> fontMetrics) {}
+  private record RepositoryState(
+      Engine engine,
+      FSCacheEx<String, FSCacheValue> fontMetrics,
+      ConcurrentMap<String, TemplateInspection> inspections) {}
 
   /** Stylesheet a layout provides for email HTML. */
   public static final String EMAIL_CSS = "email.css";
@@ -113,22 +120,122 @@ public final class DocumentRenderer {
     this.publicBaseUrl = publicBaseUrl;
   }
 
-  /** Renders the template with Qute only; the result is the XHTML every format starts from. */
+  /**
+   * Renders the template with Qute only; the result is the XHTML every format starts from.
+   *
+   * <p>If the template has a descriptor, the template must pass its schema checks and the data is
+   * validated against the schema first. Values are formatted for the language of the variant.
+   */
   public String renderSource(RenderRequest request) throws RenderException {
+    TemplateInspection inspection = inspection(request.repository(), request.templateId());
+    if (inspection.descriptorFound()) {
+      failOnProblems(inspection.problems());
+      failOnProblems(inspection.schema().validate(request.data()));
+    }
+    return qute(request, request.templateId(), language(inspection, request.templateId()));
+  }
+
+  private String qute(RenderRequest request, String templateId, Locale locale)
+      throws RenderException {
     Engine engine = state(request.repository()).engine();
     try {
-      Template template = engine.getTemplate(request.templateId());
+      Template template = engine.getTemplate(templateId);
       if (template == null) {
         throw new RenderException(
-            List.of(
-                new Problem(Problem.TEMPLATE_ERROR, "template not found", request.templateId())));
+            List.of(new Problem(Problem.TEMPLATE_ERROR, "template not found", templateId)));
       }
-      return template.data(request.data()).render();
+      return template.data(request.data()).setLocale(locale).render();
     } catch (TemplateException e) {
       throw new RenderException(
-          new Problem(Problem.TEMPLATE_ERROR, e.getMessage(), location(e, request.templateId())),
+          new Problem(
+              Problem.TEMPLATE_ERROR, e.getMessage(), TemplateInspection.location(e, templateId)),
           e);
     }
+  }
+
+  /**
+   * The data schema of a template, shared by all its language variants.
+   *
+   * @param templateId the template or one of its variants
+   * @throws RenderException if the template has no descriptor, or the template, a variant or the
+   *     descriptor has problems
+   */
+  public DataSchema schema(TemplateRepository repository, String templateId)
+      throws RenderException {
+    TemplateInspection inspection = inspection(repository, templateId);
+    if (!inspection.descriptorFound()) {
+      throw new RenderException(
+          List.of(
+              new Problem(
+                  Problem.TEMPLATE_ERROR,
+                  "the template has no field definitions; add "
+                      + LanguageVariants.descriptorPath(inspection.baseId()),
+                  inspection.baseId())));
+    }
+    failOnProblems(inspection.problems());
+    return inspection.schema();
+  }
+
+  /** Fields the template defines but never reads; empty if the template cannot be inspected. */
+  public List<String> schemaWarnings(TemplateRepository repository, String templateId) {
+    return inspection(repository, templateId).warnings();
+  }
+
+  /**
+   * Picks the language variant of a template for the accepted languages (RFC 4647 lookup). Without
+   * a match, the default variant is returned.
+   *
+   * @param templateId id of the default variant
+   * @param ranges accepted languages, e.g. {@link LanguageVariants#ranges} of {@code
+   *     Accept-Language}
+   * @return the id of the variant to render
+   */
+  public String selectVariant(
+      TemplateRepository repository, String templateId, List<Locale.LanguageRange> ranges) {
+    TemplateInspection inspection = inspection(repository, templateId);
+    Locale defaultLanguage =
+        inspection.descriptor() == null ? null : inspection.descriptor().language();
+    return LanguageVariants.select(defaultLanguage, inspection.variants().keySet(), ranges)
+        .map(inspection.variants()::get)
+        .orElse(inspection.baseId());
+  }
+
+  /** Ids of all variants of a template, the default variant first. */
+  public List<String> variants(TemplateRepository repository, String templateId) {
+    TemplateInspection inspection = inspection(repository, templateId);
+    List<String> ids = new ArrayList<>();
+    ids.add(inspection.baseId());
+    inspection.variants().keySet().stream()
+        .sorted()
+        .map(inspection.variants()::get)
+        .forEach(ids::add);
+    return ids;
+  }
+
+  /**
+   * The language a template variant is written in: the tag of a variant, the descriptor's language
+   * for the default variant, or {@link Locale#ROOT} if the template declares none.
+   */
+  public Locale language(TemplateRepository repository, String templateId) {
+    return language(inspection(repository, templateId), templateId);
+  }
+
+  private static Locale language(TemplateInspection inspection, String templateId) {
+    String tag = LanguageVariants.parse(templateId).tag();
+    if (tag != null) {
+      return Locale.forLanguageTag(tag);
+    }
+    return inspection.descriptor() != null && inspection.descriptor().language() != null
+        ? inspection.descriptor().language()
+        : Locale.ROOT;
+  }
+
+  private TemplateInspection inspection(TemplateRepository repository, String templateId) {
+    RepositoryState state = state(repository);
+    String baseId = LanguageVariants.parse(templateId).baseId();
+    return state
+        .inspections()
+        .computeIfAbsent(baseId, id -> TemplateInspection.inspect(state.engine(), repository, id));
   }
 
   public Rendered render(RenderRequest request, OutputFormat format) throws RenderException {
@@ -229,10 +336,7 @@ public final class DocumentRenderer {
     // A template may provide its own plain-text version: <name>.txt next to <name>.xhtml.
     String textId = textTemplateId(request.templateId());
     if (request.repository().template(textId).isPresent()) {
-      String text =
-          renderSource(
-              new RenderRequest(
-                  textId, request.repository(), request.data(), request.attachments()));
+      String text = qute(request, textId, language(request.repository(), request.templateId()));
       return new Rendered(OutputFormat.TEXT, text.getBytes(StandardCharsets.UTF_8), List.of());
     }
     DocumentModel model = model(document, resolver);
@@ -378,15 +482,10 @@ public final class DocumentRenderer {
   private RepositoryState state(TemplateRepository repository) {
     return states.computeIfAbsent(
         repository,
-        r -> new RepositoryState(QuteEngines.create(r, timeout), new FSDefaultCacheStore()));
-  }
-
-  private static String location(TemplateException e, String templateId) {
-    if (e.getOrigin() == null) {
-      return templateId;
-    }
-    String id =
-        e.getOrigin().hasNonGeneratedTemplateId() ? e.getOrigin().getTemplateId() : templateId;
-    return id + ", line " + e.getOrigin().getLine();
+        r ->
+            new RepositoryState(
+                QuteEngines.create(r, timeout),
+                new FSDefaultCacheStore(),
+                new ConcurrentHashMap<>()));
   }
 }

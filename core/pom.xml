@@ -45,6 +45,13 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Independent JSON Schema validator: checks that the derived schemas are real
+             JSON Schema and agree with our validator. Test scope only, never shipped. -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Benchmarks (mise run bench); test scope only, never shipped. -->
         <dependency>
             <groupId>org.openjdk.jmh</groupId>

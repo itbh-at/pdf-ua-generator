@@ -1,0 +1,11 @@
+{
+  "language": "english",
+  "colour": "red",
+  "fields": {
+    "a": { "type": "string" },
+    "b-c": { "type": "text" },
+    "d": { "type": "list" },
+    "e": { "type": "object", "fields": { "f": { "type": "text", "items": {} } } },
+    "g": { "type": "text", "label": 3 }
+  }
+}

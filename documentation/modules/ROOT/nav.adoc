@@ -10,6 +10,7 @@
 
 .Reference
 * xref:reference/cli.adoc[Command line]
+* xref:reference/template-files.adoc[Template files]
 * xref:reference/building-blocks.adoc[Template building blocks]
 * xref:reference/problem-types.adoc[Problem types]
 

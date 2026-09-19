@@ -52,8 +52,16 @@ plain text).
 - Checks that build-time Qute would provide (parse errors, unknown expressions)
   are done at runtime when a template revision is saved.
 - Every template revision has a JSON Schema (draft 2020-12) describing the data
-  it needs. It is derived from the template and exposed through the API and
-  the CLI.
+  it needs. It is derived from the template and its field definitions and
+  exposed through the API and the CLI.
+- A template's descriptor `<name>.json` holds the language of the default
+  variant and the field definitions (types `text`, `number`, `date`,
+  `boolean`, `image`, `list`, `object`); all language variants share it.
+  Every field a template reads must be defined.
+- Numbers are JSON numbers and dates ISO 8601 strings in the data; templates
+  format them (`.number`, `.currency('EUR')`, `.date`) for the variant's
+  language. No pre-formatted amounts or dates in the data.
+- `{#with}` is not available: its names cannot be resolved without the data.
 - Input data is validated against that schema before rendering, and can be
   validated without rendering. Additional properties not used by the template
   are allowed; missing required values and wrong types are errors.
@@ -109,6 +117,9 @@ plain text).
   ODT runs on the model, once for both formats.
 - DOCX and ODT writers: no office library — JDK StAX and `ZipOutputStream`
   (DOCX: WordprocessingML; ODT: ODF 1.3). No docx4j, no ODF Toolkit.
+- Writers are Java code, not Qute templates. XML and HTML output (DOCX, ODT,
+  email HTML) is written through the StAX writer `Xml`, never assembled from
+  strings; plain text is the only output built as a string.
 - Running headers and footers come from the `@page` margin boxes of the
   template CSS (strings, `counter(page)`, `counter(pages)`) and are written to
   PDF, DOCX and ODT; anything else in their `content` is an error.

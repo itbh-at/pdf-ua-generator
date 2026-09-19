@@ -93,7 +93,8 @@ class RenderCommandTest {
             DEMO.resolve("demo.xhtml").toString(),
             "-o",
             tmp.resolve("x.pdf").toString()));
-    assertTrue(err.toString().contains("not found"), err::toString);
+    // The data is validated against the schema before Qute runs.
+    assertTrue(err.toString().contains("error: is required (#/customer)"), err::toString);
   }
 
   @Test

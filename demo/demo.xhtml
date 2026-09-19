@@ -148,34 +148,34 @@
     <p><img class="logo" src="logo.svg" alt="Logo of IT Beratung Hermann GmbH" /></p>
     <img class="divider" src="divider.svg" alt="" role="presentation" />
     {#if photo??}
-    <p><img class="photo" src="attachment:photo" alt="{photo.alt}" /></p>
+    <p><img class="photo" src="{photo.src}" alt="{photo.alt}" /></p>
     {/if}
     <p>The logo is a template asset (SVG), the line above is decorative and skipped by screen readers,
         and the photo is an attachment sent with the request.</p>
 
     <h2 id="tables">Tables</h2>
     <table>
-        <caption>Order {order.number}</caption>
+        <caption>Order {order.number} of {order.date.date('long')}</caption>
         <thead>
             <tr>
                 <th scope="col">Item</th>
                 <th scope="col" class="number">Quantity</th>
-                <th scope="col" class="number">Price (EUR)</th>
+                <th scope="col" class="number">Price</th>
             </tr>
         </thead>
         <tbody>
             {#for position in order.positions}
             <tr>
                 <td>{position.name}</td>
-                <td class="number">{position.quantity}</td>
-                <td class="number">{position.price}</td>
+                <td class="number">{position.quantity.number}</td>
+                <td class="number">{position.price.currency('EUR')}</td>
             </tr>
             {/for}
         </tbody>
         <tfoot>
             <tr>
                 <td colspan="2">Total</td>
-                <td class="number">{order.total}</td>
+                <td class="number">{order.total.currency('EUR')}</td>
             </tr>
         </tfoot>
     </table>

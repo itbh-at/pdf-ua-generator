@@ -1,0 +1,14 @@
+<!--
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright 2026 IT Beratung Hermann GmbH
+
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" lang="de-AT"><head><title>Types</title></head>
+<body>
+<p>{total.currency('EUR')} {count.number} {rate.number(2)} {due.date('long')}</p>
+{#if paid}<p>paid</p>{/if}
+<p>{positions.size} {positions.0.name} {positions.first.name}</p>
+{#if notes.isEmpty}<p>none</p>{/if}
+<img src="{logo.src}" alt="{logo.alt}" />
+</body></html>

@@ -1,0 +1,5 @@
+'name' is a text field and has no 'date'; define it as type date (template.xhtml, line 9, column 4)
+'total' is a number field and has no 'date'; format it with .number or .currency('EUR') (template.xhtml, line 10, column 4)
+'customer' is an object and cannot be iterated (template.xhtml, line 11, column 24)
+'name' is a text field and has no 'first' (template.xhtml, line 12, column 4)
+'items' is a list and has no 'name' (template.xhtml, line 13, column 4)

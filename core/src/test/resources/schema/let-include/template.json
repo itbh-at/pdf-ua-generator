@@ -1,0 +1,9 @@
+{
+  "language": "en",
+  "fields": {
+    "invoice": { "type": "object", "fields": {
+      "number": { "type": "text" },
+      "customer": { "type": "object", "fields": { "name": { "type": "text" } } } } },
+    "footer": { "type": "object", "fields": { "text": { "type": "text" } } }
+  }
+}

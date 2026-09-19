@@ -14,10 +14,10 @@ import io.quarkus.qute.InsertSectionHelper;
 import io.quarkus.qute.LoopSectionHelper;
 import io.quarkus.qute.SetSectionHelper;
 import io.quarkus.qute.TemplateLocator;
+import io.quarkus.qute.ValueResolver;
 import io.quarkus.qute.ValueResolvers;
 import io.quarkus.qute.Variant;
 import io.quarkus.qute.WhenSectionHelper;
-import io.quarkus.qute.WithSectionHelper;
 import java.io.StringReader;
 import java.time.Duration;
 import java.util.List;
@@ -27,8 +27,9 @@ import java.util.Optional;
  * The one place where the Qute engine is configured, so the CLI and the server render identically.
  *
  * <p>Deliberately left out: the reflection resolver (templates cannot call Java methods), {@code
- * raw} (data cannot inject markup), {@code #eval} (data cannot become template code) and {@code
- * #cache} (would keep output of one render for the next).
+ * raw} (data cannot inject markup), {@code #eval} (data cannot become template code), {@code
+ * #cache} (would keep output of one render for the next) and {@code #with} (its names cannot be
+ * resolved without the data, so no schema could be derived; use {@code #let}).
  */
 final class QuteEngines {
 
@@ -43,7 +44,6 @@ final class QuteEngines {
         .addSectionHelpers(
             new IfSectionHelper.Factory(),
             new LoopSectionHelper.Factory(),
-            new WithSectionHelper.Factory(),
             new SetSectionHelper.Factory(),
             new WhenSectionHelper.Factory(),
             new IncludeSectionHelper.Factory(),
@@ -67,6 +67,7 @@ final class QuteEngines {
             ValueResolvers.modResolver(),
             ValueResolvers.equalsResolver(),
             ValueResolvers.mapResolver())
+        .addValueResolvers(Formatters.resolvers().toArray(ValueResolver[]::new))
         .addResultMapper(new HtmlEscaper(List.of(XHTML, "text/html")))
         .addLocator(locator(repository))
         .strictRendering(true)
