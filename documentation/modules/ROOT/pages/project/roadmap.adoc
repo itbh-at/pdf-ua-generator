@@ -25,7 +25,8 @@ Diátaxis; licence Apache-2.0 with SPDX headers
 |Current openhtmltopdf and PDFBox; in-memory rendering; JSON data; Qute strict
 and without reflection; resolver for assets, attachments and the host
 allowlist; image limits; SVG in secure mode; caches; PDF 1.7; veraPDF; CLI
-`render` with `--attach`; JMH benchmark
+`render` with `--attach`; CLI distribution with generated `NOTICE` and licence
+texts; JMH benchmark
 |The demo template renders to PDF/UA confirmed by veraPDF
 |
 
@@ -58,7 +59,8 @@ roles; worker pool with 503; warm-up before readiness
 |
 
 |5 Operations
-|Containerfile with mise, JRE and AOT cache; Helm chart for Kubernetes and
+|Containerfile with mise, JRE and AOT cache; generated `NOTICE` and licence
+texts in the image; Helm chart for Kubernetes and
 `podman kube play`; `kubeconform`; CI smoke test; load test
 |Several pods render under load and the autoscaler reacts
 |

@@ -227,6 +227,12 @@ old-school senior developer: direct and minimal.
 - The project is licensed under Apache-2.0. Every source file carries an SPDX
   header (`SPDX-License-Identifier: Apache-2.0`, `Copyright <year> IT Beratung
   Hermann GmbH`).
+- The root `NOTICE` holds only the project name and copyright. It is not a
+  dependency list; that is `THIRD_PARTY_LICENSES.md` (informational).
+- Every binary distribution (CLI with `lib/`, container image) ships its own
+  `NOTICE` and the licence texts of the bundled libraries, assembled by the
+  build from the bundled JARs (including their own `NOTICE` files), never
+  maintained by hand.
 - LGPL libraries are shipped as separate JARs (CLI: `lib/` directory; server:
   Quarkus fast-jar), never merged into an uber-jar.
 

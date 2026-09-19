@@ -16,12 +16,25 @@ file carries an SPDX header; `mise run headers` applies it and
 Versions up to and including 1.0.0-SNAPSHOT were published under GPL-3.0.
 Copies obtained under that licence remain under it.
 
+== NOTICE
+
+The `NOTICE` file in the repository root contains only the project name and
+the copyright, as Apache-2.0 section 4(d) requires everyone who redistributes
+the work to carry it along. It is deliberately not a list of dependencies.
+
+Binary distributions — the CLI with its `lib/` directory and the container
+image — contain third-party JARs. Each ships its own `NOTICE` with the notices
+those libraries require (several Apache-2.0 libraries, such as PDFBox and
+Batik, bring their own `NOTICE` files) together with their licence texts. The
+build assembles these files from the bundled JARs.
+
 == Dependencies
 
 Runtime dependencies must be licensed under Apache-2.0, MIT, BSD, EPL,
 MPL-2.0 or LGPL. GPL and AGPL are allowed only for test and build tools. A
 dual-licensed library is used under its permissive option. The current list is
-kept in `THIRD_PARTY_LICENSES.md` in the repository root.
+kept in `THIRD_PARTY_LICENSES.md` in the repository root; it is informational,
+not a legal notice.
 
 LGPL libraries (openhtmltopdf) are shipped as separate JARs so they can be
 replaced: the CLI keeps them in a `lib/` directory next to its JAR, the server
