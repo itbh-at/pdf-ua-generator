@@ -17,6 +17,17 @@ import java.util.Set;
  */
 public interface TemplateRepository {
 
+  /**
+   * A stable key for the content of this repository: two repositories with this same key hold the
+   * same files. The renderer caches what it derives from the files — parsed templates, font
+   * metrics, schemas — under this key, so a repository rebuilt from the same files reuses it
+   * instead of parsing again.
+   *
+   * <p>An implementation whose files can change returns a key unique to the instance, so its
+   * derived state is never reused for other content.
+   */
+  String contentKey();
+
   /** The Qute source of the template with the given id, e.g. for {@code {#include id}}. */
   Optional<String> template(String id);
 

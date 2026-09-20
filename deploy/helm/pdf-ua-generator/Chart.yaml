@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+apiVersion: v2
+name: pdf-ua-generator
+description: Renders Qute templates with JSON data into accessible documents (PDF/UA, XHTML, email HTML, DOCX, ODT, plain text).
+type: application
+version: 2.0.0
+appVersion: "2.0.0-SNAPSHOT"
+home: https://github.com/itbh-at/pdf-ua-generator
+sources:
+  - https://github.com/itbh-at/pdf-ua-generator

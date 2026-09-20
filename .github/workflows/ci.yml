@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+name: CI
+
+on:
+  push:
+    branches: [main, "epic/**"]
+  pull_request:
+
+# Every tool comes from mise.toml, so CI runs the same versions as a developer.
+env:
+  # The server tests and the smoke test start containers through the podman
+  # socket; mise derives DOCKER_HOST from this path.
+  XDG_RUNTIME_DIR: /tmp/podman-run
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - name: Start the podman socket
+        run: |
+          mkdir -p "$XDG_RUNTIME_DIR/podman"
+          podman system service --time=0 "unix://$XDG_RUNTIME_DIR/podman/podman.sock" &
+          for i in $(seq 30); do [ -S "$XDG_RUNTIME_DIR/podman/podman.sock" ] && break; sleep 1; done
+      - run: mise run headers-check
+      - run: mise run build
+      - run: mise run check-chart
+      - run: mise run docs
+      - name: Smoke test of the image
+        run: |
+          mise run image
+          mise run smoke-test

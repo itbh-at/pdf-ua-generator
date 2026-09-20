@@ -77,6 +77,13 @@ public class TemplateStore {
   public record Template(
       String id, String kind, OffsetDateTime createdAt, Integer latestPublished, int latest) {}
 
+  /**
+   * The result of storing a bundle.
+   *
+   * @param created {@code false} if the same files were already stored as this revision
+   */
+  public record Stored(Revision revision, boolean created) {}
+
   /** A content revision that pins a layout revision. */
   public record Dependent(String templateId, int number, String status, int layoutRevision) {}
 
@@ -112,13 +119,15 @@ public class TemplateStore {
   }
 
   /**
-   * Stores the files as a new draft revision, creating the template if needed.
+   * Stores the files as a new draft revision, creating the template if needed. Files already stored
+   * as a revision of this template yield that revision instead of a new one, so importing the same
+   * bundle twice changes nothing.
    *
    * @param kind {@link #CONTENT} or {@link #LAYOUT}; must match the template's earlier revisions
    * @param layoutId the layout a content revision pins, or {@code null}
    * @throws KindMismatchException if the template is of the other kind
    */
-  public Revision createRevision(
+  public Stored createRevision(
       String templateId,
       Map<String, byte[]> files,
       String kind,
@@ -147,6 +156,21 @@ public class TemplateStore {
               }
             }
           }
+          Map<String, String> hashes = new TreeMap<>();
+          files.forEach((path, content) -> hashes.put(path, sha256(content)));
+          String manifest = manifestHash(hashes);
+          try (PreparedStatement s =
+              c.prepareStatement(
+                  "select number from revision where template_id = ? and sha256 = ?"
+                      + " order by number desc limit 1")) {
+            s.setString(1, templateId);
+            s.setString(2, manifest);
+            try (ResultSet r = s.executeQuery()) {
+              if (r.next()) {
+                return new Stored(revision(c, templateId, r.getInt(1)).orElseThrow(), false);
+              }
+            }
+          }
           int number;
           try (PreparedStatement s =
               c.prepareStatement(
@@ -157,15 +181,12 @@ public class TemplateStore {
               number = r.getInt(1);
             }
           }
-          Map<String, String> hashes = new TreeMap<>();
           for (Map.Entry<String, byte[]> file : files.entrySet()) {
-            String sha = sha256(file.getValue());
-            hashes.put(file.getKey(), sha);
             try (PreparedStatement s =
                 c.prepareStatement(
                     "insert into asset (sha256, media_type, size, content) values (?, ?, ?, ?)"
                         + " on conflict do nothing")) {
-              s.setString(1, sha);
+              s.setString(1, hashes.get(file.getKey()));
               s.setString(2, Bundle.mediaType(file.getKey()));
               s.setLong(3, file.getValue().length);
               s.setBytes(4, file.getValue());
@@ -179,7 +200,7 @@ public class TemplateStore {
               templateId,
               number,
               DRAFT,
-              manifestHash(hashes),
+              manifest,
               layoutId,
               layoutRevision);
           try (PreparedStatement s =
@@ -195,7 +216,7 @@ public class TemplateStore {
             }
             s.executeBatch();
           }
-          return revision(c, templateId, number).orElseThrow();
+          return new Stored(revision(c, templateId, number).orElseThrow(), true);
         });
   }
 

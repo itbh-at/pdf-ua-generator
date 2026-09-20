@@ -80,8 +80,14 @@ plain text).
 - A server template revision is a bundle laid out like a CLI template
   directory (`template.xhtml`, `template.json`, variants, assets) plus
   `example.json` and `example/` for the publish checks. Revisions are
-  immutable; in-memory caches are keyed by content hash, and status is always
+  immutable; caches are keyed by content hash, and status is always
   read from the database.
+- Caching is done with `quarkus-cache`, never hand-rolled. The files of a
+  revision are plain data (`Map<String, byte[]>`), so the backend is a
+  deployment decision: Caffeine by default, a remote one where an operator
+  wants it. What the renderer derives from those files (parsed Qute engine,
+  font metrics, schemas) stays in the renderer, keyed by
+  `TemplateRepository.contentKey()` and never by the repository object.
 - Database columns derived from bundle files (`template.kind`,
   `revision.layout_id`, `layout_revision`) are an index, never a second source.
   When the way they are derived changes, a Flyway migration recomputes them
@@ -189,8 +195,10 @@ plain text).
 - JVM mode only; no GraalVM native image.
 - The REST service runs standalone on a JVM, as an OCI image under podman, and
   horizontally scaled in Kubernetes.
-- Service instances are stateless: no local session or output state, no shared
-  cache between instances. Every instance can serve every request.
+- Service instances are stateless: no local session or output state, and no
+  instance depends on another. Every instance can serve every request. A shared
+  cache is allowed where it holds nothing but immutable data addressed by
+  content hash; correctness never rests on a cache hit.
 - All configuration via MicroProfile Config (`application.properties`,
   overridable by environment variables). Nothing hard-coded that differs
   between environments.
@@ -204,7 +212,26 @@ plain text).
   no `hostPort`. PostgreSQL for podman is a minimal template in the chart,
   enabled only by `values-podman.yaml`; on Kubernetes the database is external
   and configured through values.
-- Every chart change is verified by rendering it with both values files.
+- Every chart change is verified with `mise run check-chart`: rendered with both
+  values files and validated against the Kubernetes schemas (`kubeconform`).
+- The image is built by the Quarkus container-image extension (Jib) from the JRE
+  base image pinned in `server/pom.xml` (`mise run image`). No Containerfile of
+  our own for the service.
+- Startup uses a Leyden AOT cache (`quarkus.package.jar.aot.*`, never the
+  deprecated `appcds`). It is trained by the integration test `ApiIT` against
+  the image just built and baked into a second image tagged `-aot`; that is the
+  image that gets deployed and smoke-tested.
+- The image ships the generated `NOTICE`, `THIRD-PARTY.txt` and the licence
+  texts; the build fills `server/src/main/jib`, which Jib copies into the image
+  root.
+- Templates and layouts are never part of an image of the service. They reach a
+  cluster in a bundle image of their own (`+/bundles/<template id>.zip+`, a
+  shell with `curl`), imported by an idempotent job of the chart that uploads
+  and publishes each bundle in one API call. `deploy/bundles/Containerfile`
+  builds that image for the demo and is the pattern for others.
+- `mise run smoke-test` runs the rendered chart under podman, imports the demo
+  bundles and renders; it must pass after every change to the image, the chart
+  or the import. `mise run load-test` (k6) measures a running deployment.
 
 ## Accessibility
 
@@ -253,12 +280,17 @@ old-school senior developer: direct and minimal.
 ## Toolchain — mise only
 
 - **All** toolchains and dev tools (JDK, Maven, Node, Antora, Helm, axe-core,
-  …) are pinned in `mise.toml` and used through `mise`. No SDKMAN, no system JDK, no
-  `./mvnw`.
+  …) are pinned in `mise.toml` and used through `mise`. No SDKMAN, no system
+  JDK. The Maven wrapper (`./mvnw`) is the Quarkus project standard and is
+  allowed; mise pins the JDK it runs on.
 - `mise run <task>` when a task exists (the list is in `mise.toml`), otherwise
   `mise exec -- <cmd>`.
-- Use mise inside container images too (same `mise.toml`), not an
-  `eclipse-temurin:`/`maven:` base image.
+- mise is the fallback, not the first choice: whatever the standard mechanism
+  can do — a Maven plugin, a Quarkus extension — is done there. mise pins the
+  tools that live outside the build (JDK, Maven, Antora, helm, …). It is
+  therefore not a way to build container images: the service image comes from
+  the Quarkus container-image extension (Jib) on a pinned JRE base image,
+  without a hand-written Containerfile.
 - Not managed by mise, and therefore a host prerequisite: `podman`, with its
   user socket active (`systemctl --user enable --now podman.socket`); the
   server tests and dev mode start PostgreSQL through it (`DOCKER_HOST` is set
@@ -321,9 +353,13 @@ old-school senior developer: direct and minimal.
 ## Dependencies
 
 - Keep third-party dependencies to a minimum.
-- Runtime dependencies must be Apache-2.0, MIT, BSD, EPL, MPL-2.0 or LGPL
-  licensed. No GPL/AGPL at runtime; GPL tools only as test or build tools.
-  Dual-licensed libraries (e.g. veraPDF, GPL-3.0 or MPL-2.0) are used under the
-  permissive option.
+- Runtime dependencies must be Apache-2.0, MIT, MIT-0, BSD, EPL, MPL-2.0, LGPL,
+  GPL-2.0-with-classpath-exception (the licence of the JDK itself) or a public
+  domain dedication. No GPL/AGPL at runtime; GPL tools only as test or build
+  tools. Dual-licensed libraries (e.g. veraPDF, GPL-3.0 or MPL-2.0) are used
+  under the permissive option. The allowed set is enforced by the
+  license-maven-plugin in the parent POM, for the CLI distribution and for the
+  image; spelling variants are handled by `licenseMerges`, never by widening the
+  set.
 - Every added or removed dependency is reflected in `THIRD_PARTY_LICENSES.md`.
 - All openhtmltopdf artifacts share one groupId and one version.

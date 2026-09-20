@@ -12,6 +12,10 @@
 #   mise run fmt            # format the Java sources (Google Java Style)
 #   mise run setup-hooks    # once per clone: pre-commit checks the formatting
 #   mise run bench          # render benchmark (JMH)
+#   mise run image          # build the OCI image of the REST service
+#   mise run check-chart    # render and validate the Helm chart
+#   mise run smoke-test     # image + PostgreSQL under podman, imported and rendered
+#   mise run load-test      # load test against a running service
 #   mise run check-formats  # render the demo in every format and check each result
 #   mise run docs           # build the Antora docs (documentation/build/site)
 #   mise run docs-watch     # live preview of the docs
@@ -28,6 +32,10 @@ node = "24"                 # runtime for the Antora docs (documentation/build.s
 "npm:@antora/lunr-extension" = "1.0.0-alpha.13"
 watchexec = "2.5.1"         # file-event watcher for `docs-watch`
 "npm:browser-sync" = "3.0.4"  # live-preview server for `docs-watch`
+helm = "3.22.0"             # renders the chart for Kubernetes and for podman kube play
+kubeconform = "0.8.0"       # validates the rendered manifests against the Kubernetes schemas
+k6 = "2.2.0"                # load test (scripts/load-test.js); AGPL-3.0, a test tool only
+jbang = "0.141.0"           # runs the Quarkus agent MCP server (see .mcp.json)
 "ubi:korandoru/hawkeye" = "6.5.1"  # licence-header tool; see licenserc.toml
 # Accessibility check of the HTML outputs (scripts/axe-check.mjs); libraries,
 # not CLIs — the script resolves them through `mise where`.
@@ -37,7 +45,7 @@ watchexec = "2.5.1"         # file-event watcher for `docs-watch`
 [env]
 # The server tests start PostgreSQL through Quarkus Dev Services (Testcontainers)
 # on podman. Host prerequisite: systemctl --user enable --now podman.socket
-DOCKER_HOST = "unix://{{env.XDG_RUNTIME_DIR}}/podman/podman.sock"
+DOCKER_HOST = "unix://{{ env.XDG_RUNTIME_DIR | default(value='/run/user/1000') }}/podman/podman.sock"
 # Ryuk, the Testcontainers reaper, needs a privileged container under podman;
 # Quarkus removes its containers itself.
 TESTCONTAINERS_RYUK_DISABLED = "true"
@@ -68,6 +76,22 @@ run = '''
 mvn -B -ntp -q -pl core -am install -DskipTests
 mvn -B -ntp -f server/pom.xml quarkus:dev
 '''
+
+[tasks.check-chart]
+description = "Render the Helm chart with both values files and validate the manifests"
+run = "./scripts/check-chart.sh"
+
+[tasks.smoke-test]
+description = "Run the image with PostgreSQL under podman, import the demo bundles and render"
+run = "./scripts/smoke-test.sh"
+
+[tasks.load-test]
+description = "Load test against a running service (k6); BASE_URL selects it"
+run = "k6 run scripts/load-test.js"
+
+[tasks.image]
+description = "Build the OCI image of the REST service (Jib, with AOT cache)"
+run = "mvn -B -ntp -pl server -am install -DskipTests -Pimage"
 
 [tasks.check-formats]
 description = "Render the demo in every format and check each (veraPDF, axe-core, ODF validator, LibreOffice)"

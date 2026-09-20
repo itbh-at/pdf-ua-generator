@@ -1,0 +1,91 @@
+{{/*
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 IT Beratung Hermann GmbH
+
+Imports the bundles of an OCI image into the service. The image carries
+/bundles/<template id>.zip and a shell with curl; the script comes from this
+chart, so it always matches the API. The job is named after the bundle image,
+so a new image is a new job, and running it again changes nothing: a bundle
+whose files are already stored yields the stored revision, and a published
+revision is left alone.
+*/}}
+{{- if .Values.import.enabled }}
+{{- $name := printf "%s-import" (include "pdf-ua-generator.fullname" .) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "pdf-ua-generator.labels" . | nindent 4 }}
+data:
+  import.sh: |
+    #!/bin/sh
+    # Uploads and publishes every bundle. Two passes: content whose layout is
+    # published only in the first pass succeeds in the second.
+    set -eu
+    bundles=${BUNDLES:-/bundles}
+    echo "waiting for $SERVICE_URL"
+    until curl -fsS -o /dev/null "$SERVICE_URL/q/health/ready"; do sleep 2; done
+    pass=1
+    while :; do
+      failed=""
+      for bundle in "$bundles"/*.zip; do
+        id=$(basename "$bundle" .zip)
+        status=$(curl -sS -o /tmp/answer -w '%{http_code}' -X POST \
+          -H 'Content-Type: application/zip' --data-binary "@$bundle" \
+          "$SERVICE_URL/templates/$id/revisions?publish=true")
+        case "$status" in
+        200 | 201)
+          echo "$id: $status"
+          ;;
+        *)
+          failed="$failed $id"
+          if [ "$pass" -ge 2 ]; then
+            echo "$id: $status" >&2
+            cat /tmp/answer >&2
+            echo >&2
+          fi
+          ;;
+        esac
+      done
+      [ -z "$failed" ] && exit 0
+      if [ "$pass" -ge 2 ]; then
+        echo "not imported:$failed" >&2
+        exit 1
+      fi
+      pass=$((pass + 1))
+      echo "retrying:$failed"
+    done
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-%s" $name (.Values.import.image | sha256sum | trunc 8) }}
+  labels:
+    {{- include "pdf-ua-generator.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        {{- include "pdf-ua-generator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: import
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: import
+          image: {{ required "import.image is required when import.enabled is true" .Values.import.image | quote }}
+          imagePullPolicy: {{ .Values.import.pullPolicy }}
+          command: ["/bin/sh", "/import/import.sh"]
+          env:
+            - name: SERVICE_URL
+              value: {{ .Values.import.serviceUrl | default (printf "http://%s:%d" (include "pdf-ua-generator.fullname" .) (int .Values.service.port)) | quote }}
+          volumeMounts:
+            - name: script
+              mountPath: /import
+      volumes:
+        - name: script
+          configMap:
+            name: {{ $name }}
+{{- end }}

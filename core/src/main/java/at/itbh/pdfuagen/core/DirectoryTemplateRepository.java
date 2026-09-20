@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
@@ -28,11 +29,19 @@ public final class DirectoryTemplateRepository implements TemplateRepository {
 
   private final List<Path> roots;
 
+  /** Files on disk can change, so derived state is never shared between instances. */
+  private final String contentKey = UUID.randomUUID().toString();
+
   public DirectoryTemplateRepository(Path root, List<Path> includePaths) {
     List<Path> all = new ArrayList<>();
     all.add(root.toAbsolutePath().normalize());
     includePaths.forEach(p -> all.add(p.toAbsolutePath().normalize()));
     this.roots = List.copyOf(all);
+  }
+
+  @Override
+  public String contentKey() {
+    return contentKey;
   }
 
   @Override

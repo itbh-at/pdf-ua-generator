@@ -13,12 +13,16 @@ import at.itbh.pdfuagen.core.TemplateRepository;
 import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import at.itbh.pdfuagen.server.ServerConfig;
 import at.itbh.pdfuagen.server.store.TemplateStore;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
+import io.quarkus.cache.Cache;
+import io.quarkus.cache.CacheName;
 import io.quarkus.runtime.ShutdownEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -28,15 +32,18 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 /**
  * The renderer, the revisions it works on, and the worker pool it runs in.
  *
- * <p>Revisions are immutable, so a loaded revision is kept as long as the memory budget allows
- * ({@code pdfuagen.render.cache-size}); the least recently used is dropped first and loaded again
- * from the database when needed. Rendering runs in a fixed pool with a bounded queue: when the
- * queue is full, {@link #submit} fails at once instead of letting requests time out.
+ * <p>Revisions are immutable and addressed by content hash, so their files are cached under it
+ * ({@code template-revisions}, sized by {@code quarkus.cache.caffeine}) and read from the database
+ * again only after eviction. What the renderer derives from those files — parsed templates, font
+ * metrics, schemas — it caches itself under {@link TemplateRepository#contentKey()}, so a
+ * repository rebuilt around cached files costs nothing.
+ *
+ * <p>Rendering runs in a fixed pool with a bounded queue: when the queue is full, {@link #submit}
+ * fails at once instead of letting requests time out.
  */
 @ApplicationScoped
 public class RenderService {
@@ -50,15 +57,18 @@ public class RenderService {
     }
   }
 
-  private record Entry(TemplateRepository repository, long size) {}
-
   @Inject ServerConfig config;
   @Inject TemplateStore store;
+  @Inject MeterRegistry meters;
+
+  /** Files of a revision by content hash. */
+  @Inject
+  @CacheName("template-revisions")
+  Cache revisions;
 
   private DocumentRenderer renderer;
   private ThreadPoolExecutor pool;
-  private final LinkedHashMap<String, Entry> cache = new LinkedHashMap<>(64, 0.75f, true);
-  private long cached;
+  private Counter rejected;
 
   @PostConstruct
   void init() {
@@ -88,6 +98,12 @@ public class RenderService {
               return thread;
             },
             new ThreadPoolExecutor.AbortPolicy());
+    // executor.* gauges: busy threads, queue length, remaining capacity.
+    ExecutorServiceMetrics.monitor(meters, pool, "render");
+    rejected =
+        Counter.builder("pdfuagen.render.rejected")
+            .description("Render requests answered with 503 because the queue was full")
+            .register(meters);
   }
 
   void shutdown(@Observes ShutdownEvent event) {
@@ -121,72 +137,44 @@ public class RenderService {
             }
           });
     } catch (RejectedExecutionException e) {
+      rejected.increment();
       throw new OverloadedException();
     }
     return result;
   }
 
   /**
-   * A revision ready to render: its files from memory or loaded from the database. A layout appears
-   * under {@code layout/} as well, as for the content that fills it; content that pins a layout
-   * revision is composed with it. Keyed by content hashes, so a cached entry can never be stale;
-   * status and other metadata always come from the store.
+   * A revision ready to render: its files from the cache or the database, wrapped in a repository
+   * keyed by their content hash. A layout appears under {@code layout/} as well, as for the content
+   * that fills it; content that pins a layout revision is composed with it. Status and other
+   * metadata always come from the store, never from a cached entry.
    *
    * @param layout the layout revision the content pins, or {@code null}
    */
   public TemplateRepository repository(
       TemplateStore.Revision revision, TemplateStore.Revision layout) {
-    TemplateRepository files = files(revision);
+    TemplateRepository content = files(revision);
     if (revision.files().containsKey(LayoutDescriptor.FILE)) {
-      // Composites hold only references; their files are counted in their own entries.
-      return cached(
-          revision.sha256() + "/layout",
-          () -> new Entry(new ComposedTemplateRepository(files, files), 0));
+      // A layout fills its own areas, so it is composed with itself.
+      return new ComposedTemplateRepository(content, content);
     }
-    if (layout == null) {
-      return files;
-    }
-    TemplateRepository layoutFiles = files(layout);
-    return cached(
-        revision.sha256() + "+" + layout.sha256(),
-        () -> new Entry(new ComposedTemplateRepository(files, layoutFiles), 0));
+    return layout == null ? content : new ComposedTemplateRepository(content, files(layout));
   }
 
+  /**
+   * The files of a revision, cached under its content hash. Composing a repository around them is
+   * cheap: the renderer keys what it derives on {@link TemplateRepository#contentKey()}, not on the
+   * repository object.
+   */
   private TemplateRepository files(TemplateStore.Revision revision) {
-    return cached(
-        revision.sha256(),
-        () -> {
-          Map<String, byte[]> files = store.files(revision.templateId(), revision.number());
-          return new Entry(
-              new InMemoryTemplateRepository(files),
-              files.values().stream().mapToLong(b -> b.length).sum());
-        });
-  }
-
-  /** From the cache, or loaded and added; the least recently used go when over budget. */
-  private TemplateRepository cached(String key, Supplier<Entry> load) {
-    synchronized (cache) {
-      Entry entry = cache.get(key);
-      if (entry != null) {
-        return entry.repository();
-      }
-    }
-    Entry loaded = load.get();
-    synchronized (cache) {
-      Entry existing = cache.putIfAbsent(key, loaded);
-      if (existing != null) {
-        return existing.repository();
-      }
-      cached += loaded.size();
-      var it = cache.entrySet().iterator();
-      while (cached > config.render().cacheSize() && cache.size() > 1 && it.hasNext()) {
-        var eldest = it.next();
-        if (!eldest.getKey().equals(key)) {
-          cached -= eldest.getValue().size();
-          it.remove();
-        }
-      }
-    }
-    return loaded.repository();
+    // The cache loads once even if several requests miss the same revision at the same time.
+    Map<String, byte[]> content =
+        revisions
+            .<String, Map<String, byte[]>>get(
+                revision.sha256(),
+                sha -> Map.copyOf(store.files(revision.templateId(), revision.number())))
+            .await()
+            .indefinitely();
+    return new InMemoryTemplateRepository(content, revision.sha256());
   }
 }

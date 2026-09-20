@@ -72,13 +72,19 @@ revision; a second demo layout for the same document
 
 |5 Operations
 |Import of layouts (and templates) into the cluster: bundles in their own OCI
-image, uploaded and published by an idempotent Kubernetes job of the chart
-(same content hash, no new revision); Containerfile with mise, JRE and AOT
-cache; generated `NOTICE` and licence
-texts in the image; Helm chart for Kubernetes and
-`podman kube play`; `kubeconform`; CI smoke test; load test
+image, uploaded and published by an idempotent job of the chart (upload and
+publish in one API call; same content hash, no new revision); image built by the
+Quarkus container-image extension (Jib) from a pinned JRE base image, with a
+Leyden AOT cache trained by the integration test against that image and baked
+into a second image tagged `-aot`; generated `NOTICE`, licence list and licence
+texts in the image, and the licence gate closed for the server's
+dependencies; graceful shutdown with a delay for rolling updates; Prometheus
+metrics for the render pool, the revision cache and the API; revisions cached
+with `quarkus-cache`; Helm chart for Kubernetes and
+`podman kube play`; `kubeconform`; CI with a smoke test of the image; load test
+with k6 that reads the server's own saturation
 |Several pods render under load and the autoscaler reacts
-|
+|done
 
 |6 Formats complete
 |Writers complete: headers and footers styled by the layout's `.dotx`/`.ott`
@@ -110,7 +116,10 @@ mode
 |
 
 |Later
-|Authentication and authorization: OIDC with roles, an OIDC provider
+|Confirm on a Kubernetes cluster that several pods scale under load (phase 5 was
+completed without one: the chart is verified by `kubeconform` and under podman,
+the image by the smoke test, the overload answer by the load test against one
+instance). Authentication and authorization: OIDC with roles, an OIDC provider
 (Keycloak) in the chart for podman; until then the API is open. QR code and
 chart components; real-time collaboration
 |–

@@ -27,6 +27,11 @@ public final class CachingTemplateRepository implements TemplateRepository {
   }
 
   @Override
+  public String contentKey() {
+    return delegate.contentKey();
+  }
+
+  @Override
   public Optional<String> template(String id) {
     return templates.computeIfAbsent(id, delegate::template);
   }

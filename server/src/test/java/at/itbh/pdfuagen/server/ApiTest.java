@@ -5,6 +5,10 @@
 
 package at.itbh.pdfuagen.server;
 
+import static at.itbh.pdfuagen.server.DemoBundles.DEMO;
+import static at.itbh.pdfuagen.server.DemoBundles.data;
+import static at.itbh.pdfuagen.server.DemoBundles.demoBundle;
+import static at.itbh.pdfuagen.server.DemoBundles.layoutBundle;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
@@ -16,8 +20,6 @@ import at.itbh.pdfuagen.server.store.Bundle;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -32,65 +34,9 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ApiTest {
 
-  private static final Path DEMO = Path.of("..", "demo");
   private static final String PROBLEM = "urn:itbh:pdf-ua-generator:problem:";
   private static final String DOCX =
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-  static byte[] demoBundle(int layoutRevision) throws Exception {
-    return demoBundle("demo-layout@" + layoutRevision);
-  }
-
-  /** The demo content, pinning the given layout revision. */
-  static byte[] demoBundle(String layout) throws Exception {
-    Map<String, byte[]> files = new TreeMap<>();
-    files.put("template.xhtml", Files.readAllBytes(DEMO.resolve("demo.xhtml")));
-    files.put(
-        "template.json",
-        Files.readString(DEMO.resolve("demo.json"))
-            .replace("demo-layout@1", layout)
-            .getBytes(StandardCharsets.UTF_8));
-    files.put("example.json", Files.readAllBytes(DEMO.resolve("data.json")));
-    files.put("example/photo.png", Files.readAllBytes(DEMO.resolve("photo.png")));
-    return Bundle.write(files);
-  }
-
-  /** The demo layout; {@code header} replaces its page header text. */
-  static byte[] layoutBundle(String header) throws Exception {
-    return layoutBundle("layout", header);
-  }
-
-  static byte[] layoutBundle(String directory, String header) throws Exception {
-    Path layout = DEMO.resolve(directory);
-    Map<String, byte[]> files = new TreeMap<>();
-    try (var paths = Files.walk(layout)) {
-      for (Path file : paths.filter(Files::isRegularFile).toList()) {
-        files.put(layout.relativize(file).toString().replace('\\', '/'), Files.readAllBytes(file));
-      }
-    }
-    files.put(
-        "messages.json",
-        Files.readString(layout.resolve("messages.json"))
-            .replace("Accessible document example", header)
-            .getBytes(StandardCharsets.UTF_8));
-    files.put("example.json", "{}".getBytes(StandardCharsets.UTF_8));
-    return Bundle.write(files);
-  }
-
-  private static String xhtml(String template) throws Exception {
-    return given()
-        .contentType("application/json")
-        .body(data("data-email.json"))
-        .post("/templates/" + template + "/render?format=xhtml")
-        .then()
-        .statusCode(200)
-        .extract()
-        .asString();
-  }
-
-  private static String data(String file) throws Exception {
-    return Files.readString(DEMO.resolve(file), StandardCharsets.UTF_8);
-  }
 
   @Test
   @Order(0)
@@ -399,6 +345,57 @@ class ApiTest {
     assertTrue(!plain.contains("MEMORANDUM") && plain.contains("Hello Jane Doe."), plain);
   }
 
+  /** What the import job of the chart does: upload and publish in one call, repeatedly. */
+  @Test
+  @Order(13)
+  void uploadsAndPublishesInOneCallAndRepeatsWithoutAChange() throws Exception {
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("Imported"))
+        .post("/templates/imported-layout/revisions?publish=true")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(201)
+        .body("revision", equalTo(1))
+        .body("status", equalTo("published"));
+    given()
+        .contentType("application/zip")
+        .body(demoBundle("imported-layout@1"))
+        .post("/templates/imported/revisions?publish=true")
+        .then()
+        .statusCode(201)
+        .body("status", equalTo("published"));
+
+    // The same bundles again: the stored revision, no new one, nothing to publish.
+    given()
+        .contentType("application/zip")
+        .body(demoBundle("imported-layout@1"))
+        .post("/templates/imported/revisions?publish=true")
+        .then()
+        .statusCode(200)
+        .header("Content-Location", containsString("/templates/imported/revisions/1"))
+        .body("revision", equalTo(1))
+        .body("status", equalTo("published"));
+    given()
+        .get("/templates/imported")
+        .then()
+        .body("latestRevision", equalTo(1))
+        .body("publishedRevision", equalTo(1));
+
+    // Changed files are a new revision, published by the same call.
+    given()
+        .contentType("application/zip")
+        .body(layoutBundle("Imported again"))
+        .post("/templates/imported-layout/revisions?publish=true")
+        .then()
+        .statusCode(201)
+        .body("revision", equalTo(2))
+        .body("status", equalTo("published"));
+    // The published content keeps the layout revision it pins.
+    given().get("/templates/imported").then().body("publishedRevision", equalTo(1));
+  }
+
   @Test
   @Order(11)
   void rejectsBadInput() {
@@ -434,5 +431,16 @@ class ApiTest {
             + body
             + "</p></body></html>")
         .getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static String xhtml(String template) throws Exception {
+    return given()
+        .contentType("application/json")
+        .body(data("data-email.json"))
+        .post("/templates/" + template + "/render?format=xhtml")
+        .then()
+        .statusCode(200)
+        .extract()
+        .asString();
   }
 }

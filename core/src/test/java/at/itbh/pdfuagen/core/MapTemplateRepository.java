@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 /** In-memory repository for tests. */
 final class MapTemplateRepository implements TemplateRepository {
@@ -18,6 +19,14 @@ final class MapTemplateRepository implements TemplateRepository {
   private final Map<String, String> templates = new HashMap<>();
   private final Map<String, byte[]> resources = new HashMap<>();
   private final Map<String, Set<String>> languages = new HashMap<>();
+
+  /** Contents are added after construction, so no two instances share derived state. */
+  private final String contentKey = UUID.randomUUID().toString();
+
+  @Override
+  public String contentKey() {
+    return contentKey;
+  }
 
   MapTemplateRepository template(String id, String source) {
     templates.put(id, source);

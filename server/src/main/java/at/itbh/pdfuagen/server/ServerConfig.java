@@ -39,13 +39,6 @@ public interface ServerConfig {
     /** Maximum time Qute may spend on one template. */
     @WithDefault("30s")
     Duration timeout();
-
-    /**
-     * Memory for template revisions kept parsed, in bytes of their files; the least recently used
-     * are dropped first and reloaded from the database when needed again.
-     */
-    @WithDefault("268435456")
-    long cacheSize();
   }
 
   interface Fetch {

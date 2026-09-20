@@ -8,6 +8,7 @@
 .How-to
 * xref:how-to/use-the-rest-api.adoc[Publish and render through the API]
 * xref:how-to/check-output-formats.adoc[Check the output formats]
+* xref:how-to/deploy-the-service.adoc[Deploy the service]
 
 .Reference
 * xref:reference/cli.adoc[Command line]

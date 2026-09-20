@@ -20,11 +20,13 @@ import io.smallrye.common.annotation.Blocking;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -34,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 /** Templates and their revisions: create, inspect, publish, delete; schema and validation. */
@@ -87,11 +90,20 @@ public class TemplateResource {
    * Stores a ZIP archive of template files as a new draft revision. The template is created with
    * its first revision. The response lists the problems found when parsing the template; a draft
    * with problems is stored anyway, so it can be corrected.
+   *
+   * <p>Files already stored as a revision of this template yield that revision instead of a new
+   * one. With {@code ?publish=true} the revision is published right away, unless it already is; an
+   * import can therefore be repeated without changing anything.
    */
   @POST
   @Path("/{id}/revisions")
   @Consumes(ZIP)
-  public Response create(@PathParam("id") String id, InputStream zip, @Context UriInfo uri)
+  @Blocking
+  public CompletionStage<Response> create(
+      @PathParam("id") String id,
+      InputStream zip,
+      @QueryParam("publish") @DefaultValue("false") boolean publish,
+      @Context UriInfo uri)
       throws IOException {
     Targets.checkId(id);
     Map<String, byte[]> files;
@@ -111,9 +123,9 @@ public class TemplateResource {
         // Reported with the revision's problems.
       }
     }
-    TemplateStore.Revision revision;
+    TemplateStore.Stored stored;
     try {
-      revision =
+      stored =
           store.createRevision(
               id,
               files,
@@ -123,13 +135,20 @@ public class TemplateResource {
     } catch (TemplateStore.KindMismatchException e) {
       throw Problems.conflict(e.getMessage());
     }
-    Views.Target loaded = targets.revision(id, revision.number());
-    return Response.created(
-            uri.getBaseUriBuilder()
-                .path("templates/{id}/revisions/{n}")
-                .build(id, revision.number()))
-        .entity(Views.revision(loaded, service))
-        .build();
+    int number = stored.revision().number();
+    java.net.URI location =
+        uri.getBaseUriBuilder().path("templates/{id}/revisions/{n}").build(id, number);
+    Views.Target loaded = targets.revision(id, number);
+    // Same files as a revision already stored: that revision, not a new one.
+    Response.ResponseBuilder response =
+        stored.created()
+            ? Response.created(location)
+            : Response.ok().header("Content-Location", location);
+    if (!publish || loaded.revision().published()) {
+      return CompletableFuture.completedStage(
+          response.entity(Views.revision(loaded, service)).build());
+    }
+    return publishRevision(id, number, uri).thenApply(view -> response.entity(view).build());
   }
 
   @GET
@@ -175,6 +194,10 @@ public class TemplateResource {
   @Blocking
   public CompletionStage<Views.RevisionView> publish(
       @PathParam("id") String id, @PathParam("n") int n, @Context UriInfo uri) {
+    return publishRevision(id, n, uri);
+  }
+
+  private CompletionStage<Views.RevisionView> publishRevision(String id, int n, UriInfo uri) {
     java.net.URI publicBase = config.publicBaseUrl().orElse(uri.getBaseUri());
     Views.Target loaded = targets.revision(id, n);
     if (loaded.revision().published()) {

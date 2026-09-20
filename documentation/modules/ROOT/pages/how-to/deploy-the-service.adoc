@@ -1,0 +1,138 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Deploy the service
+:description: Build the image, pack templates and layouts into a bundle image, and run both on one machine with podman or in Kubernetes.
+
+== Build the image
+
+[source,shell]
+----
+mise run image
+----
+
+This builds `itbh/pdf-ua-generator:<version>` into the local podman storage.
+Push it to the registry the cluster pulls from:
+
+[source,shell]
+----
+podman push itbh/pdf-ua-generator:2.0.0-SNAPSHOT registry.example.org/pdf-ua-generator:2.0.0
+----
+
+== Pack templates and layouts into an image
+
+The import job of the chart reads bundles from an OCI image. Such an image
+carries
+
+* `+/bundles/<template id>.zip+` — one bundle per template and layout, laid out
+  like a template directory (see
+  xref:reference/template-files.adoc[Template files]) plus `example.json` and
+  its attachments under `example/`, and
+* a shell with `curl`, so the job can run the import script of the chart.
+
+`deploy/bundles/Containerfile` builds such an image from the demo and serves as
+the pattern for your own:
+
+[source,shell]
+----
+podman build -f deploy/bundles/Containerfile -t registry.example.org/bundles:1 .
+podman push registry.example.org/bundles:1
+----
+
+Bundle ids are file names: `demo-layout.zip` becomes the template `demo-layout`,
+which content pins as `"layout": "demo-layout@1"`.
+
+== Run it on one machine with podman
+
+[source,shell]
+----
+CHART=deploy/helm/pdf-ua-generator
+helm template pdf-ua-generator $CHART -f $CHART/values-podman.yaml \
+    --set import.enabled=true --set import.image=localhost/bundles:1 \
+    | podman kube play -
+----
+
+The release has to be called `pdf-ua-generator`: podman has no Services, and
+`values-podman.yaml` therefore addresses the pods by name. The service listens
+inside the podman network; publish the port when you play it:
+
+[source,shell]
+----
+podman kube play --publish 8080:8080 ...
+----
+
+Stop everything again with `podman kube down` on the same manifests.
+
+== Deploy it in Kubernetes
+
+The database is external. Give its URL and credentials, and the image of your
+bundles:
+
+[source,shell]
+----
+helm upgrade --install pdf-ua-generator deploy/helm/pdf-ua-generator \
+    --set image.repository=registry.example.org/pdf-ua-generator \
+    --set image.tag=2.0.0 \
+    --set database.jdbcUrl=jdbc:postgresql://postgresql:5432/pdfuagen \
+    --set database.existingSecret=pdfuagen-database \
+    --set config.publicBaseUrl=https://documents.example.org \
+    --set import.enabled=true \
+    --set import.image=registry.example.org/bundles:1
+----
+
+`database.existingSecret` names a Secret with the keys `username` and
+`password`; without it, set `database.username` and `database.password` and the
+chart creates the Secret.
+
+Every value is listed in xref:reference/configuration.adoc#chart[Configuration].
+
+== Import templates again
+
+The import job runs whenever the bundle image changes — its name carries the
+image's hash. Repeating it changes nothing: a bundle whose files are already
+stored yields the stored revision, and a published revision is left alone. To
+force a run without changing the image, delete the job and upgrade again:
+
+[source,shell]
+----
+kubectl delete job -l app.kubernetes.io/component=import
+helm upgrade --install pdf-ua-generator deploy/helm/pdf-ua-generator …
+----
+
+== Check a chart change
+
+[source,shell]
+----
+mise run check-chart
+----
+
+renders the chart with both values files and validates the manifests against the
+Kubernetes schemas.
+
+== Check the image
+
+[source,shell]
+----
+mise run image
+mise run smoke-test
+----
+
+starts the rendered chart under podman, imports the demo bundles, renders a PDF,
+verifies it as PDF/UA and repeats the import to prove that nothing changes.
+
+== Measure the load a deployment carries
+
+With a service reachable at `BASE_URL` and a published template `demo`:
+
+[source,shell]
+----
+BASE_URL=https://documents.example.org mise run load-test
+----
+
+The request rate rises in steps, so an autoscaler has time to react. A `503`
+with `Retry-After` is the correct answer of an instance whose queue is full; the
+report counts those as `renders_rejected`, not as errors. `PEAK_RATE`,
+`START_RATE`, `WARM`, `RAMP` and `HOLD` change the profile, `TEMPLATE` and
+`FORMAT` what is rendered.

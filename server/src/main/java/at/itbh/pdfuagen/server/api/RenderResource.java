@@ -39,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 
@@ -61,7 +62,6 @@ public class RenderResource {
   @POST
   @Path("/render")
   @Consumes(MediaType.APPLICATION_JSON)
-  @Blocking
   public CompletionStage<Response> render(
       @PathParam("id") String id,
       @QueryParam("format") String format,
@@ -69,7 +69,7 @@ public class RenderResource {
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       byte[] data) {
-    return render(targets.published(id), format, lang, headers, uri, data, Map.of());
+    return render(() -> targets.published(id), format, lang, headers, uri, data, Map.of());
   }
 
   @POST
@@ -85,14 +85,13 @@ public class RenderResource {
       @RestForm(DATA_PART) String data,
       @RestForm(FileUpload.ALL) List<FileUpload> parts)
       throws IOException {
-    return renderParts(targets.published(id), format, lang, headers, uri, data, parts);
+    return renderParts(() -> targets.published(id), format, lang, headers, uri, data, parts);
   }
 
   /** Renders a specific revision, also a draft, e.g. as a preview. */
   @POST
   @Path("/revisions/{n}/render")
   @Consumes(MediaType.APPLICATION_JSON)
-  @Blocking
   public CompletionStage<Response> renderRevision(
       @PathParam("id") String id,
       @PathParam("n") int n,
@@ -101,7 +100,7 @@ public class RenderResource {
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       byte[] data) {
-    return render(targets.revision(id, n), format, lang, headers, uri, data, Map.of());
+    return render(() -> targets.revision(id, n), format, lang, headers, uri, data, Map.of());
   }
 
   @POST
@@ -118,11 +117,11 @@ public class RenderResource {
       @RestForm(DATA_PART) String data,
       @RestForm(FileUpload.ALL) List<FileUpload> parts)
       throws IOException {
-    return renderParts(targets.revision(id, n), format, lang, headers, uri, data, parts);
+    return renderParts(() -> targets.revision(id, n), format, lang, headers, uri, data, parts);
   }
 
   private CompletionStage<Response> renderParts(
-      Views.Target target,
+      Supplier<Views.Target> target,
       String format,
       String lang,
       HttpHeaders headers,
@@ -147,8 +146,13 @@ public class RenderResource {
     return render(target, format, lang, headers, uri, data, attachments);
   }
 
+  /**
+   * Everything that touches the database or the renderer happens in the worker pool, so an
+   * overloaded service answers 503 before it does any work; only the request headers are read here,
+   * because they belong to the request thread.
+   */
   private CompletionStage<Response> render(
-      Views.Target target,
+      Supplier<Views.Target> target,
       String format,
       String lang,
       HttpHeaders headers,
@@ -156,14 +160,15 @@ public class RenderResource {
       byte[] data,
       Map<String, byte[]> attachments) {
     DocumentRenderer renderer = service.renderer();
-    var repository = target.repository();
     List<MediaType> acceptable = headers.getAcceptableMediaTypes();
     List<Locale.LanguageRange> ranges = ranges(lang, headers);
     URI publicBase = config.publicBaseUrl().orElse(uri.getBaseUri());
     return Problems.submit(
         service,
         () -> {
-          // Inside the pool: the first use of a revision parses its templates.
+          // Inside the pool: the revision is looked up, and its first use parses its templates.
+          Views.Target resolved = target.get();
+          var repository = resolved.repository();
           OutputFormat outputFormat =
               select(format, acceptable, renderer.formats(repository, Bundle.TEMPLATE));
           String variant = renderer.selectVariant(repository, Bundle.TEMPLATE, ranges);
@@ -190,11 +195,11 @@ public class RenderResource {
                   .header(
                       "Content-Disposition",
                       "inline; filename=\""
-                          + target.revision().templateId()
+                          + resolved.revision().templateId()
                           + "."
                           + outputFormat.extension()
                           + "\"")
-                  .header("Template-Revision", target.revision().number());
+                  .header("Template-Revision", resolved.revision().number());
           Locale language = renderer.language(repository, variant);
           if (!language.equals(Locale.ROOT)) {
             response.header("Content-Language", language.toLanguageTag());

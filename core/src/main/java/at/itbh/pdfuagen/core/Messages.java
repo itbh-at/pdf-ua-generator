@@ -12,7 +12,6 @@ import io.quarkus.qute.NamespaceResolver;
 import io.quarkus.qute.Results;
 import io.quarkus.qute.TemplateInstance;
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -86,12 +85,11 @@ public final class Messages {
     return Optional.of(texts);
   }
 
-  /** The {@code msg:} resolver for an engine; weak, like the engine's template locator. */
+  /** The {@code msg:} resolver for an engine; it lives and dies with the engine. */
   static NamespaceResolver resolver(TemplateRepository repository, String prefix) {
-    WeakReference<TemplateRepository> reference = new WeakReference<>(repository);
     Map<String, Optional<Map<String, String>>> files = new ConcurrentHashMap<>();
     return NamespaceResolver.builder(NAMESPACE)
-        .resolveAsync(ctx -> lookup(reference.get(), prefix, files, ctx))
+        .resolveAsync(ctx -> lookup(repository, prefix, files, ctx))
         .build();
   }
 

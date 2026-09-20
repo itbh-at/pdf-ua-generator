@@ -1,0 +1,85 @@
+{{/*
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 IT Beratung Hermann GmbH
+
+A minimal PostgreSQL for a single machine with podman. On Kubernetes the
+database is operated separately; leave postgresql.enabled at false there.
+*/}}
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "pdf-ua-generator.fullname" . }}-postgresql
+  labels:
+    {{- include "pdf-ua-generator.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pdf-ua-generator.fullname" . }}-postgresql
+  labels:
+    {{- include "pdf-ua-generator.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: postgresql
+      protocol: TCP
+  selector:
+    {{- include "pdf-ua-generator.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pdf-ua-generator.fullname" . }}-postgresql
+  labels:
+    {{- include "pdf-ua-generator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "pdf-ua-generator.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgresql
+  template:
+    metadata:
+      labels:
+        {{- include "pdf-ua-generator.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: {{ .Values.postgresql.image | quote }}
+          ports:
+            - name: postgresql
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_DB
+              value: pdfuagen
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pdf-ua-generator.databaseSecret" . }}
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pdf-ua-generator.databaseSecret" . }}
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "pdf-ua-generator.fullname" . }}-postgresql
+{{- end }}

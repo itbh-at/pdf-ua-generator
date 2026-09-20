@@ -4,7 +4,7 @@
 ////
 
 = Configuration
-:description: Settings of the REST service and their environment variables.
+:description: Settings of the REST service, their environment variables, and the values of the Helm chart.
 
 Every setting is a MicroProfile Config property and can be overridden by an
 environment variable: upper case, `.` and `-` replaced by `_`
@@ -40,10 +40,24 @@ when the service is reached through a proxy under another name.
 |`30s`
 |Maximum time Qute may spend on one template.
 
-|`pdfuagen.render.cache-size`
-|`268435456` (256 MB)
-|Memory for template revisions kept parsed, in bytes of their files. The least
-recently used are dropped first and reloaded from the database when needed.
+|`quarkus.cache.caffeine."template-revisions".maximum-size`
+|`64`
+|Template revisions kept in memory, counted in revisions, not bytes. Revisions
+are immutable and addressed by content hash, so a cached entry is never stale;
+the least recently used are dropped and read from the database again when
+needed. A revision with embedded fonts is far larger than one without, so leave
+headroom. Environment variable:
+`QUARKUS_CACHE_CAFFEINE__TEMPLATE_REVISIONS__MAXIMUM_SIZE`.
+
+|`quarkus.shutdown.delay`
+|`5s`
+|How long the instance keeps answering after SIGTERM before it shuts down.
+Kubernetes removes a pod from its Service asynchronously, so without this delay
+requests already on their way are refused.
+
+|`quarkus.shutdown.timeout`
+|`30s`
+|How long running renders may finish after that.
 
 |`pdfuagen.fetch.allowed-hosts`
 |none
@@ -66,4 +80,87 @@ refuses hosts that resolve to private, loopback or link-local addresses.
 |`quarkus.http.limits.max-body-size`
 |`60M`
 |Maximum request size: bundles and render requests with attachments.
+|===
+
+[[chart]]
+== Helm chart
+
+`deploy/helm/pdf-ua-generator` with `values.yaml` for Kubernetes and
+`values-podman.yaml` for `podman kube play`. The chart renders plain manifests
+only: Deployment, Service, Secret, HorizontalPodAutoscaler, the import job, and
+a minimal PostgreSQL for podman.
+
+[cols="3,2,4",options="header"]
+|===
+|Value |Default |Meaning
+
+|`replicaCount`
+|`2`
+|Instances; ignored while `autoscaling.enabled` is true.
+
+|`image.repository`, `image.tag`, `image.pullPolicy`
+|`itbh/pdf-ua-generator`, the chart's `appVersion`, `IfNotPresent`
+|The service image, built by `mise run image`.
+
+|`imagePullSecrets`
+|`[]`
+|Pull secrets for a private registry.
+
+|`service.type`, `service.port`
+|`ClusterIP`, `8080`
+|The Service. The chart uses no `hostPort`; for podman publish the port with
+`podman kube play --publish`.
+
+|`resources`
+|0.5 CPU and 1 GiB requested, 2 GiB limit
+|Rendering is CPU-bound; the autoscaler scales on CPU.
+
+|`database.jdbcUrl`, `database.username`, `database.password`
+|`jdbc:postgresql://postgresql:5432/pdfuagen`, `pdfuagen`, –
+|The database. Username and password become a Secret of this release.
+
+|`database.existingSecret`
+|–
+|Instead: an existing Secret with the keys `username` and `password`.
+
+|`config.publicBaseUrl`
+|–
+|`pdfuagen.public-base-url`, see above.
+
+|`config.allowedHosts`
+|`[]`
+|`pdfuagen.fetch.allowed-hosts`, as a list.
+
+|`config.renderThreads`
+|–
+|`pdfuagen.render.threads`.
+
+|`config.logLevel`
+|`INFO`
+|`QUARKUS_LOG_LEVEL`.
+
+|`autoscaling.enabled`, `minReplicas`, `maxReplicas`, `targetCPUUtilizationPercentage`
+|`true`, `2`, `10`, `70`
+|HorizontalPodAutoscaler on CPU. podman has no autoscaler;
+`values-podman.yaml` switches it off.
+
+|`import.enabled`, `import.image`, `import.pullPolicy`
+|`false`, –, `IfNotPresent`
+|The image the templates and layouts come from, see
+xref:how-to/deploy-the-service.adoc[Deploy the service]. The job is named after
+the image's hash, so a new image is a new job.
+
+|`import.serviceUrl`
+|the Service of this release
+|Where the job reaches the service. podman has no Services, so
+`values-podman.yaml` names the pod instead.
+
+|`postgresql.enabled`, `postgresql.image`, `postgresql.storage`
+|`false`, `docker.io/library/postgres:18-alpine`, `2Gi`
+|A single PostgreSQL beside the service, for podman only. On Kubernetes the
+database is operated separately.
+
+|`podAnnotations`, `nodeSelector`, `tolerations`, `affinity`
+|empty
+|Passed through to the pod.
 |===

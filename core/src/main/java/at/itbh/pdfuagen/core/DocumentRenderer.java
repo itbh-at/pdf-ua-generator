@@ -17,6 +17,8 @@ import at.itbh.pdfuagen.core.writer.EmailHtmlWriter;
 import at.itbh.pdfuagen.core.writer.OdtWriter;
 import at.itbh.pdfuagen.core.writer.OfficeTemplate;
 import at.itbh.pdfuagen.core.writer.TextWriter;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openhtmltopdf.extend.FSCacheEx;
 import com.openhtmltopdf.extend.FSCacheValue;
 import com.openhtmltopdf.extend.impl.FSDefaultCacheStore;
@@ -39,7 +41,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HexFormat;
 import java.util.List;
@@ -47,7 +48,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
@@ -57,14 +57,21 @@ import org.w3c.dom.Document;
  * Renders a template with data: Qute runs once, every output format is produced from the resulting
  * XHTML.
  *
- * <p>Thread-safe. Parsed templates and font metrics are cached per {@link TemplateRepository}
- * instance, so pass the same instance (e.g. a {@link CachingTemplateRepository} of a published
- * revision) to benefit, and a new one when the templates change.
+ * <p>Thread-safe. Parsed templates, font metrics and schemas are cached under {@link
+ * TemplateRepository#contentKey()}, so a repository rebuilt from the same files — for instance
+ * after its files came back from a cache — reuses them instead of parsing again.
  */
 public final class DocumentRenderer {
 
   public static final String PRODUCER = "itbh.at PDF UA Generator";
   static final float PDF_VERSION = 1.7f;
+
+  /**
+   * Templates kept parsed. Each entry holds one Qute engine with the parsed templates of a
+   * revision, its font metrics and its schemas; the least recently used are dropped and derived
+   * again on the next render.
+   */
+  private static final int MAX_PARSED_REPOSITORIES = 256;
 
   static {
     // Renderer messages reach the caller as Rendered.warnings(), not the console:
@@ -100,8 +107,8 @@ public final class DocumentRenderer {
   private final ResourceLimits limits;
   private final Duration timeout;
   private final URI publicBaseUrl;
-  private final Map<TemplateRepository, RepositoryState> states =
-      Collections.synchronizedMap(new WeakHashMap<>());
+  private final Cache<String, RepositoryState> states =
+      Caffeine.newBuilder().maximumSize(MAX_PARSED_REPOSITORIES).build();
 
   /** Renderer without external resources, default limits and a 30 s template timeout. */
   public DocumentRenderer() {
@@ -578,11 +585,11 @@ public final class DocumentRenderer {
   }
 
   private RepositoryState state(TemplateRepository repository) {
-    return states.computeIfAbsent(
-        repository,
-        r ->
+    return states.get(
+        repository.contentKey(),
+        key ->
             new RepositoryState(
-                QuteEngines.create(r, timeout),
+                QuteEngines.create(repository, timeout),
                 new FSDefaultCacheStore(),
                 new ConcurrentHashMap<>()));
   }

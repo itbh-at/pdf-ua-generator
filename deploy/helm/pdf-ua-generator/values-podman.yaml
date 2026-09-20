@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# One machine with podman:
+#   helm template pdf-ua-generator deploy/helm/pdf-ua-generator -f deploy/helm/pdf-ua-generator/values-podman.yaml | podman kube play -
+# podman knows no autoscaler, so the replica count is fixed and the database
+# runs beside the service.
+#
+# podman has no Services: inside its network a deployment answers under
+# "<deployment name>-pod". The names below therefore assume the release is
+# called pdf-ua-generator, as in the command above.
+
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+
+postgresql:
+  enabled: true
+
+database:
+  jdbcUrl: jdbc:postgresql://pdf-ua-generator-postgresql-pod:5432/pdfuagen
+  username: pdfuagen
+  password: pdfuagen
+
+import:
+  serviceUrl: http://pdf-ua-generator-pod:8080
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi

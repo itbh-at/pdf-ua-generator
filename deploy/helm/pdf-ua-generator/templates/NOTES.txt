@@ -1,0 +1,16 @@
+{{- /*
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 IT Beratung Hermann GmbH
+*/ -}}
+{{ .Chart.Name }} {{ .Chart.AppVersion }} is deployed as {{ include "pdf-ua-generator.fullname" . }}.
+
+The API is at http://{{ include "pdf-ua-generator.fullname" . }}:{{ .Values.service.port }}/ inside the cluster:
+
+  kubectl port-forward svc/{{ include "pdf-ua-generator.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/templates
+
+{{ if .Values.import.enabled -}}
+Templates and layouts come from {{ .Values.import.image }}; the import job runs after every change to that image.
+{{- else -}}
+No import job: set import.enabled and import.image to load templates and layouts from an image.
+{{- end }}

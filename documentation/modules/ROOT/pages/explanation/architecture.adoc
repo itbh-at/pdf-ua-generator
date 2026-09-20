@@ -69,12 +69,20 @@ later and lets editors preview drafts. A revision is a bundle laid out like a
 template directory of the CLI, so the same files work in both.
 
 Files are stored once per SHA-256 of their content. A revision's hash covers
-its paths and file hashes and is the key of the in-memory cache: a cached
-revision can never be stale, and identical revisions share one entry. The
-cache holds only the immutable files and what is derived from them (parsed
-templates, schema, font metrics); status and other metadata are always read
-from the database, so every instance sees the same state. Its size is limited
-in bytes, and the least recently used revisions are dropped first.
+its paths and file hashes, and everything cached hangs off it: a cached entry
+can never be stale, and identical revisions share one. Status and other
+metadata are always read from the database, so every instance sees the same
+state.
+
+There are two caches, and the split matters. The files of a revision are plain
+data — a map of path to bytes — held by the `quarkus-cache` extension, so the
+backend is a configuration question: Caffeine in memory by default, a remote
+one where an operator prefers that. What the renderer derives from those files
+— the parsed Qute engine, font metrics, compiled schemas — cannot travel: it is
+live object graphs of the rendering libraries. The renderer therefore keeps it
+itself, keyed by the repository's content key rather than by the repository
+object, so a repository rebuilt around cached files finds the parsed form
+again.
 
 === Layouts, components and content templates
 
@@ -294,7 +302,14 @@ revisions and renders their example data in every format before readiness
 reports ready, so a new pod receives traffic only when it is warm. Rendering
 runs in a worker pool sized to the CPU cores; when the queue is full the
 service answers 503 with `Retry-After`, which lets the autoscaler react instead
-of requests timing out.
+of requests timing out. Everything that reads the database or renders happens
+in that pool, so an overloaded instance refuses before it does any work.
+
+The pool, the cache and the API report to Prometheus at `/q/metrics`
+(`executor.*`, `pdfuagen_render_rejected_total`, `cache.*`,
+`http_server_requests_seconds`). That is what separates the two reasons a
+render gets slow: a full queue means the service wants more instances, an empty
+one with rising render times means rendering itself got slower.
 
 == Deployment
 
@@ -303,6 +318,33 @@ only — standalone, as an OCI image under podman, or scaled out in Kubernetes.
 One Helm chart serves both Kubernetes and `podman kube play` (rendered with
 `helm template`); for podman it adds a local PostgreSQL. One
 deployment serves one tenant; separate tenants are separate deployments.
+
+The image is built by the Quarkus container-image extension (Jib) from a pinned
+JRE base image. There is no Containerfile of our own: the extension layers the
+application and sets the entry point.
+
+Startup time is what makes scaling on load useful — a pod that is ready sooner
+absorbs a spike sooner — so the image carries a Leyden AOT cache. Recording it
+needs a representative run, and that run is the integration test `ApiIT`: it
+imports the demo layout and template and renders every format, against the
+image just built, so the cache matches the JVM that will run it. A second image
+is then written with the cache baked in, tagged with the suffix `-aot`; that is
+the image to deploy. Anything the test leaves out stays uncached.
+
+=== How templates reach a cluster
+
+Templates and layouts are data of the running service, not part of its image,
+and the target clusters have no access to a Git repository. They travel in an
+OCI image of their own: a bundle per template, `+/bundles/<id>.zip+`. An
+idempotent job of the chart uploads and publishes them through the API. Its name
+carries the hash of the bundle image, so a new image is a new job, and running it
+again changes nothing: a bundle whose files are already stored yields the stored
+revision, because a revision is identified by the content hash of its files.
+
+The job therefore needs one API call per bundle — upload and publish in one step
+— and no client logic of ours: it is a shell script of the chart, which keeps the
+script and the API in one version. Two passes are enough for the only ordering
+constraint, content that pins a layout published in the same run.
 
 == Editor
 

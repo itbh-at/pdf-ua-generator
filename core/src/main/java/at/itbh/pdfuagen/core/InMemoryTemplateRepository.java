@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 /**
  * Template repository over files held in memory, keyed by relative path — e.g. a stored template
@@ -18,12 +19,31 @@ import java.util.TreeSet;
 public final class InMemoryTemplateRepository implements TemplateRepository {
 
   private final Map<String, byte[]> files;
+  private final String contentKey;
 
   /**
+   * Files without a content key of their own: the renderer treats every instance as different
+   * content and parses its templates again.
+   *
    * @param files file contents by normalized relative path ({@link ResourcePaths#normalize})
    */
   public InMemoryTemplateRepository(Map<String, byte[]> files) {
+    this(files, UUID.randomUUID().toString());
+  }
+
+  /**
+   * @param files file contents by normalized relative path ({@link ResourcePaths#normalize})
+   * @param contentKey identifies these files, e.g. the content hash of a stored revision; see
+   *     {@link TemplateRepository#contentKey()}
+   */
+  public InMemoryTemplateRepository(Map<String, byte[]> files, String contentKey) {
     this.files = Map.copyOf(files);
+    this.contentKey = contentKey;
+  }
+
+  @Override
+  public String contentKey() {
+    return contentKey;
   }
 
   @Override

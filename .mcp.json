@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "quarkus-agent": {
+      "command": "mise",
+      "args": ["exec", "--", "jbang", "quarkus-agent-mcp@quarkusio"]
+    }
+  }
+}

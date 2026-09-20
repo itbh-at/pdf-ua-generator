@@ -25,7 +25,7 @@
             <outputDirectory>lib</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>src/dist/licenses</directory>
+            <directory>../licenses</directory>
             <outputDirectory>licenses</outputDirectory>
         </fileSet>
         <fileSet>

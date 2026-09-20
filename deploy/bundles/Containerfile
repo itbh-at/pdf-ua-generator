@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# The bundle image of the demo: the reference for an image that carries
+# templates and layouts into a cluster. Build from the repository root:
+#   podman build -f deploy/bundles/Containerfile -t pdf-ua-generator-bundles:dev .
+#
+# What the import job of the chart expects of such an image:
+#   * /bundles/<template id>.zip — one bundle per template or layout, laid out
+#     like a template directory: template.xhtml, template.json, assets,
+#     example.json and its attachments under example/; a layout also has
+#     layout.json.
+#   * a shell and curl, so the job can run the import script of the chart.
+# How the bundles are built is up to whoever ships them; this file packs the
+# demo, whose files carry different names.
+
+ARG BASE=docker.io/library/alpine:3.24.2
+
+FROM ${BASE} AS pack
+RUN apk add --no-cache zip
+COPY demo /demo
+RUN set -eu; \
+    mkdir -p /bundles; \
+    # The content: the demo document, its descriptor and its example data.
+    mkdir -p /content/example; \
+    cp /demo/demo.xhtml /content/template.xhtml; \
+    cp /demo/demo.json /content/template.json; \
+    cp /demo/data.json /content/example.json; \
+    cp /demo/photo.png /content/example/photo.png; \
+    (cd /content && zip -Xrq /bundles/demo.zip .); \
+    # The layouts, each with its own example data; a layout renders on its own.
+    for layout in layout layout-memo; do \
+        rm -rf /layout; cp -a "/demo/$layout" /layout; \
+        echo '{}' > /layout/example.json; \
+        (cd /layout && zip -Xrq "/bundles/demo-$layout.zip" .); \
+    done
+
+FROM ${BASE}
+RUN apk add --no-cache curl
+COPY --from=pack /bundles /bundles
+USER 1001

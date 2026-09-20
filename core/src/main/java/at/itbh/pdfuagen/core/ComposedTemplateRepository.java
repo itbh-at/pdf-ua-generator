@@ -28,6 +28,11 @@ public final class ComposedTemplateRepository implements TemplateRepository {
   }
 
   @Override
+  public String contentKey() {
+    return content.contentKey() + '+' + layout.contentKey();
+  }
+
+  @Override
   public Optional<String> template(String id) {
     Optional<String> path = ResourcePaths.normalize(id);
     if (path.isEmpty()) {

@@ -19,6 +19,13 @@
     <name>itbh.at PDF UA Generator: server</name>
     <description>Quarkus REST service: template store, API, security.</description>
 
+    <properties>
+        <!-- Jib copies this directory into the image root; the build fills it. -->
+        <jib.files>${project.basedir}/src/main/jib</jib.files>
+        <!-- The JRE of the image, pinned; also the JVM the AOT cache is trained with. -->
+        <jre.base-image>registry.access.redhat.com/ubi9/openjdk-25-runtime:1.24</jre.base-image>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>at.itbh</groupId>
@@ -50,6 +57,19 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-cache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <!-- Builds the OCI image and the AOT cache in it; no Containerfile of our own. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-container-image-jib</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
@@ -59,6 +79,54 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- mise run image: OCI image with Jib, including the AOT cache. Not part of the
+             normal build, where the training run would only cost time. -->
+        <profile>
+            <id>image</id>
+            <properties>
+                <quarkus.container-image.build>true</quarkus.container-image.build>
+                <!--
+                    Leyden AOT (JDK 24+); AppCDS is its predecessor and deprecated for removal.
+                    The cache is trained by ApiIT against the image just built, so it matches the
+                    JVM of the base image, and the result is tagged with the suffix "-aot".
+                -->
+                <quarkus.package.jar.type>aot-jar</quarkus.package.jar.type>
+                <quarkus.package.jar.aot.enabled>true</quarkus.package.jar.aot.enabled>
+                <quarkus.package.jar.aot.phase>integration-tests</quarkus.package.jar.aot.phase>
+                <skipITs>false</skipITs>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- The training run reads the flag from the system properties, not from the
+                         project, so failsafe has to pass it on. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <quarkus.package.jar.aot.enabled>true</quarkus.package.jar.aot.enabled>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                    <!-- Bakes the cache recorded by ApiIT into a second image, tagged "-aot". -->
+                    <plugin>
+                        <groupId>${quarkus.platform.group-id}</groupId>
+                        <artifactId>quarkus-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>aot-image</id>
+                                <goals>
+                                    <goal>build-enhanced-artifact</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>
@@ -76,6 +144,71 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Licence list of everything the image ships; fails on a licence outside the
+                 allowed set. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>third-party</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>add-third-party</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dependency-notices</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <excludeGroupIds>at.itbh</excludeGroupIds>
+                            <includes>META-INF/NOTICE*,META-INF/LICENSE*,META-INF/LICENCE*</includes>
+                            <useSubDirectoryPerArtifact>true</useSubDirectoryPerArtifact>
+                            <stripVersion>true</stripVersion>
+                            <outputDirectory>${jib.files}/licenses/bundled</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- What the image ships beside the application: the project licence, the
+                 generated NOTICE (the project notice followed by the notices of every bundled
+                 library, Apache-2.0 section 4(d)), the licence list and the licence texts.
+                 Jib copies src/main/jib into the image root. -->
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>notice</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <concat destfile="${jib.files}/NOTICE" fixlastline="yes" encoding="UTF-8" outputencoding="UTF-8">
+                                    <filelist dir="${project.basedir}/.." files="NOTICE"/>
+                                    <filelist dir="${project.basedir}/src/dist" files="notice-bundled.txt"/>
+                                    <fileset dir="${jib.files}/licenses/bundled" includes="**/NOTICE*" erroronmissingdir="false"/>
+                                </concat>
+                                <copy file="${project.basedir}/../LICENSE" todir="${jib.files}"/>
+                                <copy file="${project.build.directory}/generated-sources/license/THIRD-PARTY.txt" todir="${jib.files}"/>
+                                <copy todir="${jib.files}/licenses">
+                                    <fileset dir="${project.basedir}/../licenses"/>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
@@ -83,6 +216,28 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <!--
+                ApiIT runs against the packaged service, and against the container image when one
+                is built. With the profile "image" it is also the training run for the AOT cache.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                                <maven.home>${maven.home}</maven.home>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

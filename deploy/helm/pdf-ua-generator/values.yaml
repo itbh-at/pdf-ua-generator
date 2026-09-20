@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 IT Beratung Hermann GmbH
+
+# Defaults for Kubernetes. For podman, add -f values-podman.yaml.
+
+replicaCount: 2
+
+image:
+  repository: itbh/pdf-ua-generator
+  # Empty: the appVersion of the chart.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 2Gi
+
+# The database. On Kubernetes it is external; give the password either directly
+# (it becomes a Secret of this release) or in an existing Secret with the keys
+# username and password.
+database:
+  jdbcUrl: jdbc:postgresql://postgresql:5432/pdfuagen
+  username: pdfuagen
+  password: ""
+  existingSecret: ""
+
+# Settings of the service; empty values keep its own defaults.
+config:
+  # Base of the public asset URLs in email HTML, e.g. https://documents.example.org
+  publicBaseUrl: ""
+  # Hosts external images may be fetched from, e.g. ["images.example.org"]
+  allowedHosts: []
+  # Rendering threads per instance; empty: the number of CPU cores.
+  renderThreads: ""
+  # Template revisions kept in memory per instance, counted in revisions, not
+  # bytes; empty: the default of the service.
+  revisionCacheSize: ""
+  logLevel: INFO
+
+# The service exposes Prometheus metrics at /q/metrics: executor.* for the
+# render pool, pdfuagen_render_rejected_total for the 503s, cache.* for the
+# revision cache, http_server_requests_seconds for the API. The annotations are
+# what a Prometheus with pod discovery reads; an operator with a ServiceMonitor
+# CRD is configured outside this chart.
+metrics:
+  scrapeAnnotations: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# Imports template and layout bundles from an OCI image that carries
+# /bundles/<template id>.zip and a shell with curl. The job uploads and
+# publishes every bundle; repeating it changes nothing as long as the files are
+# unchanged.
+import:
+  enabled: false
+  image: ""
+  pullPolicy: IfNotPresent
+  # Where the job reaches the service; empty: the Service of this release.
+  # podman knows no Services, so values-podman.yaml names the pod instead.
+  serviceUrl: ""
+
+# A minimal PostgreSQL for podman; on Kubernetes the database is external.
+postgresql:
+  enabled: false
+  image: docker.io/library/postgres:18-alpine
+  storage: 2Gi
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

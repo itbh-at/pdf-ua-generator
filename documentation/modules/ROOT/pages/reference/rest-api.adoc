@@ -26,11 +26,17 @@ xref:reference/problem-types.adoc[Problem types].
 |204. Deletes the template with all revisions.
 
 |`+POST /templates/{id}/revisions+` +
-`Content-Type: application/zip`
+`Content-Type: application/zip` +
+`?publish=true`
 |201 with `Location` and the revision. Stores the archive as a new draft
 revision; the first revision creates the template. The body lists `problems`
 found when parsing — a draft with problems is stored anyway, so it can be
-corrected — and `warnings`.
+corrected — and `warnings`. +
+ +
+Files that are already stored as a revision of this template give 200 with
+`Content-Location` and that revision instead of a new one. With `?publish=true`
+the revision is published in the same call, unless it already is; an import can
+therefore be repeated without changing anything.
 
 |`+GET /templates/{id}/revisions/{n}+`
 |The revision (see below).
