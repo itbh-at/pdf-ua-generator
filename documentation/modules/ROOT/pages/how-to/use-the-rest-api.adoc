@@ -6,9 +6,11 @@
 = Publish and render a template through the API
 :description: Upload the demo template, publish it, validate data and render documents with curl.
 
-Prerequisites: `podman` with its user socket
-(`systemctl --user enable --now podman.socket`) and the toolchain from
-`mise install`.
+Prerequisites: a running `podman` — on Linux its user socket
+(`systemctl --user enable --now podman.socket`), on macOS a started machine
+(`podman machine start`) — and the toolchain from `mise install`. mise picks
+the right socket for either system; an explicit `DOCKER_HOST` in the
+environment overrides it.
 
 . Start the service in dev mode; it starts PostgreSQL in a container:
 +

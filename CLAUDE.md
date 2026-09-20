@@ -291,10 +291,12 @@ old-school senior developer: direct and minimal.
   therefore not a way to build container images: the service image comes from
   the Quarkus container-image extension (Jib) on a pinned JRE base image,
   without a hand-written Containerfile.
-- Not managed by mise, and therefore a host prerequisite: `podman`, with its
-  user socket active (`systemctl --user enable --now podman.socket`); the
-  server tests and dev mode start PostgreSQL through it (`DOCKER_HOST` is set
-  in `mise.toml`). LibreOffice
+- Not managed by mise, and therefore a host prerequisite: a running `podman` —
+  on Linux its user socket (`systemctl --user enable --now podman.socket`), on
+  macOS a started machine (`podman machine start`); the server tests and dev
+  mode start PostgreSQL through it. `DOCKER_HOST` is resolved for either system
+  by `scripts/docker-host.sh` (wired into `mise.toml`), and an explicit
+  `DOCKER_HOST` in the environment overrides it. LibreOffice
   for the format check runs in a podman image
   (`scripts/libreoffice/Containerfile`), never from the host.
 
