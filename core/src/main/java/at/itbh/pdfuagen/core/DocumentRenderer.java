@@ -461,7 +461,7 @@ public final class DocumentRenderer {
     }
     DocumentModel model = model(document, resolver);
     List<Problem> problems = new ArrayList<>();
-    String html;
+    byte[] html;
     try {
       html =
           EmailHtmlWriter.write(
@@ -475,7 +475,7 @@ public final class DocumentRenderer {
           e);
     }
     failOnProblems(problems);
-    return new Rendered(OutputFormat.EMAIL_HTML, html.getBytes(StandardCharsets.UTF_8), List.of());
+    return new Rendered(OutputFormat.EMAIL_HTML, html, List.of());
   }
 
   /**

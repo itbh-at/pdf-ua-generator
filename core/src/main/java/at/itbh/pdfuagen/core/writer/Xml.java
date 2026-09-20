@@ -37,6 +37,16 @@ final class Xml {
     }
   }
 
+  /** Writes a document type declaration, e.g. {@code <!DOCTYPE html>}, before the root element. */
+  Xml doctype(String dtd) {
+    try {
+      writer.writeDTD(dtd);
+      return this;
+    } catch (XMLStreamException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
   /** Inserts a balanced fragment written by another {@code Xml} as the next content. */
   Xml raw(byte[] fragment) {
     try {

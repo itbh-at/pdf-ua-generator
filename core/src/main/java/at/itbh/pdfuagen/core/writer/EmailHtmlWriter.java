@@ -27,20 +27,23 @@ import at.itbh.pdfuagen.core.model.DocumentModel.Table;
 import at.itbh.pdfuagen.core.model.DocumentModel.Text;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
  * HTML for email bodies: styles from the layout's {@code email.css} inlined into {@code style}
  * attributes, absolute image URLs, columns and boxes as tables with {@code role="presentation"},
- * footnotes as a linked list at the end.
+ * footnotes as a linked list at the end. Written through the {@link Xml} StAX writer; the output is
+ * served as {@code text/html}, so it carries an {@code <!DOCTYPE html>} but no XML declaration.
  */
 public final class EmailHtmlWriter {
 
   private final DocumentModel model;
   private final CssRules css;
   private final Function<Image, String> imageUrl;
-  private final StringBuilder out = new StringBuilder();
+  private final Xml x = new Xml(false);
   private final List<List<Inline>> footnotes = new ArrayList<>();
 
   private EmailHtmlWriter(DocumentModel model, CssRules css, Function<Image, String> imageUrl) {
@@ -52,42 +55,49 @@ public final class EmailHtmlWriter {
   /**
    * @param imageUrl absolute URL of an image as the recipient's mail client loads it
    */
-  public static String write(DocumentModel model, CssRules css, Function<Image, String> imageUrl)
+  public static byte[] write(DocumentModel model, CssRules css, Function<Image, String> imageUrl)
       throws IOException {
     return new EmailHtmlWriter(model, css, imageUrl).write();
   }
 
-  private String write() throws IOException {
-    out.append("<!DOCTYPE html>\n<html lang=\"").append(attr(model.lang())).append("\">\n<head>\n");
-    out.append("<meta charset=\"utf-8\">\n");
-    out.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
-    out.append("<title>").append(text(model.title())).append("</title>\n</head>\n");
-    out.append("<body").append(style("body")).append(">\n");
+  private byte[] write() throws IOException {
+    x.doctype("<!DOCTYPE html>");
+    x.open("html", "lang", model.lang());
+    x.open("head");
+    x.empty("meta", "charset", "utf-8");
+    x.empty("meta", "name", "viewport", "content", "width=device-width, initial-scale=1");
+    x.element("title", model.title());
+    x.close();
+    x.open("body", "style", styleOf("body"));
     // Screen readers announce the message as an email with its title (common email practice).
-    out.append("<div role=\"article\" aria-roledescription=\"email\" aria-label=\"")
-        .append(attr(model.title()))
-        .append("\" lang=\"")
-        .append(attr(model.lang()))
-        .append("\">\n");
+    x.open(
+        "div",
+        "role",
+        "article",
+        "aria-roledescription",
+        "email",
+        "aria-label",
+        model.title(),
+        "lang",
+        model.lang());
     blocks(model.blocks());
     if (!footnotes.isEmpty()) {
-      out.append("<hr")
-          .append(style("hr"))
-          .append(">\n<ol")
-          .append(style("ol", "footnotes"))
-          .append(">\n");
+      x.empty("hr", "style", styleOf("hr"));
+      x.open("ol", "style", styleOf("ol", "footnotes"));
       for (int i = 0; i < footnotes.size(); i++) {
         int n = i + 1;
-        out.append("<li id=\"fn").append(n).append('"').append(style("li", "footnote")).append('>');
+        x.open("li", "id", "fn" + n, "style", styleOf("li", "footnote"));
         inlines(footnotes.get(i));
-        out.append(" <a href=\"#fnref")
-            .append(n)
-            .append("\" aria-label=\"Back to text\">↩</a></li>\n");
+        x.text(" ");
+        x.open("a", "href", "#fnref" + n, "aria-label", "Back to text").text("↩").close();
+        x.close();
       }
-      out.append("</ol>\n");
+      x.close();
     }
-    out.append("</div>\n</body>\n</html>\n");
-    return out.toString();
+    x.close(); // div
+    x.close(); // body
+    x.close(); // html
+    return x.bytes();
   }
 
   private void blocks(List<Block> blocks) throws IOException {
@@ -95,66 +105,79 @@ public final class EmailHtmlWriter {
       switch (block) {
         case Heading h -> {
           String tag = "h" + h.level();
-          out.append('<').append(tag);
-          if (h.id() != null) {
-            out.append(" id=\"").append(attr(h.id())).append('"');
-          }
-          out.append(style(tag, h.style())).append('>');
+          x.open(tag, "id", h.id(), "style", styleOf(tag, h.style()));
           inlines(h.content());
-          out.append("</").append(tag).append(">\n");
+          x.close();
         }
         case Paragraph p -> {
-          out.append("<p").append(style("p", p.style())).append('>');
+          x.open("p", "style", styleOf("p", p.style()));
           inlines(p.content());
-          out.append("</p>\n");
+          x.close();
         }
         case ListBlock list -> {
           String tag = list.ordered() ? "ol" : "ul";
-          out.append('<').append(tag).append(style(tag)).append(">\n");
+          x.open(tag, "style", styleOf(tag));
           for (List<Block> item : list.items()) {
-            out.append("<li").append(style("li")).append('>');
+            x.open("li", "style", styleOf("li"));
             if (item.size() == 1 && item.getFirst() instanceof Paragraph p) {
               inlines(p.content());
             } else {
               blocks(item);
             }
-            out.append("</li>\n");
+            x.close();
           }
-          out.append("</").append(tag).append(">\n");
+          x.close();
         }
         case Table table -> table(table);
         case ImageBlock image -> {
-          out.append("<p").append(style("p")).append('>');
+          x.open("p", "style", styleOf("p"));
           image(image.image());
-          out.append("</p>\n");
+          x.close();
         }
         case Columns columns -> {
-          out.append(
-                  "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\""
-                      + " border=\"0\"")
-              .append(style("table", "columns"))
-              .append("><tr>\n");
+          x.open(
+              "table",
+              "role",
+              "presentation",
+              "width",
+              "100%",
+              "cellpadding",
+              "0",
+              "cellspacing",
+              "0",
+              "border",
+              "0",
+              "style",
+              styleOf("table", "columns"));
+          x.open("tr");
           int width = 100 / Math.max(1, columns.columns().size());
           for (List<Block> column : columns.columns()) {
-            out.append("<td valign=\"top\" width=\"")
-                .append(width)
-                .append("%\"")
-                .append(style("td", "col"))
-                .append(">\n");
+            x.open("td", "valign", "top", "width", width + "%", "style", styleOf("td", "col"));
             blocks(column);
-            out.append("</td>\n");
+            x.close();
           }
-          out.append("</tr></table>\n");
+          x.close(); // tr
+          x.close(); // table
         }
         case Box box -> {
-          out.append(
-                  "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\""
-                      + " border=\"0\"><tr>")
-              .append("<td")
-              .append(style("td", "box", box.style()))
-              .append(">\n");
+          x.open(
+              "table",
+              "role",
+              "presentation",
+              "width",
+              "100%",
+              "cellpadding",
+              "0",
+              "cellspacing",
+              "0",
+              "border",
+              "0");
+          x.open("tr");
+          x.open("td", "style", styleOf("td", "box", box.style()));
           blocks(box.content());
-          out.append("</td></tr></table>\n");
+          x.close(); // td
+          x.close(); // tr
+          x.close(); // table
         }
         case PageBreak pageBreak -> {}
       }
@@ -162,45 +185,45 @@ public final class EmailHtmlWriter {
   }
 
   private void table(Table table) throws IOException {
-    out.append("<table").append(style("table")).append(">\n");
+    x.open("table", "style", styleOf("table"));
     if (!table.caption().isEmpty()) {
-      out.append("<caption").append(style("caption")).append('>');
+      x.open("caption", "style", styleOf("caption"));
       inlines(table.caption());
-      out.append("</caption>\n");
+      x.close();
     }
     section("thead", table.head(), true);
     section("tbody", table.body(), false);
     section("tfoot", table.foot(), false);
-    out.append("</table>\n");
+    x.close();
   }
 
   private void section(String tag, List<Row> rows, boolean head) throws IOException {
     if (rows.isEmpty()) {
       return;
     }
-    out.append('<').append(tag).append(">\n");
+    x.open(tag);
     for (Row row : rows) {
-      out.append("<tr>");
+      x.open("tr");
       for (Cell cell : row.cells()) {
         String cellTag = cell.header() ? "th" : "td";
-        out.append('<').append(cellTag);
-        if (cell.header()) {
-          out.append(" scope=\"").append(head ? "col" : "row").append('"');
-        }
-        if (cell.colspan() > 1) {
-          out.append(" colspan=\"").append(cell.colspan()).append('"');
-        }
-        out.append(style(cellTag)).append('>');
+        x.open(
+            cellTag,
+            "scope",
+            cell.header() ? (head ? "col" : "row") : null,
+            "colspan",
+            cell.colspan() > 1 ? String.valueOf(cell.colspan()) : null,
+            "style",
+            styleOf(cellTag));
         if (cell.content().size() == 1 && cell.content().getFirst() instanceof Paragraph p) {
           inlines(p.content());
         } else {
           blocks(cell.content());
         }
-        out.append("</").append(cellTag).append('>');
+        x.close();
       }
-      out.append("</tr>\n");
+      x.close();
     }
-    out.append("</").append(tag).append(">\n");
+    x.close();
   }
 
   private void inlines(List<Inline> inlines) throws IOException {
@@ -210,52 +233,40 @@ public final class EmailHtmlWriter {
           boolean lang = t.lang() != null && !t.lang().equalsIgnoreCase(model.lang());
           boolean span = lang || t.style() != null;
           if (span) {
-            out.append("<span");
-            if (lang) {
-              out.append(" lang=\"").append(attr(t.lang())).append('"');
-            }
-            out.append(style("span", t.style())).append('>');
+            x.open("span", "lang", lang ? t.lang() : null, "style", styleOf("span", t.style()));
           }
           if (t.marks().contains(Mark.STRONG)) {
-            out.append("<strong>");
+            x.open("strong");
           }
           if (t.marks().contains(Mark.EMPHASIS)) {
-            out.append("<em>");
+            x.open("em");
           }
-          out.append(text(t.text()));
+          x.text(t.text());
           if (t.marks().contains(Mark.EMPHASIS)) {
-            out.append("</em>");
+            x.close();
           }
           if (t.marks().contains(Mark.STRONG)) {
-            out.append("</strong>");
+            x.close();
           }
           if (span) {
-            out.append("</span>");
+            x.close();
           }
         }
         case Link link -> {
-          out.append("<a href=\"")
-              .append(attr(link.href()))
-              .append('"')
-              .append(style("a"))
-              .append('>');
+          x.open("a", "href", link.href(), "style", styleOf("a"));
           inlines(link.content());
-          out.append("</a>");
+          x.close();
         }
-        case LineBreak lb -> out.append("<br>");
+        case LineBreak lb -> x.empty("br");
         case InlineImage image -> image(image.image());
         case Footnote footnote -> {
           footnotes.add(footnote.content());
           int n = footnotes.size();
-          out.append("<sup><a href=\"#fn")
-              .append(n)
-              .append("\" id=\"fnref")
-              .append(n)
-              .append('"')
-              .append(style("a", "footnote-ref"))
-              .append('>')
-              .append(n)
-              .append("</a></sup>");
+          x.open("sup");
+          x.open("a", "href", "#fn" + n, "id", "fnref" + n, "style", styleOf("a", "footnote-ref"))
+              .text(String.valueOf(n))
+              .close();
+          x.close();
         }
       }
     }
@@ -263,36 +274,26 @@ public final class EmailHtmlWriter {
 
   private void image(Image image) throws IOException {
     Images.Raster raster = Images.raster(image);
-    out.append("<img src=\"")
-        .append(attr(imageUrl.apply(image)))
-        .append("\" alt=\"")
-        .append(attr(image.decorative() || image.alt() == null ? "" : image.alt()))
-        .append('"');
-    if (image.decorative()) {
-      out.append(" role=\"presentation\"");
-    }
-    out.append(" width=\"")
-        .append(raster.width())
-        .append("\" height=\"")
-        .append(raster.height())
-        .append('"')
-        .append(style("img"))
-        .append('>');
+    x.empty(
+        "img",
+        "src",
+        imageUrl.apply(image),
+        "alt",
+        image.decorative() || image.alt() == null ? "" : image.alt(),
+        "role",
+        image.decorative() ? "presentation" : null,
+        "width",
+        String.valueOf(raster.width()),
+        "height",
+        String.valueOf(raster.height()),
+        "style",
+        styleOf("img"));
   }
 
-  private String style(String element, String... classes) {
+  /** The declarations for {@code element} and {@code classes}, or {@code null} when empty. */
+  private String styleOf(String element, String... classes) {
     String declarations =
-        css.style(
-            element,
-            java.util.Arrays.stream(classes).filter(c -> c != null).toArray(String[]::new));
-    return declarations.isEmpty() ? "" : " style=\"" + attr(declarations) + "\"";
-  }
-
-  private static String text(String value) {
-    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-  }
-
-  private static String attr(String value) {
-    return text(value).replace("\"", "&quot;");
+        css.style(element, Arrays.stream(classes).filter(Objects::nonNull).toArray(String[]::new));
+    return declarations.isEmpty() ? null : declarations;
   }
 }
