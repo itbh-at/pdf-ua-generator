@@ -13,13 +13,24 @@
 mise run image
 ----
 
-This builds `itbh/pdf-ua-generator:<version>` into the local podman storage.
-Push it to the registry the cluster pulls from:
+This builds two images into the local podman storage:
+
+`itbh/pdf-ua-generator:<version>`:: the plain image. The integration test
+`ApiIT` runs against it to record the AOT cache, which is the only reason it
+exists.
+`itbh/pdf-ua-generator:<version>-aot`:: the same application with that cache
+baked in. **This is the image to deploy** — it starts in a fraction of the
+time, which is what makes scaling on load useful.
+
+Push the `-aot` one to the registry the cluster pulls from:
 
 [source,shell]
 ----
-podman push itbh/pdf-ua-generator:2.0.0-SNAPSHOT registry.example.org/pdf-ua-generator:2.0.0
+podman push itbh/pdf-ua-generator:2.0.0-SNAPSHOT-aot registry.example.org/pdf-ua-generator:2.0.0
 ----
+
+The cache is recorded by a real run, so it is only as good as what `ApiIT`
+does. If the service gains work that matters at startup, extend that test.
 
 == Pack templates and layouts into an image
 
@@ -136,3 +147,9 @@ with `Retry-After` is the correct answer of an instance whose queue is full; the
 report counts those as `renders_rejected`, not as errors. `PEAK_RATE`,
 `START_RATE`, `WARM`, `RAMP` and `HOLD` change the profile, `TEMPLATE` and
 `FORMAT` what is rendered.
+
+Alongside the load, the test reads `/q/metrics` and reports
+`server_render_queue` and `server_render_active`. Read a breach of
+`render_time` with them: a queue at its capacity means the service is saturated
+and wants more instances; an empty queue with rising render times means
+rendering itself got slower, which is a defect and not a scaling question.

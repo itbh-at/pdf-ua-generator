@@ -94,7 +94,7 @@ ahead with phase 4); image sizes from the template; SVG with PNG fallback; `rows
 instead of string assembly
 |Every format passes its automated checks; DOCX also passes Word's
 accessibility checker
-|
+|next
 
 |7 Editor, stage 1
 |Qute pages with htmx: management, field definitions, example data,
@@ -119,7 +119,9 @@ mode
 |Confirm on a Kubernetes cluster that several pods scale under load (phase 5 was
 completed without one: the chart is verified by `kubeconform` and under podman,
 the image by the smoke test, the overload answer by the load test against one
-instance). Authentication and authorization: OIDC with roles, an OIDC provider
+instance; the k6 script has since gained a probe of `/q/metrics` that has not
+been run against a deployment yet). Authentication and authorization: OIDC with
+roles, an OIDC provider
 (Keycloak) in the chart for podman; until then the API is open. QR code and
 chart components; real-time collaboration
 |–
