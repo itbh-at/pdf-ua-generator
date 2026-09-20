@@ -18,15 +18,36 @@ environment overrides it.
 mise run dev
 ----
 
-. Pack the demo as a bundle:
+. Pack the layout as a bundle. The demo content pins `demo-layout@1`, so the
+layout is published first. A bundle carries the layout's files plus an
+`example.json` for the publish checks:
++
+----
+mkdir -p /tmp/layout
+cp -r demo/layout/. /tmp/layout/
+printf '{}' > /tmp/layout/example.json
+(cd /tmp/layout && zip -r ../layout.zip .)
+----
+
+. Upload and publish the layout as revision 1 of `demo-layout`:
++
+----
+curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/layout.zip \
+  http://localhost:8080/templates/demo-layout/revisions
+curl -X POST http://localhost:8080/templates/demo-layout/revisions/1/publish
+----
+
+. Pack the demo content as a bundle. The fonts, styles and images live in the
+layout, so the content bundle holds only the template, its language variants,
+the descriptor, and the example data and attachment:
 +
 ----
 mkdir -p /tmp/demo/example
 cp demo/demo.xhtml /tmp/demo/template.xhtml
+cp demo/demo.de.xhtml /tmp/demo/template.de.xhtml
 cp demo/demo.json /tmp/demo/template.json
 cp demo/data.json /tmp/demo/example.json
 cp demo/photo.png /tmp/demo/example/
-cp demo/email.css demo/*.svg demo/*.ttf /tmp/demo/
 (cd /tmp/demo && zip -r ../demo.zip .)
 ----
 
@@ -62,4 +83,12 @@ curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pd
 ----
 curl -H 'Content-Type: application/json' -d @demo/data-email.json \
   'http://localhost:8080/templates/demo/render?format=email-html' -o demo.html
+----
+
+. Render the German variant with `Accept-Language` (or `?lang=de`); the response
+carries `Content-Language: de`:
++
+----
+curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pdf' \
+  -H 'Accept-Language: de' -o demo.de.pdf http://localhost:8080/templates/demo/render
 ----

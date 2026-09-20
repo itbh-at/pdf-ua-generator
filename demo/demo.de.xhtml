@@ -1,0 +1,109 @@
+{#include layout}
+
+{#title}Allround-Beispiel für ein barrierefreies Dokument{/title}
+
+{#head}
+    <meta name="subject" content="Barrierefreie Dokumente aus einer Vorlage" />
+    <meta name="description" content="Eine Vorlage mit jedem Baustein, gerendert nach PDF/UA, XHTML, E-Mail-HTML, DOCX, ODT und reinem Text." />
+
+    <bookmarks>
+        <bookmark name="Text" href="#text" />
+        <bookmark name="Listen" href="#lists" />
+        <bookmark name="Bilder" href="#images" />
+        <bookmark name="Tabellen" href="#tables" />
+        <bookmark name="Layout" href="#layout" />
+        <bookmark name="Fazit" href="#conclusion" />
+    </bookmarks>
+{/head}
+
+{#body}
+    <p class="lead">Ein Layout, eine Vorlage, ein Satz Daten, sechs Formate: Dieses Dokument wird nach
+        <strong>PDF/UA</strong>, <em>eigenständigem XHTML</em>, E-Mail-HTML, DOCX, ODT und reinem Text
+        gerendert und ist in jedem davon barrierefrei.</p>
+
+    <h2 id="text">Text</h2>
+    <p>Hallo {customer.name}. Text kann <strong>fett</strong>, <em>hervorgehoben</em> sein oder einen
+        <span class="highlight">Katalog-Zeichenstil</span> verwenden. Eine Wendung in einer anderen
+        Sprache wird als solche ausgezeichnet, damit Screenreader sie richtig aussprechen: Das
+        englische Wort für Barrierefreiheit ist <span lang="en">accessibility</span>.{#footnote}Fußnoten
+        sind echte Fußnoten in PDF, DOCX und ODT und am Ende eine verlinkte Liste in HTML und Text.{/footnote}</p>
+    <p class="small">Dieser Absatz verwendet den Katalogstil <em>small</em>.</p>
+
+    <h2 id="lists">Listen</h2>
+    <ul>
+        {#for item in items}
+        <li>{item}</li>
+        {/for}
+    </ul>
+    <ol>
+        <li>Erster Schritt</li>
+        <li>Zweiter Schritt, mit Details:
+            <ul>
+                <li>ein untergeordneter Punkt</li>
+                <li>noch ein untergeordneter Punkt</li>
+            </ul>
+        </li>
+        <li>Dritter Schritt</li>
+    </ol>
+
+    <h2 id="images">Bilder</h2>
+    {#divider /}
+    {#if photo??}
+    <p><img class="photo" src="{photo.src}" alt="{photo.alt}" /></p>
+    {/if}
+    <p>Das Logo oben gehört zum Layout (SVG), die Linie darüber ist dekorativ und wird von
+        Screenreadern übersprungen, und das Foto ist ein mit der Anfrage gesendeter Anhang.</p>
+
+    <h2 id="tables">Tabellen</h2>
+    <table>
+        <caption>Bestellung {order.number} vom {order.date.date('long')}</caption>
+        <thead>
+            <tr>
+                <th scope="col">Position</th>
+                <th scope="col" class="number">Menge</th>
+                <th scope="col" class="number">Preis</th>
+            </tr>
+        </thead>
+        <tbody>
+            {#for position in order.positions}
+            <tr>
+                <td>{position.name}</td>
+                <td class="number">{position.quantity.number}</td>
+                <td class="number">{position.price.currency('EUR')}</td>
+            </tr>
+            {/for}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2">Summe</td>
+                <td class="number">{order.total.currency('EUR')}</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h2 id="layout">Layout</h2>
+    {#columns}
+        {#col}
+            <h3>Linke Spalte</h3>
+            <p>Spalten werden der Reihe nach gelesen: zuerst die linke Spalte, dann die rechte.</p>
+        {/col}
+        {#col}
+            <h3>Rechte Spalte</h3>
+            <p>In DOCX und ODT werden sie zu einer Layout-Tabelle, in E-Mail-HTML zu einer Tabelle mit
+                <em>role="presentation"</em>.</p>
+        {/col}
+    {/columns}
+    {#box title="Hinweis"}
+        <p>Ein umrahmter Kasten hält zusammengehörende Inhalte zusammen und wird nie über Seiten getrennt.</p>
+    {/box}
+    <p>Verweise funktionieren innerhalb des Dokuments — zurück nach <a href="#top">oben</a> — und nach
+        außen, etwa zur <a href="https://www.itbh.at/">Website der IT Beratung Hermann GmbH</a>.</p>
+
+    {#pagebreak /}
+
+    <h2 id="conclusion">Fazit</h2>
+    <p>Alles auf der vorigen Seite stammt aus einer Vorlage und einem JSON-Dokument; das Layout
+        ergänzt das Logo, die Schriften, die Kopf- und Fußzeile und die Komponenten.</p>
+{/body}
+
+{/include}
