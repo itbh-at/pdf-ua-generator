@@ -1,10 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 IT Beratung Hermann GmbH
-#
-# Runs the rendered chart under podman: the service image with PostgreSQL, the
-# import job with the demo bundles, then a render through the API. Everything
-# is removed again afterwards. Run through `mise run smoke-test`.
+
 set -eu
 
 CHART=deploy/helm/pdf-ua-generator

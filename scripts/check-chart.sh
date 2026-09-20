@@ -1,9 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 IT Beratung Hermann GmbH
-#
-# Renders the Helm chart with both values files and validates the manifests
-# against the Kubernetes schemas. Run through `mise run check-chart`.
+
 set -eu
 
 CHART=deploy/helm/pdf-ua-generator
