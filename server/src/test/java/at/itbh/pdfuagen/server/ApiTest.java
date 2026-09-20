@@ -19,24 +19,41 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import at.itbh.pdfuagen.server.store.Bundle;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
+import jakarta.inject.Inject;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 /** The API end to end, against PostgreSQL from Dev Services, with the demo template. */
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ApiTest {
 
   private static final String PROBLEM = "urn:itbh:pdf-ua-generator:problem:";
   private static final String DOCX =
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+  @Inject Flyway flyway;
+
+  // The ordered methods build up revisions from an empty database and assert their
+  // numbers, so start from a clean schema. Without this the test fails on a reused
+  // Dev Services database (testcontainers.reuse.enable=true) that still holds a
+  // previous run's templates.
+  @BeforeAll
+  void resetDatabase() {
+    flyway.clean();
+    flyway.migrate();
+  }
 
   @Test
   @Order(0)

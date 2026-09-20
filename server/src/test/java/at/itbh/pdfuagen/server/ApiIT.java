@@ -25,29 +25,37 @@ import org.junit.jupiter.api.Test;
 @QuarkusIntegrationTest
 class ApiIT {
 
+  // Unique per run so the test is reuse-safe: with a reused Dev Services database
+  // (testcontainers.reuse.enable=true) it neither collides with ApiTest's demo
+  // template nor with its own earlier runs, which would turn a fresh 201 into a
+  // 200 for the already-stored content.
+  private static final String SUFFIX = Long.toHexString(System.nanoTime());
+  private static final String LAYOUT = "demo-layout-" + SUFFIX;
+  private static final String TEMPLATE = "demo-" + SUFFIX;
+
   @Test
   void importsTheDemoAndRendersEveryFormat() throws Exception {
     given()
         .contentType("application/zip")
         .body(layoutBundle("Accessible document example"))
-        .post("/templates/demo-layout/revisions")
+        .post("/templates/" + LAYOUT + "/revisions")
         .then()
         .statusCode(201);
-    given().post("/templates/demo-layout/revisions/1/publish").then().statusCode(200);
+    given().post("/templates/" + LAYOUT + "/revisions/1/publish").then().statusCode(200);
     given()
         .contentType("application/zip")
-        .body(demoBundle(1))
-        .post("/templates/demo/revisions")
+        .body(demoBundle(LAYOUT + "@1"))
+        .post("/templates/" + TEMPLATE + "/revisions")
         .then()
         .statusCode(201);
-    given().post("/templates/demo/revisions/1/publish").then().statusCode(200);
+    given().post("/templates/" + TEMPLATE + "/revisions/1/publish").then().statusCode(200);
 
     for (String format : new String[] {"pdf", "xhtml", "email-html", "text", "docx", "odt"}) {
       byte[] document =
           given()
               .contentType("application/json")
               .body(data())
-              .post("/templates/demo/render?format=" + format)
+              .post("/templates/" + TEMPLATE + "/render?format=" + format)
               .then()
               .statusCode(200)
               .extract()
@@ -59,7 +67,7 @@ class ApiIT {
     given()
         .contentType("application/json")
         .body(data())
-        .post("/templates/demo/render?format=pdf")
+        .post("/templates/" + TEMPLATE + "/render?format=pdf")
         .then()
         .statusCode(200);
 
@@ -68,7 +76,7 @@ class ApiIT {
     given()
         .contentType("application/json")
         .body("{}")
-        .post("/templates/demo/validate")
+        .post("/templates/" + TEMPLATE + "/validate")
         .then()
         .statusCode(422)
         .body("type", equalTo("urn:itbh:pdf-ua-generator:problem:invalid-data"));
