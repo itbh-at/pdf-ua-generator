@@ -13,11 +13,6 @@ on:
   schedule:
     - cron: "0 3 * * *" # nightly, 03:00 UTC
   workflow_dispatch:
-  # TEMPORARY: run on epic/rebuild pushes so the smoke test can be validated
-  # before the epic reaches main (where schedule/workflow_dispatch activate).
-  # Remove this trigger before merging the epic.
-  push:
-    branches: ["epic/**"]
 
 permissions:
   contents: read
