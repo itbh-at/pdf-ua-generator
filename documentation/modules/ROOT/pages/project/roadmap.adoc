@@ -94,14 +94,14 @@ ahead with phase 4); image sizes from the template; SVG with PNG fallback; `rows
 instead of string assembly
 |Every format passes its automated checks; DOCX also passes Word's
 accessibility checker
-|next
+|done
 
 |7 Editor, stage 1
 |Qute pages with htmx: management, field definitions, example data,
 publishing; CodeMirror 6 with Qute mode, completion and server diagnostics; PDF
 preview; ETag conflict detection; editing language variants side by side
 |An experienced editor publishes a template without a developer
-|
+|next
 
 |Prototype
 |Clickable block editor, tested with real editors
