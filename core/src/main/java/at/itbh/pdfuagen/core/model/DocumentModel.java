@@ -127,7 +127,21 @@ public record DocumentModel(
    * @param mediaType {@code image/png}, {@code image/jpeg} or {@code image/svg+xml}
    * @param alt alternative text; empty for decorative images
    * @param decorative {@code alt=""} or {@code role="presentation"}
+   * @param width display width in CSS pixels from the template, or {@code null} for the image's own
+   * @param height display height in CSS pixels from the template, or {@code null} for the image's
+   *     own
    */
   public record Image(
-      String source, byte[] bytes, String mediaType, String alt, boolean decorative) {}
+      String source,
+      byte[] bytes,
+      String mediaType,
+      String alt,
+      boolean decorative,
+      Integer width,
+      Integer height) {
+
+    public Image(String source, byte[] bytes, String mediaType, String alt, boolean decorative) {
+      this(source, bytes, mediaType, alt, decorative, null, null);
+    }
+  }
 }

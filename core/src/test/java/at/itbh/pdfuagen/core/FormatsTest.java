@@ -66,6 +66,8 @@ class FormatsTest {
     assertTrue(document.contains("adec:decorative"), "decorative image flagged");
     assertTrue(document.contains("asvg:svgBlip"), "SVG embedded as vector with a PNG fallback");
     assertTrue(parts.get("[Content_Types].xml").contains("image/svg+xml"));
+    // Image size from the template: the logo's .logo { width: 50mm } is 189px = 1800225 EMU.
+    assertTrue(document.contains("cx=\"1800225\""), "logo sized from the layout CSS");
     assertTrue(document.contains("<w:tblHeader"));
     assertTrue(document.contains("<w:tblCaption w:val=\"Order 2026-0042 of September 19, 2026\""));
     assertTrue(document.contains("<w:footnoteReference"));
@@ -117,6 +119,8 @@ class FormatsTest {
     assertTrue(html.contains("<h1 id=\"top\" style=\""));
     assertTrue(html.contains("alt=\"\" role=\"presentation\""));
     assertFalse(html.contains("<style"));
+    // The logo takes its size from the layout CSS (.logo { width: 50mm } → 189px), not its own.
+    assertTrue(html.contains("width=\"189\""), html);
   }
 
   @Test

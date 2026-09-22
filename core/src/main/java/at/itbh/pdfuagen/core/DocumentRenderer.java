@@ -292,6 +292,7 @@ public final class DocumentRenderer {
   private static DocumentModel model(Document document, ResourceResolver resolver)
       throws RenderException {
     List<Problem> problems = new ArrayList<>();
+    CssRules catalog = CssRules.parse(stylesheets(document, resolver));
     ModelBuilder builder =
         new ModelBuilder(
             reference -> {
@@ -317,7 +318,8 @@ public final class DocumentRenderer {
                         return Optional.of(
                             new ModelBuilder.LoadedImage(uri, r.bytes(), r.kind().mediaType));
                       });
-            });
+            },
+            (element, classes) -> catalog.style(element, classes.toArray(new String[0])));
     DocumentModel model = builder.build(document);
     PageBoxes.Result pageBoxes = PageBoxes.parse(stylesheets(document, resolver));
     model = model.withPageBoxes(pageBoxes.header(), pageBoxes.footer());

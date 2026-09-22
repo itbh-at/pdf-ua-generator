@@ -628,8 +628,11 @@ public final class DocxWriter {
       svgRelId = "rIdImage" + number + "svg";
       relationships.add(new Relationship(svgRelId, REL_TYPE + "image", svgName, false));
     }
-    long cx = raster.width() * 9525L;
-    long cy = raster.height() * 9525L;
+    // The template's display size when it gives one, otherwise the image's own pixels.
+    int width = image.width() != null ? image.width() : raster.width();
+    int height = image.height() != null ? image.height() : raster.height();
+    long cx = width * 9525L;
+    long cy = height * 9525L;
     if (cx > textWidthEmu) {
       cy = cy * textWidthEmu / cx;
       cx = textWidthEmu;

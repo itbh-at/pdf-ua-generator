@@ -276,6 +276,9 @@ public final class EmailHtmlWriter {
 
   private void image(Image image) throws IOException {
     Images.Raster raster = Images.raster(image);
+    // The template's display size when it gives one, otherwise the image's own pixels.
+    int width = image.width() != null ? image.width() : raster.width();
+    int height = image.height() != null ? image.height() : raster.height();
     x.empty(
         "img",
         "src",
@@ -285,9 +288,9 @@ public final class EmailHtmlWriter {
         "role",
         image.decorative() ? "presentation" : null,
         "width",
-        String.valueOf(raster.width()),
+        String.valueOf(width),
         "height",
-        String.valueOf(raster.height()),
+        String.valueOf(height),
         "style",
         styleOf("img"));
   }

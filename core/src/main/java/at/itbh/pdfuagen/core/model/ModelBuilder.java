@@ -5,6 +5,7 @@
 
 package at.itbh.pdfuagen.core.model;
 
+import at.itbh.pdfuagen.core.ImageSize;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.model.DocumentModel.Block;
 import at.itbh.pdfuagen.core.model.DocumentModel.Box;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -50,6 +53,15 @@ public final class ModelBuilder {
   /** An image as loaded by the renderer. */
   public record LoadedImage(String source, byte[] bytes, String mediaType) {}
 
+  /** Resolves the catalog CSS declarations that apply to an element with the given classes. */
+  @FunctionalInterface
+  public interface StyleSheet {
+    /** e.g. {@code declarations("img", ["logo"])} → {@code "width: 50mm;"}; empty if none. */
+    String declarations(String element, List<String> classes);
+
+    StyleSheet NONE = (element, classes) -> "";
+  }
+
   private static final Set<String> BLOCK_ELEMENTS =
       Set.of("h1", "h2", "h3", "h4", "h5", "h6", "p", "ul", "ol", "table", "div");
 
@@ -64,10 +76,16 @@ public final class ModelBuilder {
   }
 
   private final ImageLoader images;
+  private final StyleSheet styles;
   private final List<Problem> problems = new ArrayList<>();
 
   public ModelBuilder(ImageLoader images) {
+    this(images, StyleSheet.NONE);
+  }
+
+  public ModelBuilder(ImageLoader images, StyleSheet styles) {
     this.images = images;
+    this.styles = styles;
   }
 
   public List<Problem> problems() {
@@ -302,13 +320,100 @@ public final class ModelBuilder {
     return images
         .load(attr(element, "src"))
         .map(
-            loaded ->
-                new Image(
-                    loaded.source(),
-                    loaded.bytes(),
-                    loaded.mediaType(),
-                    decorative ? "" : alt,
-                    decorative));
+            loaded -> {
+              int[] size = displaySize(element, loaded);
+              return new Image(
+                  loaded.source(),
+                  loaded.bytes(),
+                  loaded.mediaType(),
+                  decorative ? "" : alt,
+                  decorative,
+                  size == null ? null : size[0],
+                  size == null ? null : size[1]);
+            });
+  }
+
+  private static final Pattern LENGTH = Pattern.compile("([0-9]*\\.?[0-9]+)(px|mm|cm|in|pt|pc|q)?");
+
+  /**
+   * The display size in CSS pixels the template asks for, or {@code null} to keep the image's own
+   * size. Read from the {@code style} attribute, the catalog CSS of the image's classes and the
+   * {@code width}/{@code height} attributes; a missing side follows from the image's aspect ratio.
+   * Non-absolute values ({@code %}, {@code auto}) are ignored.
+   */
+  private int[] displaySize(Element element, LoadedImage loaded) {
+    List<String> classes = classes(element);
+    String inline = attr(element, "style");
+    String catalog = styles.declarations("img", classes);
+    Double w =
+        firstLength(cssValue("width", inline), cssValue("width", catalog), attr(element, "width"));
+    Double h =
+        firstLength(
+            cssValue("height", inline), cssValue("height", catalog), attr(element, "height"));
+    if (w == null && h == null) {
+      return null;
+    }
+    if (w == null || h == null) {
+      int[] intrinsic = ImageSize.of(loaded.bytes(), loaded.mediaType()).orElse(null);
+      if (intrinsic == null || intrinsic[0] <= 0 || intrinsic[1] <= 0) {
+        return null;
+      }
+      double ratio = (double) intrinsic[0] / intrinsic[1];
+      if (w == null) {
+        w = h * ratio;
+      } else {
+        h = w / ratio;
+      }
+    }
+    return new int[] {Math.round(w.floatValue()), Math.round(h.floatValue())};
+  }
+
+  private static List<String> classes(Element element) {
+    String value = attr(element, "class").strip();
+    return value.isEmpty() ? List.of() : List.of(value.split("\\s+"));
+  }
+
+  /** The first value that parses as an absolute CSS length, in pixels, or {@code null}. */
+  private static Double firstLength(String... values) {
+    for (String value : values) {
+      Double px = length(value);
+      if (px != null) {
+        return px;
+      }
+    }
+    return null;
+  }
+
+  private static Double length(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    Matcher m = LENGTH.matcher(value.strip().toLowerCase(Locale.ROOT));
+    if (!m.matches()) {
+      return null;
+    }
+    double n = Double.parseDouble(m.group(1));
+    String unit = m.group(2) == null ? "px" : m.group(2);
+    return switch (unit) {
+      case "px" -> n;
+      case "mm" -> n * 96 / 25.4;
+      case "cm" -> n * 96 / 2.54;
+      case "in" -> n * 96;
+      case "pt" -> n * 96 / 72;
+      case "pc" -> n * 96 / 6;
+      case "q" -> n * 96 / 25.4 / 4;
+      default -> null;
+    };
+  }
+
+  private static String cssValue(String property, String declarations) {
+    if (declarations == null || declarations.isEmpty()) {
+      return null;
+    }
+    Matcher m =
+        Pattern.compile("(?:^|;)\\s*" + property + "\\s*:\\s*([^;]+)", Pattern.CASE_INSENSITIVE)
+            .matcher(declarations);
+    return m.find() ? m.group(1).strip() : null;
   }
 
   /** Merges adjacent runs with equal formatting and trims whitespace at the edges. */

@@ -395,8 +395,11 @@ public final class OdtWriter {
       svgName = base + ".svg";
       pictures.put(svgName, image.bytes());
     }
-    double width = raster.width() / 96.0 * 2.54;
-    double height = raster.height() / 96.0 * 2.54;
+    // The template's display size when it gives one, otherwise the image's own pixels.
+    int wpx = image.width() != null ? image.width() : raster.width();
+    int hpx = image.height() != null ? image.height() : raster.height();
+    double width = wpx / 96.0 * 2.54;
+    double height = hpx / 96.0 * 2.54;
     if (width > textWidthCm) {
       height = height * textWidthCm / width;
       width = textWidthCm;
