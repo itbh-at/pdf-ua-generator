@@ -74,10 +74,12 @@ jobs:
           echo "${PODMAN_SHA256}  /tmp/podman.tar.gz" | sha256sum -c -
           tar -xzf /tmp/podman.tar.gz -C /tmp
           sudo cp -r /tmp/podman-linux-amd64/usr /tmp/podman-linux-amd64/etc /
-          # The runner's AppArmor profile is scoped to /usr/bin/podman; the new
-          # binary is in /usr/local/bin, so unload the profile rather than let it
-          # confine an unmatched path.
-          if [ -e /etc/apparmor.d/podman ]; then sudo apparmor_parser -R /etc/apparmor.d/podman || true; fi
+          # Ubuntu 24.04 restricts unprivileged user namespaces to binaries with
+          # an AppArmor profile that grants them. The system /usr/bin/podman has
+          # one; the new /usr/local/bin/podman does not, so rootless podman would
+          # fail to re-exec into its user namespace. Lift the restriction on this
+          # throwaway runner rather than author a profile for the new path.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           hash -r
           podman version
 
