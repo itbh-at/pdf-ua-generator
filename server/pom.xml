@@ -78,6 +78,14 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- ApiIT starts its own PostgreSQL (PostgresResource) instead of Dev Services, so the
+             app reaches it over the host gateway rather than a container network alias. Version
+             from the Testcontainers BOM imported by the Quarkus platform BOM. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -107,6 +115,11 @@
                         <configuration>
                             <systemPropertyVariables>
                                 <quarkus.package.jar.aot.enabled>true</quarkus.package.jar.aot.enabled>
+                                <!-- ApiIT runs as a container here, so it reaches its PostgreSQL
+                                     (started on the host by PostgresResource) over the podman host
+                                     gateway; the ordinary build runs it as a host process and keeps
+                                     the default "localhost". -->
+                                <pdfuagen.it.db-host>host.containers.internal</pdfuagen.it.db-host>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

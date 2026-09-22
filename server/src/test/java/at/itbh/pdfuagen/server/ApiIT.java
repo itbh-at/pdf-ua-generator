@@ -11,6 +11,8 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.quarkus.test.common.TestResourceScope;
+import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 import org.junit.jupiter.api.Test;
 
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * fonts, render every format. Anything it leaves out stays uncached and slow at startup.
  */
 @QuarkusIntegrationTest
+@WithTestResource(value = PostgresResource.class, scope = TestResourceScope.RESTRICTED_TO_CLASS)
 class ApiIT {
 
   // Unique per run so the test is reuse-safe: with a reused Dev Services database
