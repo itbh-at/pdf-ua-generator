@@ -71,6 +71,11 @@ class FormatsTest {
     assertTrue(document.contains("<w:footnoteReference"));
     assertTrue(document.contains("<w:lang w:val=\"de-AT\""));
     assertTrue(parts.get("word/footer1.xml").contains("NUMPAGES"));
+    // The running header and footer are styled by the layout's .dotx Header/Footer styles.
+    assertTrue(parts.get("word/header1.xml").contains("<w:pStyle w:val=\"Header\""));
+    assertTrue(
+        parts.get("word/styles.xml").contains("<w:color w:val=\"555555\""),
+        "header/footer take the layout's .dotx style (grey Roboto)");
     assertTrue(
         parts
             .get("docProps/core.xml")
@@ -92,6 +97,10 @@ class FormatsTest {
     assertTrue(content.contains("text:note-class=\"footnote\""));
     assertTrue(content.contains("fo:language=\"de\""));
     assertTrue(parts.get("styles.xml").contains("<text:page-count>"));
+    // The running header and footer are styled by the layout's .ott Header/Footer styles.
+    assertTrue(
+        parts.get("styles.xml").contains("fo:color=\"#555555\""),
+        "header/footer take the layout's .ott style (grey Roboto)");
     assertTrue(parts.get("meta.xml").contains("<dc:language>en</dc:language>"));
   }
 
