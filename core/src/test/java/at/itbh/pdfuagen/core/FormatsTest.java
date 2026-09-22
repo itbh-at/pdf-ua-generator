@@ -64,6 +64,8 @@ class FormatsTest {
     assertTrue(document.contains("<w:pStyle w:val=\"Heading1\""));
     assertTrue(document.contains("descr=\"Logo of IT Beratung Hermann GmbH\""));
     assertTrue(document.contains("adec:decorative"), "decorative image flagged");
+    assertTrue(document.contains("asvg:svgBlip"), "SVG embedded as vector with a PNG fallback");
+    assertTrue(parts.get("[Content_Types].xml").contains("image/svg+xml"));
     assertTrue(document.contains("<w:tblHeader"));
     assertTrue(document.contains("<w:tblCaption w:val=\"Order 2026-0042 of September 19, 2026\""));
     assertTrue(document.contains("<w:footnoteReference"));
@@ -84,6 +86,8 @@ class FormatsTest {
     assertEquals("application/vnd.oasis.opendocument.text", parts.get("mimetype"));
     assertTrue(content.contains("text:outline-level=\"1\""));
     assertTrue(content.contains("<svg:title>Logo of IT Beratung Hermann GmbH</svg:title>"));
+    assertTrue(content.contains("draw:mime-type=\"image/svg+xml\""), "SVG kept as vector");
+    assertTrue(parts.get("META-INF/manifest.xml").contains("image/svg+xml"));
     assertTrue(content.contains("<table:table-header-rows>"));
     assertTrue(content.contains("text:note-class=\"footnote\""));
     assertTrue(content.contains("fo:language=\"de\""));

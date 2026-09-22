@@ -619,6 +619,15 @@ public final class DocxWriter {
     media.put(name, raster.bytes());
     String relId = "rIdImage" + number;
     relationships.add(new Relationship(relId, REL_TYPE + "image", name, false));
+    // An SVG is embedded as vector with the rasterized PNG as the fallback blip, so viewers
+    // without SVG support (and the PDF/UA export) still show the image.
+    String svgRelId = null;
+    if ("image/svg+xml".equals(image.mediaType())) {
+      String svgName = "media/image" + number + ".svg";
+      media.put(svgName, image.bytes());
+      svgRelId = "rIdImage" + number + "svg";
+      relationships.add(new Relationship(svgRelId, REL_TYPE + "image", svgName, false));
+    }
     long cx = raster.width() * 9525L;
     long cy = raster.height() * 9525L;
     if (cx > textWidthEmu) {
@@ -657,12 +666,22 @@ public final class DocxWriter {
             alt)
         .empty("pic:cNvPicPr")
         .close();
-    x.open("pic:blipFill")
-        .empty("a:blip", "r:embed", relId)
-        .open("a:stretch")
-        .empty("a:fillRect")
-        .close()
-        .close();
+    x.open("pic:blipFill").open("a:blip", "r:embed", relId);
+    if (svgRelId != null) {
+      x.open("a:extLst")
+          .open("a:ext", "uri", "{96DAC541-7B7A-43D3-8B79-37D633B846F1}")
+          .empty(
+              "asvg:svgBlip",
+              "xmlns:asvg",
+              "http://schemas.microsoft.com/office/drawing/2016/SVG/main",
+              "r:embed",
+              svgRelId)
+          .close()
+          .close();
+    }
+    x.close(); // a:blip
+    x.open("a:stretch").empty("a:fillRect").close();
+    x.close(); // pic:blipFill
     x.open("pic:spPr")
         .open("a:xfrm")
         .empty("a:off", "x", "0", "y", "0")
@@ -977,6 +996,7 @@ public final class DocxWriter {
     x.empty("Default", "Extension", "xml", "ContentType", "application/xml");
     x.empty("Default", "Extension", "png", "ContentType", "image/png");
     x.empty("Default", "Extension", "jpeg", "ContentType", "image/jpeg");
+    x.empty("Default", "Extension", "svg", "ContentType", "image/svg+xml");
     if (!embeddedFonts.isEmpty()) {
       x.empty(
           "Default",

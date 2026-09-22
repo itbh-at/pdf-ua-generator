@@ -385,8 +385,16 @@ public final class OdtWriter {
 
   private void image(Xml x, Image image) throws IOException {
     Images.Raster raster = Images.raster(image);
-    String name = "Pictures/image" + (++imageCount) + "." + raster.extension();
+    String base = "Pictures/image" + (++imageCount);
+    String name = base + "." + raster.extension();
     pictures.put(name, raster.bytes());
+    // An SVG is kept as vector with the rasterized PNG as a fallback; ODF renders the first
+    // draw:image it supports, so the SVG comes first and the PNG after it.
+    String svgName = null;
+    if ("image/svg+xml".equals(image.mediaType())) {
+      svgName = base + ".svg";
+      pictures.put(svgName, image.bytes());
+    }
     double width = raster.width() / 96.0 * 2.54;
     double height = raster.height() / 96.0 * 2.54;
     if (width > textWidthCm) {
@@ -407,6 +415,20 @@ public final class OdtWriter {
         cm(height),
         "draw:z-index",
         "0");
+    if (svgName != null) {
+      x.empty(
+          "draw:image",
+          "xlink:href",
+          svgName,
+          "xlink:type",
+          "simple",
+          "xlink:show",
+          "embed",
+          "xlink:actuate",
+          "onLoad",
+          "draw:mime-type",
+          "image/svg+xml");
+    }
     x.empty(
         "draw:image",
         "xlink:href",
@@ -969,7 +991,9 @@ public final class OdtWriter {
           "manifest:full-path",
           picture,
           "manifest:media-type",
-          picture.endsWith(".jpeg") ? "image/jpeg" : "image/png");
+          picture.endsWith(".jpeg")
+              ? "image/jpeg"
+              : picture.endsWith(".svg") ? "image/svg+xml" : "image/png");
     }
     x.close();
     return x.bytes();
