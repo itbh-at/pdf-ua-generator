@@ -59,6 +59,28 @@ jobs:
         with:
           version: 2026.6.10 # pin mise; see ci.yml
 
+      - name: Install a current podman
+        # ubuntu-latest ships podman 4.9.3, whose `kube play` does not run
+        # Kubernetes Job resources (the chart imports the bundles with a Job) --
+        # that landed in podman 5. Install a pinned static build (podman + crun +
+        # conmon + netavark + aardvark-dns) so the runner matches a real
+        # deployment. Verified by checksum; the version tracks with the URL.
+        env:
+          PODMAN_VERSION: v6.1.2
+          PODMAN_SHA256: 481b6f5a57919aea837b54df1eaa6a5b968df505eedbdd78356e80306af676f1
+        run: |
+          curl -fsSL -o /tmp/podman.tar.gz \
+            "https://github.com/mgoltzsche/podman-static/releases/download/${PODMAN_VERSION}/podman-linux-amd64.tar.gz"
+          echo "${PODMAN_SHA256}  /tmp/podman.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/podman.tar.gz -C /tmp
+          sudo cp -r /tmp/podman-linux-amd64/usr /tmp/podman-linux-amd64/etc /
+          # The runner's AppArmor profile is scoped to /usr/bin/podman; the new
+          # binary is in /usr/local/bin, so unload the profile rather than let it
+          # confine an unmatched path.
+          if [ -e /etc/apparmor.d/podman ]; then sudo apparmor_parser -R /etc/apparmor.d/podman || true; fi
+          hash -r
+          podman version
+
       - name: Enable a systemd user session for rootless podman
         # Building the bundle image runs RUN steps, and podman kube play starts
         # pods; without a lingering user session crun cannot set up their cgroups
