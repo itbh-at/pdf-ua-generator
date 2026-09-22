@@ -28,15 +28,23 @@ trap cleanup EXIT INT TERM
 
 fail() {
     echo "smoke test failed: $1" >&2
-    # Dump every pod of the release -- the service, the database and the import
-    # job -- each labelled by its component, so a failure in any of them is
-    # visible (the import job in particular writes its HTTP errors here).
-    for cid in $(podman ps -aq --filter label=app.kubernetes.io/name=pdf-ua-generator); do
-        name=$(podman inspect --format \
-            '{{ index .Config.Labels "app.kubernetes.io/component" }} {{ .Name }}' \
-            "$cid" 2>/dev/null || echo "$cid")
-        echo "--- logs: $name ---" >&2
-        podman logs "$cid" 2>&1 | tail -40 >&2 || true
+    # Show every pod and container of the release with its status, then the logs
+    # of each -- the service, the database and the import job -- so a failure in
+    # any of them is visible (the import job in particular writes its HTTP errors
+    # to its log). Matched by name, not label, so a pod that never reached its
+    # labelled state still shows.
+    echo "--- pods ---" >&2
+    podman pod ps >&2 || true
+    echo "--- containers ---" >&2
+    podman ps -a >&2 || true
+    for cid in $(podman ps -aq); do
+        name=$(podman inspect --format '{{ .Name }}' "$cid" 2>/dev/null || echo "$cid")
+        case "$name" in
+        *pdf-ua-generator*)
+            echo "--- logs: $name ---" >&2
+            podman logs "$cid" 2>&1 | tail -40 >&2 || true
+            ;;
+        esac
     done
     exit 1
 }
@@ -51,7 +59,7 @@ helm template pdf-ua-generator "$CHART" -f "$CHART/values-podman.yaml" \
     > "$WORK/manifests.yaml"
 
 echo "starting the pods"
-podman kube play "$WORK/manifests.yaml" >/dev/null
+podman kube play "$WORK/manifests.yaml"
 
 echo "waiting for readiness"
 ready=0
