@@ -115,11 +115,6 @@
                         <configuration>
                             <systemPropertyVariables>
                                 <quarkus.package.jar.aot.enabled>true</quarkus.package.jar.aot.enabled>
-                                <!-- ApiIT runs as a container here, so it reaches its PostgreSQL
-                                     (started on the host by PostgresResource) over the podman host
-                                     gateway; the ordinary build runs it as a host process and keeps
-                                     the default "localhost". -->
-                                <pdfuagen.it.db-host>host.containers.internal</pdfuagen.it.db-host>
                             </systemPropertyVariables>
                         </configuration>
                     </plugin>

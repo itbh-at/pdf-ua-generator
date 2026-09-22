@@ -10,26 +10,29 @@ import java.util.Map;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
- * PostgreSQL for {@link ApiIT}, reached over the host gateway instead of a container network alias.
+ * PostgreSQL for {@link ApiIT} when the container runtime cannot resolve the Dev Services network
+ * alias.
  *
- * <p>Dev Services would start the database too, but when ApiIT runs the built image the
- * integration-test launcher rewrites the datasource URL to the Dev Services container's network
- * alias and joins the app container to the Testcontainers network. Under podman on CI that alias is
- * not reliably reachable, so the app never connects and startup times out. Starting the database
- * here and handing the app an explicit URL disables Dev Services and its URL rewriting: the app
- * connects to the published port directly — {@code localhost} when it runs as a host process (the
- * ordinary build), {@code host.containers.internal} when it runs as a container (the {@code image}
- * profile), selected by the system property {@code pdfuagen.it.db-host}.
+ * <p>Normally Dev Services provides the database and the integration-test launcher reaches it by
+ * the container's network alias — which works on Docker and in local development. Under rootless
+ * podman on CI that alias is not reliably reachable (aardvark-dns), so the smoke-test workflow sets
+ * {@code PDFUAGEN_IT_DB_HOST=host.containers.internal}: this resource then starts the database
+ * itself and hands the app an explicit URL over the host gateway, bypassing Dev Services and its
+ * alias rewriting. Without that variable it starts nothing and lets Dev Services do its job.
  */
 public class PostgresResource implements QuarkusTestResourceLifecycleManager {
 
-  // Same image the Dev Services default resolved to, so nothing about the database changes.
-  private final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
+  // Started only when a host gateway is requested; the same image Dev Services resolves to.
+  private PostgreSQLContainer<?> postgres;
 
   @Override
   public Map<String, String> start() {
+    String host = System.getenv("PDFUAGEN_IT_DB_HOST");
+    if (host == null || host.isBlank()) {
+      return Map.of();
+    }
+    postgres = new PostgreSQLContainer<>("postgres:18");
     postgres.start();
-    String host = System.getProperty("pdfuagen.it.db-host", "localhost");
     String url =
         "jdbc:postgresql://"
             + host
@@ -45,6 +48,8 @@ public class PostgresResource implements QuarkusTestResourceLifecycleManager {
 
   @Override
   public void stop() {
-    postgres.stop();
+    if (postgres != null) {
+      postgres.stop();
+    }
   }
 }

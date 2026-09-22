@@ -1,6 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 IT Beratung Hermann GmbH
 
+# GitHub Actions CI. Uses mise, so the toolchain matches local development 1:1.
+# Container-backed tests (Testcontainers via Quarkus Dev Services) run against the
+# runner's native Docker daemon -- reliable inter-container DNS, no rootless
+# podman on the runner. The deployment smoke test, which genuinely needs podman
+# (podman kube play) and builds the AOT image, lives in smoke-test.yml.
 name: CI
 
 on:
@@ -8,34 +13,62 @@ on:
     branches: [main, "epic/**"]
   pull_request:
 
-# Every tool comes from mise.toml, so CI runs the same versions as a developer.
+# Read-only: the build compiles third-party code, so its token must not be able
+# to push anything back.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The checkout is the mise config these jobs are meant to obey.
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+  # Testcontainers and Quarkus Dev Services talk to the runner's Docker daemon;
+  # an explicit DOCKER_HOST wins in scripts/docker-host.sh, so mise does not fall
+  # back to a (nonexistent) podman socket here.
+  DOCKER_HOST: unix:///var/run/docker.sock
+
+defaults:
+  run:
+    # GitHub's bash is `bash --noprofile --norc -eo pipefail`; the implicit
+    # default omits pipefail, which hides failures inside pipelines.
+    shell: bash
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Well under this today; the cap keeps a hang from burning GitHub's default.
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - name: Enable a systemd user session for rootless podman
-        # Building the bundle image runs RUN steps, and podman kube play starts
-        # pods; without a lingering user session crun cannot set up their cgroups
-        # (sd-bus call: Interactive authentication required). Linger starts the
-        # user systemd manager and its session bus under /run/user/<uid>, which is
-        # also where the podman socket and the server tests' DOCKER_HOST then live.
-        run: |
-          sudo loginctl enable-linger "$(id -un)"
-          runtime="/run/user/$(id -u)"
-          for i in $(seq 30); do [ -S "$runtime/bus" ] && break; sleep 1; done
-          echo "XDG_RUNTIME_DIR=$runtime" >> "$GITHUB_ENV"
-      - name: Start the podman socket
-        run: |
-          mkdir -p "$XDG_RUNTIME_DIR/podman"
-          podman system service --time=0 "unix://$XDG_RUNTIME_DIR/podman/podman.sock" &
-          for i in $(seq 30); do [ -S "$XDG_RUNTIME_DIR/podman/podman.sock" ] && break; sleep 1; done
-      - run: mise run headers-check
-      - run: mise run build
-      - run: mise run check-chart
-      - run: mise run docs
-      - name: Smoke test of the image
-        run: |
-          mise run image
-          mise run smoke-test
+      # Actions are pinned to commit SHAs, not floating tags: a tag is mutable,
+      # so the audited code would not be the code that runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Avoids recompiling and re-downloading the whole dependency graph every
+      # run. Keyed on the POMs; the prefix restore-key still warms a moved one.
+      - name: Cache the Maven repository
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          # Pin mise itself, not only the action: the action installs the latest
+          # mise otherwise, and a new mise can break a build that passes on the
+          # pinned version.
+          version: 2026.6.10
+
+      - name: Licence headers
+        run: mise run headers-check
+      - name: Compile, test and package
+        run: mise run build
+      - name: Render and validate the Helm chart
+        run: mise run check-chart
+      - name: Build the documentation
+        run: mise run docs
