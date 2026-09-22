@@ -29,6 +29,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -169,43 +170,82 @@ public class RenderResource {
           // Inside the pool: the revision is looked up, and its first use parses its templates.
           Views.Target resolved = target.get();
           var repository = resolved.repository();
-          OutputFormat outputFormat =
-              select(format, acceptable, renderer.formats(repository, Bundle.TEMPLATE));
+          Set<OutputFormat> offered = renderer.formats(repository, Bundle.TEMPLATE);
+          Negotiated negotiated = negotiate(format, acceptable, offered);
           String variant = renderer.selectVariant(repository, Bundle.TEMPLATE, ranges);
-          Rendered rendered;
+          RenderRequest request =
+              new RenderRequest(
+                  variant,
+                  repository,
+                  JsonData.parse(new ByteArrayInputStream(data)),
+                  attachments,
+                  publicBase);
+          Response.ResponseBuilder response;
           try {
-            rendered =
-                renderer.render(
-                    new RenderRequest(
-                        variant,
-                        repository,
-                        JsonData.parse(new ByteArrayInputStream(data)),
-                        attachments,
-                        publicBase),
-                    outputFormat);
+            response =
+                negotiated.multipart()
+                    ? multipartAlternative(renderer, request)
+                    : single(renderer, request, negotiated.format(), resolved);
           } catch (RenderException e) {
             throw Problems.from(e.problems());
           }
-          Response.ResponseBuilder response =
-              Response.ok(rendered.content())
-                  .type(
-                      outputFormat.mediaType()
-                          + (outputFormat.mediaType().startsWith("text/") ? "; charset=utf-8" : ""))
-                  .header("Vary", "Accept, Accept-Language")
-                  .header(
-                      "Content-Disposition",
-                      "inline; filename=\""
-                          + resolved.revision().templateId()
-                          + "."
-                          + outputFormat.extension()
-                          + "\"")
-                  .header("Template-Revision", resolved.revision().number());
+          response
+              .header("Vary", "Accept, Accept-Language")
+              .header("Template-Revision", resolved.revision().number());
           Locale language = renderer.language(repository, variant);
           if (!language.equals(Locale.ROOT)) {
             response.header("Content-Language", language.toLanguageTag());
           }
           return response.build();
         });
+  }
+
+  /** A single format response, with the inline filename and text charset. */
+  private static Response.ResponseBuilder single(
+      DocumentRenderer renderer, RenderRequest request, OutputFormat format, Views.Target resolved)
+      throws RenderException {
+    Rendered rendered = renderer.render(request, format);
+    return Response.ok(rendered.content())
+        .type(
+            format.mediaType() + (format.mediaType().startsWith("text/") ? "; charset=utf-8" : ""))
+        .header(
+            "Content-Disposition",
+            "inline; filename=\""
+                + resolved.revision().templateId()
+                + "."
+                + format.extension()
+                + "\"");
+  }
+
+  /**
+   * A {@code multipart/alternative} body of the same document as plain text and as email HTML. Per
+   * RFC 2046 the least faithful alternative comes first, so text precedes HTML. The service builds
+   * the body; it never sends mail.
+   */
+  private static Response.ResponseBuilder multipartAlternative(
+      DocumentRenderer renderer, RenderRequest request) throws RenderException {
+    byte[] text = renderer.render(request, OutputFormat.TEXT).content();
+    byte[] html = renderer.render(request, OutputFormat.EMAIL_HTML).content();
+    String boundary = "itbh-" + java.util.UUID.randomUUID();
+    return Response.ok(multipartBody(boundary, text, html))
+        .type("multipart/alternative; boundary=\"" + boundary + "\"");
+  }
+
+  private static byte[] multipartBody(String boundary, byte[] text, byte[] html) {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    writePart(out, boundary, "text/plain; charset=utf-8", text);
+    writePart(out, boundary, "text/html; charset=utf-8", html);
+    out.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+    return out.toByteArray();
+  }
+
+  private static void writePart(
+      ByteArrayOutputStream out, String boundary, String contentType, byte[] content) {
+    out.writeBytes(
+        ("--" + boundary + "\r\nContent-Type: " + contentType + "\r\n\r\n")
+            .getBytes(StandardCharsets.UTF_8));
+    out.writeBytes(content);
+    out.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
   }
 
   /** The {@code lang} parameter if given, otherwise {@code Accept-Language}; malformed: none. */
@@ -228,31 +268,66 @@ public class RenderResource {
     }
   }
 
+  static final String MULTIPART_ALTERNATIVE = "multipart/alternative";
+
   /**
-   * The output format: the {@code format} parameter, otherwise the first acceptable media type the
-   * template offers ({@code *}{@code /*} gives the first offered, PDF if offered).
+   * The chosen rendition: either one {@link OutputFormat}, or the {@code multipart/alternative}
+   * pair.
    */
-  static OutputFormat select(String format, List<MediaType> acceptable, Set<OutputFormat> offered) {
+  record Negotiated(OutputFormat format, boolean multipart) {
+    static final Negotiated MULTIPART = new Negotiated(null, true);
+
+    static Negotiated of(OutputFormat format) {
+      return new Negotiated(format, false);
+    }
+  }
+
+  /**
+   * The chosen rendition: the {@code format} parameter, otherwise the {@code Accept} header in
+   * order ({@code *}{@code /*} gives the first offered, PDF if offered). {@code
+   * multipart/alternative} pairs plain text and email HTML, which the template must both offer.
+   */
+  static Negotiated negotiate(
+      String format, List<MediaType> acceptable, Set<OutputFormat> offered) {
     if (format != null) {
+      if (format.equalsIgnoreCase(MULTIPART_ALTERNATIVE)) {
+        return multipart(offered);
+      }
       OutputFormat requested =
           OutputFormat.of(format)
               .orElseThrow(() -> notSupported("unknown format " + format, offered));
       if (!offered.contains(requested)) {
         throw notSupported("the template does not offer " + format, offered);
       }
-      return requested;
+      return Negotiated.of(requested);
     }
     if (acceptable.isEmpty()) {
-      return offered.iterator().next();
+      return Negotiated.of(offered.iterator().next());
     }
     for (MediaType type : acceptable) {
+      if (isMultipartAlternative(type)) {
+        return multipart(offered);
+      }
       for (OutputFormat candidate : offered) {
         if (type.isCompatible(MediaType.valueOf(candidate.mediaType()))) {
-          return candidate;
+          return Negotiated.of(candidate);
         }
       }
     }
     throw notSupported("none of the accepted media types is offered", offered);
+  }
+
+  private static Negotiated multipart(Set<OutputFormat> offered) {
+    if (!offered.contains(OutputFormat.TEXT) || !offered.contains(OutputFormat.EMAIL_HTML)) {
+      throw notSupported("multipart/alternative needs both text and email-html", offered);
+    }
+    return Negotiated.MULTIPART;
+  }
+
+  /** An explicit {@code multipart/alternative} or {@code multipart} type, not the wildcard type. */
+  private static boolean isMultipartAlternative(MediaType type) {
+    return "multipart".equalsIgnoreCase(type.getType())
+        && (type.isWildcardSubtype() || "alternative".equalsIgnoreCase(type.getSubtype()));
   }
 
   private static RuntimeException notSupported(String detail, Set<OutputFormat> offered) {

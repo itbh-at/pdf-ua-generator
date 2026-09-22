@@ -92,3 +92,11 @@ carries `Content-Language: de`:
 curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pdf' \
   -H 'Accept-Language: de' -o demo.de.pdf http://localhost:8080/templates/demo/render
 ----
+
+. Get plain text and email HTML in one response with `Accept: multipart/alternative`
+(text first, HTML last); the service builds the body and never sends mail:
++
+----
+curl -H 'Content-Type: application/json' -d @demo/data-email.json \
+  -H 'Accept: multipart/alternative' -o demo.eml http://localhost:8080/templates/demo/render
+----

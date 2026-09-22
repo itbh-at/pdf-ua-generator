@@ -40,6 +40,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 class ApiTest {
 
   private static final String PROBLEM = "urn:itbh:pdf-ua-generator:problem:";
+  private static final String MULTIPART_ALTERNATIVE = "multipart/alternative";
   private static final String DOCX =
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -411,6 +412,28 @@ class ApiTest {
         .body("status", equalTo("published"));
     // The published content keeps the layout revision it pins.
     given().get("/templates/imported").then().body("publishedRevision", equalTo(1));
+  }
+
+  @Test
+  @Order(14)
+  void rendersMultipartAlternativeAsTextThenHtml() throws Exception {
+    String body =
+        given()
+            .contentType("application/json")
+            .accept(MULTIPART_ALTERNATIVE)
+            .body(data("data-email.json"))
+            .post("/templates/demo/render")
+            .then()
+            .statusCode(200)
+            .contentType(startsWith(MULTIPART_ALTERNATIVE))
+            .header("Content-Language", "en")
+            .extract()
+            .asString();
+    int text = body.indexOf("Content-Type: text/plain");
+    int html = body.indexOf("Content-Type: text/html");
+    assertTrue(text >= 0, body);
+    assertTrue(html > text, "text part comes before the html part");
+    assertTrue(body.contains("<html"), "the html part is the email HTML");
   }
 
   @Test
