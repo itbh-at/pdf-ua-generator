@@ -356,3 +356,16 @@ the server. Block-edited templates are stored in our own JSON format, not in
 the document format of an editor library; `core` translates it into Qute XHTML
 and escapes all literal text, so only placeholder nodes produce Qute
 expressions.
+
+The UI is one client of the JSON API, not a privileged part of it. The API is
+the single, UI-agnostic contract: it delivers everything any UI needs, so a
+later single-page or mobile client works against the same endpoints. The
+JSON API therefore never returns HTML. The UI is a separate presentation layer
+under `+/ui+` (`UiResource`): it renders Qute pages and htmx fragments from the
+same service layer the JSON resources use, and it relies on nothing the JSON API
+does not also expose — a data need of the editor becomes a JSON endpoint first.
+Its own Qute pages live in `+src/main/resources/templates+` and are part of the
+build; this is the server's Quarkus Qute engine, separate from the runtime
+engine in `core` that parses editors' document templates. To keep the pages free
+of build-time type-safe validation they use injected `Template` instances rather
+than `@CheckedTemplate`.

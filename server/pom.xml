@@ -35,6 +35,23 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-rest-jackson</artifactId>
         </dependency>
+        <!-- Editor UI: server-rendered Qute pages with htmx, a client of the JSON API. -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-qute</artifactId>
+        </dependency>
+        <!-- Bundles the UI's JavaScript and CSS, and mvnpm dependencies (htmx). -->
+        <dependency>
+            <groupId>io.quarkiverse.web-bundler</groupId>
+            <artifactId>quarkus-web-bundler</artifactId>
+            <version>2.3.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mvnpm</groupId>
+            <artifactId>htmx.org</artifactId>
+            <version>2.0.10</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.quarkiverse.httpproblem</groupId>
             <artifactId>quarkus-http-problem</artifactId>

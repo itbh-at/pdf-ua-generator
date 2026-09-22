@@ -1,0 +1,42 @@
+{#include ui/base}
+{#title}{template.id}{/title}
+<p><a href="/ui">← Templates</a></p>
+<h1>{template.id} <small>{template.kind}</small></h1>
+
+<h2>Revisions</h2>
+<table>
+  <thead>
+    <tr><th>#</th><th>Status</th><th>Layout</th><th>Created</th><th>Published</th></tr>
+  </thead>
+  <tbody>
+    {#for r in revisions}
+    <tr>
+      <td>{r.number}</td>
+      <td><span class="status {r.status}">{r.status}</span></td>
+      <td>{#if r.layoutId}{r.layoutId}@{r.layoutRevision}{#else}<span class="muted">—</span>{/if}</td>
+      <td class="muted">{r.createdAt}</td>
+      <td class="muted">{#if r.publishedAt}{r.publishedAt}{#else}—{/if}</td>
+    </tr>
+    {/for}
+  </tbody>
+</table>
+
+{#if dependents}
+<h2>Used by</h2>
+<table>
+  <thead>
+    <tr><th>Template</th><th>Revision</th><th>Status</th><th>Layout revision</th></tr>
+  </thead>
+  <tbody>
+    {#for d in dependents}
+    <tr>
+      <td><a href="/ui/templates/{d.templateId}">{d.templateId}</a></td>
+      <td>{d.number}</td>
+      <td><span class="status {d.status}">{d.status}</span></td>
+      <td>{d.layoutRevision}</td>
+    </tr>
+    {/for}
+  </tbody>
+</table>
+{/if}
+{/include}

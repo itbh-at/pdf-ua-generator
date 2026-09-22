@@ -1,0 +1,23 @@
+{#include ui/base}
+{#title}Templates{/title}
+<h1>Templates</h1>
+<table>
+  <thead>
+    <tr><th>ID</th><th>Kind</th><th>Latest</th><th>Published</th><th>Created</th></tr>
+  </thead>
+  <tbody>
+    {#for t in templates}
+    <tr>
+      <td><a href="/ui/templates/{t.id}">{t.id}</a></td>
+      <td>{t.kind}</td>
+      <td>{t.latest}</td>
+      <td>{#if t.latestPublished}{t.latestPublished}{#else}<span class="muted">—</span>{/if}</td>
+      <td class="muted">{t.createdAt}</td>
+    </tr>
+    {/for}
+    {#if templates.isEmpty()}
+    <tr><td colspan="5" class="muted">No templates yet.</td></tr>
+    {/if}
+  </tbody>
+</table>
+{/include}

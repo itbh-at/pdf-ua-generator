@@ -31,4 +31,8 @@ excludes = [
   "licenses/**",
   "cli/src/dist/notice-bundled.txt",
   "server/src/dist/notice-bundled.txt",
+  # Qute view templates of the editor UI: an HTML comment header would render into
+  # the page, and before the doctype it forces quirks mode. The project licence
+  # covers them.
+  "server/src/main/resources/templates/**",
 ]

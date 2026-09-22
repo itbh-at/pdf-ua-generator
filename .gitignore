@@ -9,7 +9,9 @@ server/src/main/jib/
 
 # Antora build output and the lunr symlink written by documentation/build.sh
 documentation/build/
-documentation/node_modules/
+
+# Installed npm/mvnpm packages: Antora's, and the Quarkus Web Bundler's (from mvnpm)
+node_modules/
 
 # Editor/OS
 .DS_Store
