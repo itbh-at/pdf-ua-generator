@@ -28,7 +28,16 @@ trap cleanup EXIT INT TERM
 
 fail() {
     echo "smoke test failed: $1" >&2
-    podman logs "$(podman ps -aq --filter label=app.kubernetes.io/name=pdf-ua-generator | head -1)" 2>&1 | tail -30 >&2 || true
+    # Dump every pod of the release -- the service, the database and the import
+    # job -- each labelled by its component, so a failure in any of them is
+    # visible (the import job in particular writes its HTTP errors here).
+    for cid in $(podman ps -aq --filter label=app.kubernetes.io/name=pdf-ua-generator); do
+        name=$(podman inspect --format \
+            '{{ index .Config.Labels "app.kubernetes.io/component" }} {{ .Name }}' \
+            "$cid" 2>/dev/null || echo "$cid")
+        echo "--- logs: $name ---" >&2
+        podman logs "$cid" 2>&1 | tail -40 >&2 || true
+    done
     exit 1
 }
 
