@@ -115,5 +115,11 @@ jobs:
 
       - name: Build the AOT image
         run: mise run image
+      - name: Build the CLI
+        # The smoke test verifies the rendered PDF with the CLI's veraPDF check
+        # when cli/target/pdf-ua-generator.jar is present. skipTests, so this does
+        # not run ApiIT (which under this job's PDFUAGEN_IT_DB_HOST would expect a
+        # container, not the host process).
+        run: mise exec -- mvn -B -ntp -pl cli -am package -DskipTests
       - name: Run the smoke test
         run: mise run smoke-test
