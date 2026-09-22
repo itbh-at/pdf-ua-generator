@@ -215,10 +215,12 @@ public final class ModelBuilder {
         unsupported(cell);
         continue;
       }
-      if (positive(attr(cell, "rowspan")) > 1) {
-        problem("rowspan is not supported", cell);
-      }
-      cells.add(new Cell(name.equals("th"), positive(attr(cell, "colspan")), blocks(cell)));
+      cells.add(
+          new Cell(
+              name.equals("th"),
+              positive(attr(cell, "colspan")),
+              positive(attr(cell, "rowspan")),
+              blocks(cell)));
     }
     return new Row(cells);
   }

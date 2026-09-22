@@ -256,23 +256,30 @@ public final class OdtWriter {
     x.empty("table:table-column", "table:number-columns-repeated", String.valueOf(columns));
     if (!table.head().isEmpty()) {
       x.open("table:table-header-rows");
-      for (Row row : table.head()) {
-        row(x, row);
-      }
+      section(x, table.head());
       x.close();
     }
-    for (Row row : table.body()) {
-      row(x, row);
-    }
-    for (Row row : table.foot()) {
-      row(x, row);
-    }
+    section(x, table.body());
+    section(x, table.foot());
     x.close();
   }
 
-  private void row(Xml x, Row row) throws IOException {
+  private void section(Xml x, List<Row> rows) throws IOException {
+    for (List<TableGrid.Slot> slots : TableGrid.layout(rows)) {
+      row(x, slots);
+    }
+  }
+
+  private void row(Xml x, List<TableGrid.Slot> slots) throws IOException {
     x.open("table:table-row");
-    for (Cell cell : row.cells()) {
+    for (TableGrid.Slot slot : slots) {
+      if (slot instanceof TableGrid.Covered covered) {
+        for (int i = 0; i < covered.columns(); i++) {
+          x.empty("table:covered-table-cell");
+        }
+        continue;
+      }
+      Cell cell = ((TableGrid.Placed) slot).cell();
       x.open(
           "table:table-cell",
           "table:style-name",
@@ -280,7 +287,9 @@ public final class OdtWriter {
           "office:value-type",
           "string",
           "table:number-columns-spanned",
-          cell.colspan() > 1 ? String.valueOf(cell.colspan()) : null);
+          cell.colspan() > 1 ? String.valueOf(cell.colspan()) : null,
+          "table:number-rows-spanned",
+          cell.rowspan() > 1 ? String.valueOf(cell.rowspan()) : null);
       cellContent(x, cell.content(), cell.header() ? "Table_20_Heading" : "Table_20_Contents");
       x.close();
       for (int i = 1; i < cell.colspan(); i++) {

@@ -47,7 +47,7 @@ class AccessibilityCheckerTest {
 
   @Test
   void reportsEveryViolation() {
-    Row row = new Row(List.of(new Cell(false, 1, List.of(new Paragraph(text("x"), null)))));
+    Row row = new Row(List.of(new Cell(false, 1, 1, List.of(new Paragraph(text("x"), null)))));
     DocumentModel model =
         new DocumentModel(
             "",

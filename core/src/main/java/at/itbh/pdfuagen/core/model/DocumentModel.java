@@ -88,8 +88,10 @@ public record DocumentModel(
 
   public record Row(List<Cell> cells) {}
 
-  /** A table cell; {@code header} for {@code <th>}. */
-  public record Cell(boolean header, int colspan, List<Block> content) {}
+  /**
+   * A table cell; {@code header} for {@code <th>}. {@code colspan}/{@code rowspan} are at least 1.
+   */
+  public record Cell(boolean header, int colspan, int rowspan, List<Block> content) {}
 
   public record ImageBlock(Image image) implements Block {}
 

@@ -110,9 +110,16 @@ public final class TextWriter {
     }
     List<List<String>> rows = new ArrayList<>();
     for (List<Row> section : List.of(table.head(), table.body(), table.foot())) {
-      for (Row row : section) {
+      for (List<TableGrid.Slot> slots : TableGrid.layout(section)) {
         List<String> cells = new ArrayList<>();
-        for (Cell cell : row.cells()) {
+        for (TableGrid.Slot slot : slots) {
+          if (slot instanceof TableGrid.Covered covered) {
+            for (int i = 0; i < covered.columns(); i++) {
+              cells.add("");
+            }
+            continue;
+          }
+          Cell cell = ((TableGrid.Placed) slot).cell();
           StringBuilder text = new StringBuilder();
           for (Block block : cell.content()) {
             if (block instanceof Paragraph p) {

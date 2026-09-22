@@ -376,26 +376,46 @@ public final class DocxWriter {
     }
     x.close();
     grid(x, columns);
-    for (Row row : table.head()) {
-      row(x, row, columns, true);
-    }
-    for (Row row : table.body()) {
-      row(x, row, columns, false);
-    }
-    for (Row row : table.foot()) {
-      row(x, row, columns, false);
-    }
+    section(x, table.head(), columns, true);
+    section(x, table.body(), columns, false);
+    section(x, table.foot(), columns, false);
     x.close();
     // Word needs a paragraph between two tables and after a table at the end of a cell.
     x.empty("w:p");
   }
 
-  private void row(Xml x, Row row, int columns, boolean header) throws IOException {
+  private void section(Xml x, List<Row> rows, int columns, boolean header) throws IOException {
+    for (List<TableGrid.Slot> slots : TableGrid.layout(rows)) {
+      row(x, slots, columns, header);
+    }
+  }
+
+  private void row(Xml x, List<TableGrid.Slot> slots, int columns, boolean header)
+      throws IOException {
     x.open("w:tr");
     if (header) {
       x.open("w:trPr").empty("w:tblHeader").close();
     }
-    for (Cell cell : row.cells()) {
+    for (TableGrid.Slot slot : slots) {
+      if (slot instanceof TableGrid.Covered covered) {
+        // A cell merged upwards: same width, continue the vertical merge, keep a paragraph.
+        x.open("w:tc").open("w:tcPr");
+        x.empty(
+            "w:tcW",
+            "w:w",
+            String.valueOf(textWidthTwips * covered.columns() / columns),
+            "w:type",
+            "dxa");
+        if (covered.columns() > 1) {
+          x.empty("w:gridSpan", "w:val", String.valueOf(covered.columns()));
+        }
+        x.empty("w:vMerge");
+        x.close();
+        x.empty("w:p");
+        x.close();
+        continue;
+      }
+      Cell cell = ((TableGrid.Placed) slot).cell();
       x.open("w:tc").open("w:tcPr");
       x.empty(
           "w:tcW",
@@ -405,6 +425,9 @@ public final class DocxWriter {
           "dxa");
       if (cell.colspan() > 1) {
         x.empty("w:gridSpan", "w:val", String.valueOf(cell.colspan()));
+      }
+      if (cell.rowspan() > 1) {
+        x.empty("w:vMerge", "w:val", "restart");
       }
       x.close();
       cellContent(x, cell.content(), cell.header() ? "TableHeading" : null);

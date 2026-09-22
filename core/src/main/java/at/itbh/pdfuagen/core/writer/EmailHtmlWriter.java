@@ -212,6 +212,8 @@ public final class EmailHtmlWriter {
             cell.header() ? (head ? "col" : "row") : null,
             "colspan",
             cell.colspan() > 1 ? String.valueOf(cell.colspan()) : null,
+            "rowspan",
+            cell.rowspan() > 1 ? String.valueOf(cell.rowspan()) : null,
             "style",
             styleOf(cellTag));
         if (cell.content().size() == 1 && cell.content().getFirst() instanceof Paragraph p) {
