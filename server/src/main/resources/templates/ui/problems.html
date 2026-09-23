@@ -1,0 +1,7 @@
+<div class="notice error">
+  <ul class="problems">
+    {#for p in problems}
+    <li>{p.detail}{#if p.location} <span class="muted">({p.location})</span>{/if}</li>
+    {/for}
+  </ul>
+</div>

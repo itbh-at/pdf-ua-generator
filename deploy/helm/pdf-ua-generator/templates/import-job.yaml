@@ -36,7 +36,7 @@ data:
         id=$(basename "$bundle" .zip)
         status=$(curl -sS -o /tmp/answer -w '%{http_code}' -X POST \
           -H 'Content-Type: application/zip' --data-binary "@$bundle" \
-          "$SERVICE_URL/templates/$id/revisions?publish=true")
+          "$SERVICE_URL/templates/$id/revisions")
         case "$status" in
         200 | 201)
           echo "$id: $status"

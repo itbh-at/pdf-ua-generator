@@ -1,0 +1,35 @@
+{#include ui/base}
+{#title}{template.id} · generate{/title}
+<p><a href="/ui/templates/{template.id}">← {template.id}</a></p>
+<h1>Generate <small>{template.id}</small></h1>
+
+{#if published}
+{#if schema}
+<details class="schema">
+  <summary>Data model (JSON Schema)</summary>
+  <pre class="mono">{schema}</pre>
+</details>
+{/if}
+<form method="post" action="/ui/templates/{template.id}/render"
+      enctype="multipart/form-data" target="preview">
+  <p>
+    <label>Format
+      <select name="format">
+        {#for f in formats}<option value="{f}">{f}</option>{/for}
+      </select>
+    </label>
+    <button>Generate</button>
+  </p>
+  <p><textarea name="data" rows="12" spellcheck="false">{example}</textarea></p>
+  {#if !attachments.isEmpty()}
+  <p class="muted">Attachments — the example is used by default; upload a file to override:</p>
+  {#for a in attachments}
+  <p><label>{a} <input type="file" name="{a}"></label></p>
+  {/for}
+  {/if}
+</form>
+<iframe name="preview" title="Preview"></iframe>
+{#else}
+<p class="notice error">This template has no published revision. Publish one first.</p>
+{/if}
+{/include}

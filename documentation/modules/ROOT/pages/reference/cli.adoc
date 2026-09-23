@@ -138,8 +138,8 @@ Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
 === Example
 
 ----
-pdf-ua-generator render -t demo/demo.xhtml -L demo/layout -d demo/data.json -a photo=demo/photo.png --verify
-pdf-ua-generator render -t demo/demo.xhtml -L demo/layout-memo -d demo/data.json -a photo=demo/photo.png
+pdf-ua-generator render -t demo/content/template.xhtml -L demo/layout -d demo/content/example.json -a photo=demo/content/example/photo.png --verify
+pdf-ua-generator render -t demo/content/template.xhtml -L demo/layout-memo -d demo/content/example.json -a photo=demo/content/example/photo.png
 ----
 
 == `schema`

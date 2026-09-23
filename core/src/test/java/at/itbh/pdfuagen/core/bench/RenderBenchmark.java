@@ -50,14 +50,14 @@ public class RenderBenchmark {
 
   @Setup
   public void setUp() throws IOException, RenderException {
-    try (InputStream in = Files.newInputStream(DEMO.resolve("data.json"))) {
+    try (InputStream in = Files.newInputStream(DEMO.resolve("content/example.json"))) {
       data = JsonData.parse(in);
     }
     warmRepository = new CachingTemplateRepository(at.itbh.pdfuagen.core.Demo.repository());
   }
 
   private RenderRequest request(TemplateRepository repository) {
-    return new RenderRequest("demo.xhtml", repository, data, Map.of());
+    return new RenderRequest("template.xhtml", repository, data, Map.of());
   }
 
   @Benchmark

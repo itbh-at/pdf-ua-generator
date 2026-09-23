@@ -8,13 +8,12 @@ package at.itbh.pdfuagen.server;
 import static at.itbh.pdfuagen.server.DemoBundles.layoutBundle;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
-/** The management UI renders the catalogue and a template, and publishes and deletes through it. */
+/** The management UI renders the catalogue and a template, and archives and deletes through it. */
 @QuarkusTest
 class UiTest {
 
@@ -22,14 +21,17 @@ class UiTest {
   private static final String ID = "ui-" + Long.toHexString(System.nanoTime());
 
   @Test
-  void listsShowsPublishesAndDeletes() throws Exception {
+  void listsArchivesAndDeletes() throws Exception {
     String layout = ID + "-layout";
+
+    // Upload validates and releases in one step; htmx navigates to the new template.
     given()
-        .contentType("application/zip")
-        .body(layoutBundle("Example"))
-        .post("/templates/" + layout + "/revisions")
+        .multiPart("id", layout)
+        .multiPart("bundle", "bundle.zip", layoutBundle("Example"), "application/zip")
+        .post("/ui/templates")
         .then()
-        .statusCode(201);
+        .statusCode(200)
+        .header("HX-Redirect", "/ui/templates/" + layout);
 
     // Catalogue: HTML with the bundle and the new template linked.
     given()
@@ -41,15 +43,17 @@ class UiTest {
         .body(containsString("<script"))
         .body(containsString("/ui/templates/" + layout));
 
-    // Template detail: the revisions panel with the draft and its actions.
+    // Template detail: the revisions panel with the released revision, an archive action and
+    // delete.
     given()
         .accept("text/html")
         .get("/ui/templates/" + layout)
         .then()
         .statusCode(200)
         .body(containsString("id=\"revisions\""))
-        .body(containsString("draft"))
-        .body(containsString("hx-post"));
+        .body(containsString("published"))
+        .body(containsString("hx-post"))
+        .body(containsString("Delete template"));
 
     // Revision detail: the files of the revision.
     given()
@@ -60,31 +64,62 @@ class UiTest {
         .body(containsString("Files"))
         .body(containsString("layout.json"));
 
-    // Publish through the UI: the panel comes back with the published status and a notice.
+    // Archive through the UI: the panel comes back with the archived status and a notice.
     given()
         .accept("text/html")
-        .post("/ui/templates/" + layout + "/revisions/1/publish")
+        .post("/ui/templates/" + layout + "/revisions/1/archive")
+        .then()
+        .statusCode(200)
+        .body(containsString("archived"))
+        .body(containsString("Revision 1 archived."));
+
+    // Delete the whole template (nothing references it) through the UI.
+    given()
+        .accept("text/html")
+        .post("/ui/templates/" + layout + "/delete")
+        .then()
+        .statusCode(200)
+        .header("HX-Redirect", "/ui");
+    given().accept("text/html").get("/ui/templates/" + layout).then().statusCode(404);
+  }
+
+  @Test
+  void createsAndRendersThroughTheUi() throws Exception {
+    String id = ID + "-new";
+
+    // Upload a bundle; it is validated and released right away.
+    given()
+        .multiPart("id", id)
+        .multiPart("bundle", "bundle.zip", layoutBundle("Created via UI"), "application/zip")
+        .post("/ui/templates")
+        .then()
+        .statusCode(200)
+        .header("HX-Redirect", "/ui/templates/" + id);
+
+    given()
+        .accept("text/html")
+        .get("/ui/templates/" + id)
         .then()
         .statusCode(200)
         .body(containsString("published"))
-        .body(containsString("Revision 1 published."));
+        .body(containsString("Generate a document"));
 
-    // Delete a fresh draft through the UI.
-    String draft = ID + "-draft";
-    given()
-        .contentType("application/zip")
-        .body(layoutBundle("Draft"))
-        .post("/templates/" + draft + "/revisions")
-        .then()
-        .statusCode(201);
+    // The generate form offers the template's formats.
     given()
         .accept("text/html")
-        .post("/ui/templates/" + draft + "/revisions/1/delete")
+        .get("/ui/templates/" + id + "/render")
         .then()
         .statusCode(200)
-        .body(containsString("Draft 1 deleted."))
-        .body(not(containsString("hx-post")));
+        .body(containsString("<textarea"))
+        .body(containsString("pdf"));
 
-    given().accept("text/html").get("/ui/templates/does-not-exist").then().statusCode(404);
+    // Generate a PDF from the form fields (multipart, so attachments can ride along).
+    given()
+        .multiPart("data", "{}")
+        .multiPart("format", "pdf")
+        .post("/ui/templates/" + id + "/render")
+        .then()
+        .statusCode(200)
+        .contentType(startsWith("application/pdf"));
   }
 }

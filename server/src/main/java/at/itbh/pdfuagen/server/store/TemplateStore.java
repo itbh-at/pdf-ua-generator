@@ -34,8 +34,12 @@ public class TemplateStore {
   /** Template ids: lower-case letters, digits and hyphens, starting with a letter or digit. */
   public static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
 
+  // 'draft' is transient: a revision holds it only while its upload is validated, then it is
+  // promoted to 'published' (released for use) or removed. A released revision is retired by
+  // moving it to 'archived'.
   public static final String DRAFT = "draft";
   public static final String PUBLISHED = "published";
+  public static final String ARCHIVED = "archived";
 
   public static final String CONTENT = "content";
   public static final String LAYOUT = "layout";
@@ -61,12 +65,19 @@ public class TemplateStore {
       String sha256,
       OffsetDateTime createdAt,
       OffsetDateTime publishedAt,
+      OffsetDateTime archivedAt,
       String layoutId,
       Integer layoutRevision,
       Map<String, String> files) {
 
+    /** Released for use. */
     public boolean published() {
       return PUBLISHED.equals(status);
+    }
+
+    /** Retired: it existed and is kept as history, but is no longer current. */
+    public boolean archived() {
+      return ARCHIVED.equals(status);
     }
   }
 
@@ -257,14 +268,32 @@ public class TemplateStore {
     return files;
   }
 
-  /** Marks a draft as published; {@code false} if it does not exist or is already published. */
-  public boolean publish(String templateId, int number) {
+  /**
+   * Releases a revision for use: a freshly validated draft, or an archived revision uploaded again.
+   *
+   * @return {@code false} if it does not exist or is already published
+   */
+  public boolean release(String templateId, int number) {
     return transaction(
             c ->
                 update(
                     c,
-                    "update revision set status = 'published', published_at = now()"
-                        + " where template_id = ? and number = ? and status = 'draft'",
+                    "update revision set status = 'published', published_at ="
+                        + " coalesce(published_at, now()), archived_at = null where template_id = ?"
+                        + " and number = ? and status in ('draft', 'archived')",
+                    templateId,
+                    number))
+        == 1;
+  }
+
+  /** Retires a released revision. {@code false} if it does not exist or is not published. */
+  public boolean archive(String templateId, int number) {
+    return transaction(
+            c ->
+                update(
+                    c,
+                    "update revision set status = 'archived', archived_at = now()"
+                        + " where template_id = ? and number = ? and status = 'published'",
                     templateId,
                     number))
         == 1;
@@ -337,8 +366,8 @@ public class TemplateStore {
     }
     try (PreparedStatement s =
         c.prepareStatement(
-            "select status, sha256, created_at, published_at, layout_id, layout_revision"
-                + " from revision"
+            "select status, sha256, created_at, published_at, archived_at, layout_id,"
+                + " layout_revision from revision"
                 + " where template_id = ? and number = ?")) {
       s.setString(1, templateId);
       s.setInt(2, number);
@@ -354,8 +383,9 @@ public class TemplateStore {
                 r.getString(2),
                 r.getObject(3, OffsetDateTime.class),
                 r.getObject(4, OffsetDateTime.class),
-                r.getString(5),
-                (Integer) r.getObject(6),
+                r.getObject(5, OffsetDateTime.class),
+                r.getString(6),
+                (Integer) r.getObject(7),
                 java.util.Collections.unmodifiableMap(files)));
       }
     }

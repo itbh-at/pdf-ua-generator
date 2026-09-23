@@ -3,8 +3,8 @@
   // Copyright 2026 IT Beratung Hermann GmbH
 ////
 
-= Publish and render a template through the API
-:description: Upload the demo template, publish it, validate data and render documents with curl.
+= Upload and render a template through the API
+:description: Upload the demo template (validated and released on upload), validate data and render documents with curl.
 
 Prerequisites: a running `podman` — on Linux its user socket
 (`systemctl --user enable --now podman.socket`), on macOS a started machine
@@ -19,69 +19,58 @@ mise run dev
 ----
 
 . Pack the layout as a bundle. The demo content pins `demo-layout@1`, so the
-layout is published first. A bundle carries the layout's files plus an
-`example.json` for the publish checks:
+layout is uploaded first. A layout carries only styles, so its directory is a
+complete bundle as it is (no example data):
 +
 ----
-mkdir -p /tmp/layout
-cp -r demo/layout/. /tmp/layout/
-printf '{}' > /tmp/layout/example.json
-(cd /tmp/layout && zip -r ../layout.zip .)
+(cd demo/layout && zip -r /tmp/layout.zip .)
 ----
 
-. Upload and publish the layout as revision 1 of `demo-layout`:
+. Upload the layout as revision 1 of `demo-layout`. It is validated and
+released for use in one step:
 +
 ----
 curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/layout.zip \
   http://localhost:8080/templates/demo-layout/revisions
-curl -X POST http://localhost:8080/templates/demo-layout/revisions/1/publish
 ----
 
-. Pack the demo content as a bundle. The fonts, styles and images live in the
-layout, so the content bundle holds only the template, its language variants,
-the descriptor, and the example data and attachment:
+. Pack the demo content as a bundle. Every demo is a self-contained bundle
+directory, so packing is just zipping it. The content bundle
+(`demo/content/`) holds the template, its language variants, the descriptor,
+and the example data and attachment; the fonts, styles and images live in the
+layout. (`data-email.json` is only a render input for the format check, not
+part of the bundle.)
 +
 ----
-mkdir -p /tmp/demo/example
-cp demo/demo.xhtml /tmp/demo/template.xhtml
-cp demo/demo.de.xhtml /tmp/demo/template.de.xhtml
-cp demo/demo.json /tmp/demo/template.json
-cp demo/data.json /tmp/demo/example.json
-cp demo/photo.png /tmp/demo/example/
-(cd /tmp/demo && zip -r ../demo.zip .)
+(cd demo/content && zip -r /tmp/demo.zip . -x data-email.json)
 ----
 
-. Upload it as the first revision of the template `demo`:
+. Upload it as the first revision of the template `demo`; it is checked with
+its `example.json` and released:
 +
 ----
 curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/demo.zip \
   http://localhost:8080/templates/demo/revisions
 ----
 
-. Publish revision 1:
-+
-----
-curl -X POST http://localhost:8080/templates/demo/revisions/1/publish
-----
-
 . Validate data:
 +
 ----
-curl -H 'Content-Type: application/json' -d @demo/data.json \
+curl -H 'Content-Type: application/json' -d @demo/content/example.json \
   http://localhost:8080/templates/demo/validate
 ----
 
 . Render a PDF with the photo as attachment:
 +
 ----
-curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pdf' \
+curl -F data=@demo/content/example.json -F photo=@demo/content/example/photo.png -H 'Accept: application/pdf' \
   -o demo.pdf http://localhost:8080/templates/demo/render
 ----
 
 . Render other formats with `format`, and email HTML without attachments:
 +
 ----
-curl -H 'Content-Type: application/json' -d @demo/data-email.json \
+curl -H 'Content-Type: application/json' -d @demo/content/data-email.json \
   'http://localhost:8080/templates/demo/render?format=email-html' -o demo.html
 ----
 
@@ -89,7 +78,7 @@ curl -H 'Content-Type: application/json' -d @demo/data-email.json \
 carries `Content-Language: de`:
 +
 ----
-curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pdf' \
+curl -F data=@demo/content/example.json -F photo=@demo/content/example/photo.png -H 'Accept: application/pdf' \
   -H 'Accept-Language: de' -o demo.de.pdf http://localhost:8080/templates/demo/render
 ----
 
@@ -97,6 +86,6 @@ curl -F data=@demo/data.json -F photo=@demo/photo.png -H 'Accept: application/pd
 (text first, HTML last); the service builds the body and never sends mail:
 +
 ----
-curl -H 'Content-Type: application/json' -d @demo/data-email.json \
+curl -H 'Content-Type: application/json' -d @demo/content/data-email.json \
   -H 'Accept: multipart/alternative' -o demo.eml http://localhost:8080/templates/demo/render
 ----

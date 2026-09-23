@@ -11,19 +11,20 @@ command-line tool and as a REST service.
 ## Usage
 
 ```bash
-pdf-ua-generator render -t demo/demo.xhtml -L demo/layout -d demo/data.json -a photo=demo/photo.png --verify
-pdf-ua-generator render -t demo/demo.xhtml -L demo/layout-memo -d demo/data.json -a photo=demo/photo.png -f docx
-pdf-ua-generator schema -t demo/demo.xhtml -L demo/layout
-pdf-ua-generator check -t demo/demo.xhtml -L demo/layout -d demo/data.json -a photo=demo/photo.png
+pdf-ua-generator render -t demo/content/template.xhtml -L demo/layout -d demo/content/example.json -a photo=demo/content/example/photo.png --verify
+pdf-ua-generator render -t demo/content/template.xhtml -L demo/layout-memo -d demo/content/example.json -a photo=demo/content/example/photo.png -f docx
+pdf-ua-generator schema -t demo/content/template.xhtml -L demo/layout
+pdf-ua-generator check -t demo/content/template.xhtml -L demo/layout -d demo/content/example.json -a photo=demo/content/example/photo.png
 ```
 
-The first command renders the content template `demo/demo.xhtml` in the layout
-`demo/layout` with the data from `demo/data.json` and the attached photo into
-`demo/demo.pdf` and checks it against PDF/UA-1; the second writes the same
-document as `demo/demo.docx` in the memo layout. Formats: `pdf`, `xhtml`,
-`email-html`, `text`, `docx`, `odt`. `schema` prints the JSON Schema of the
-data the template needs, derived from the template and its field definitions
-in `demo/demo.json`; `check` runs the checks a template must pass before it is
+The first command renders the content template `demo/content/template.xhtml` in
+the layout `demo/layout` with the data from `demo/content/example.json` and the
+attached photo into `demo/content/template.pdf` and checks it against PDF/UA-1;
+the second writes the same document as `demo/content/template.docx` in the memo
+layout. Formats: `pdf`,
+`xhtml`, `email-html`, `text`, `docx`, `odt`. `schema` prints the JSON Schema of
+the data the template needs, derived from the template and its field definitions
+in `demo/content/template.json`; `check` runs the checks a template must pass before it is
 published. The distribution
 `cli/target/pdf-ua-generator-<version>.zip` contains the launcher
 `bin/pdf-ua-generator`.

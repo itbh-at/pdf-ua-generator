@@ -78,10 +78,18 @@ plain text).
   URN is not used before it is documented there.
 - Template data is JSON. No `Map<String, String>` or other flattening of the data.
 - A server template revision is a bundle laid out like a CLI template
-  directory (`template.xhtml`, `template.json`, variants, assets) plus
-  `example.json` and `example/` for the publish checks. Revisions are
-  immutable; caches are keyed by content hash, and status is always
-  read from the database.
+  directory (`template.xhtml`, `template.json`, variants, assets). A content
+  bundle also carries `example.json` and `example/` for the publish checks; a
+  layout carries no example data of its own and is checked with empty data.
+  Revisions are immutable; caches are keyed by content hash, and status is
+  always read from the database.
+- A bundle is validated by the publish checks and released for use on upload;
+  there is no separate publish step and no resting draft. A released revision is
+  not deleted but archived (retired, kept as history); a whole template is
+  deleted only while nothing references it. A layout revision cannot be archived,
+  nor its template deleted, while released content pins it. Status values are
+  `published` (released) and `archived`; `draft` is only transient during an
+  upload.
 - Caching is done with `quarkus-cache`, never hand-rolled. The files of a
   revision are plain data (`Map<String, byte[]>`), so the backend is a
   deployment decision: Caffeine by default, a remote one where an operator

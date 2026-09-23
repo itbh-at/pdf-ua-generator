@@ -2,6 +2,7 @@
 {#title}{template.id}{/title}
 <p><a href="/ui">← Templates</a></p>
 <h1>{template.id} <small>{template.kind}</small></h1>
+{#if template.latestPublished}<p><a href="/ui/templates/{template.id}/render">Generate a document →</a></p>{/if}
 
 <h2>Revisions</h2>
 {#include ui/revisions /}
@@ -24,4 +25,13 @@
   </tbody>
 </table>
 {/if}
+
+<h2>Delete</h2>
+<p class="muted">Removes the template with all its revisions. A layout can be deleted only while no
+content references it.</p>
+<form hx-post="/ui/templates/{template.id}/delete" hx-target="#delete-result" hx-swap="innerHTML"
+      hx-confirm="Delete template {template.id} with all its revisions?">
+  <button class="danger">Delete template</button>
+</form>
+<div id="delete-result"></div>
 {/include}

@@ -11,31 +11,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /** Renders the demo template shipped in {@code demo/} in every format. */
 class DemoTemplateTest {
 
-  private static final Path DEMO = Path.of("..", "demo");
-
   private final DocumentRenderer renderer = new DocumentRenderer();
 
   private RenderRequest request() throws Exception {
-    return request("demo.xhtml");
+    return request("template.xhtml");
   }
 
   private RenderRequest request(String template) throws Exception {
     Map<String, Object> data;
-    try (InputStream in = Files.newInputStream(DEMO.resolve("data.json"))) {
+    try (InputStream in = Files.newInputStream(Demo.CONTENT.resolve("example.json"))) {
       data = JsonData.parse(in);
     }
     return new RenderRequest(
         template,
         Demo.repository(),
         data,
-        Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));
+        Map.of("photo", Files.readAllBytes(Demo.CONTENT.resolve("example/photo.png"))));
   }
 
   @Test
@@ -60,7 +57,7 @@ class DemoTemplateTest {
 
   @Test
   void germanVariantRendersInGermanAndConformsToPdfUa1() throws Exception {
-    RenderRequest de = request("demo.de.xhtml");
+    RenderRequest de = request("template.de.xhtml");
 
     String xhtml =
         new String(renderer.render(de, OutputFormat.XHTML).content(), StandardCharsets.UTF_8);

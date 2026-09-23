@@ -29,20 +29,20 @@ class DemoLayoutsTest {
           URI.create("https://assets.example.invalid/"));
 
   private static Map<String, Object> data() throws Exception {
-    try (InputStream in = Files.newInputStream(Demo.DIR.resolve("data.json"))) {
+    try (InputStream in = Files.newInputStream(Demo.CONTENT.resolve("example.json"))) {
       return JsonData.parse(in);
     }
   }
 
   private static Map<String, byte[]> photo() throws Exception {
-    return Map.of("photo", Files.readAllBytes(Demo.DIR.resolve("photo.png")));
+    return Map.of("photo", Files.readAllBytes(Demo.CONTENT.resolve("example/photo.png")));
   }
 
   @Test
   void theSameDocumentPassesEveryCheckInEveryLayout() throws Exception {
     for (String layout : Demo.LAYOUTS) {
       TemplateCheck.Report report =
-          TemplateCheck.check(renderer, Demo.repository(layout), "demo.xhtml", data(), photo());
+          TemplateCheck.check(renderer, Demo.repository(layout), "template.xhtml", data(), photo());
       assertTrue(report.passed(), layout + ": " + report.problems());
     }
   }
@@ -53,7 +53,7 @@ class DemoLayoutsTest {
     Map<String, String> text = new HashMap<>();
     for (String layout : Demo.LAYOUTS) {
       RenderRequest request =
-          new RenderRequest("demo.xhtml", Demo.repository(layout), data(), photo());
+          new RenderRequest("template.xhtml", Demo.repository(layout), data(), photo());
       xhtml.put(layout, utf8(renderer.render(request, OutputFormat.XHTML).content()));
       text.put(layout, utf8(renderer.render(request, OutputFormat.TEXT).content()));
     }

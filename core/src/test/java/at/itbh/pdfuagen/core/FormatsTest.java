@@ -37,12 +37,14 @@ class FormatsTest {
 
   private RenderRequest request(String data, boolean photo) throws Exception {
     Map<String, Object> values;
-    try (InputStream in = Files.newInputStream(DEMO.resolve(data))) {
+    try (InputStream in = Files.newInputStream(Demo.CONTENT.resolve(data))) {
       values = JsonData.parse(in);
     }
     Map<String, byte[]> attachments =
-        photo ? Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))) : Map.of();
-    return new RenderRequest("demo.xhtml", Demo.repository(), values, attachments);
+        photo
+            ? Map.of("photo", Files.readAllBytes(Demo.CONTENT.resolve("example/photo.png")))
+            : Map.of();
+    return new RenderRequest("template.xhtml", Demo.repository(), values, attachments);
   }
 
   private static Map<String, String> unzip(byte[] zip) throws Exception {
@@ -58,7 +60,7 @@ class FormatsTest {
   @Test
   void docxCarriesTheAccessibilityStructure() throws Exception {
     Map<String, String> parts =
-        unzip(renderer.render(request("data.json", true), OutputFormat.DOCX).content());
+        unzip(renderer.render(request("example.json", true), OutputFormat.DOCX).content());
     String document = parts.get("word/document.xml");
 
     assertTrue(document.contains("<w:pStyle w:val=\"Heading1\""));
@@ -87,7 +89,7 @@ class FormatsTest {
   @Test
   void odtCarriesTheAccessibilityStructure() throws Exception {
     Map<String, String> parts =
-        unzip(renderer.render(request("data.json", true), OutputFormat.ODT).content());
+        unzip(renderer.render(request("example.json", true), OutputFormat.ODT).content());
     String content = parts.get("content.xml");
 
     assertEquals("application/vnd.oasis.opendocument.text", parts.get("mimetype"));
@@ -128,7 +130,7 @@ class FormatsTest {
     RenderException e =
         assertThrows(
             RenderException.class,
-            () -> renderer.render(request("data.json", true), OutputFormat.EMAIL_HTML));
+            () -> renderer.render(request("example.json", true), OutputFormat.EMAIL_HTML));
     assertEquals(Problem.RESOURCE_REJECTED, e.problems().getFirst().type());
   }
 
@@ -136,7 +138,7 @@ class FormatsTest {
   void plainTextListsFootnotesAndLinks() throws Exception {
     String text =
         new String(
-            renderer.render(request("data.json", true), OutputFormat.TEXT).content(),
+            renderer.render(request("example.json", true), OutputFormat.TEXT).content(),
             StandardCharsets.UTF_8);
 
     // The layout's logo comes first, as its alt text.

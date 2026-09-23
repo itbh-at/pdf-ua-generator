@@ -35,7 +35,7 @@ class TemplateCommandsTest {
   }
 
   private String demo() {
-    return DEMO.resolve("demo.xhtml").toString();
+    return DEMO.resolve("content/template.xhtml").toString();
   }
 
   @Test
@@ -69,7 +69,7 @@ class TemplateCommandsTest {
             "--layout",
             DEMO.resolve("layout").toString(),
             "-d",
-            DEMO.resolve("data.json").toString()));
+            DEMO.resolve("content/example.json").toString()));
     assertEquals("valid\n", out.toString());
 
     Path data = tmp.resolve("data.json");
@@ -105,9 +105,9 @@ class TemplateCommandsTest {
             "--layout",
             DEMO.resolve("layout").toString(),
             "-d",
-            DEMO.resolve("data.json").toString(),
+            DEMO.resolve("content/example.json").toString(),
             "-a",
-            "photo=" + DEMO.resolve("photo.png"));
+            "photo=" + DEMO.resolve("content/example/photo.png"));
     assertEquals(0, exit, err::toString);
     assertEquals("passed\n", out.toString());
   }

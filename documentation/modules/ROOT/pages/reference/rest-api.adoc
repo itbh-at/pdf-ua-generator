@@ -23,20 +23,20 @@ xref:reference/problem-types.adoc[Problem types].
 |One template with the list of its revisions.
 
 |`+DELETE /templates/{id}+`
-|204. Deletes the template with all revisions.
+|204. Deletes the template with all revisions. A layout that content still
+references gives 409.
 
 |`+POST /templates/{id}/revisions+` +
-`Content-Type: application/zip` +
-`?publish=true`
-|201 with `Location` and the revision. Stores the archive as a new draft
-revision; the first revision creates the template. The body lists `problems`
-found when parsing — a draft with problems is stored anyway, so it can be
-corrected — and `warnings`. +
+`Content-Type: application/zip`
+|201 with `Location` and the released revision. The archive is validated by the
+publish checks and released for use in one step; the first revision creates the
+template. A bundle that fails the checks gives 422 `publish-rejected` with every
+problem, and nothing is stored. +
  +
 Files that are already stored as a revision of this template give 200 with
-`Content-Location` and that revision instead of a new one. With `?publish=true`
-the revision is published in the same call, unless it already is; an import can
-therefore be repeated without changing anything.
+`Content-Location` and that revision instead of a new one, so an import can be
+repeated without changing anything. A layout carries no example data and is
+checked with empty data; a content template is checked with its `example.json`.
 
 |`+GET /templates/{id}/revisions/{n}+`
 |The revision (see below).
@@ -45,11 +45,8 @@ therefore be repeated without changing anything.
 |The files of the revision as a ZIP archive.
 
 |`+DELETE /templates/{id}/revisions/{n}+`
-|204. Only drafts; a published revision gives 409.
-
-|`+POST /templates/{id}/revisions/{n}/publish+`
-|The published revision, after the publish checks passed; 422
-`publish-rejected` with every problem otherwise, 409 if already published.
+|The archived revision. Retires (archives) a released revision, keeping it as
+history; a layout revision that released content still pins gives 409.
 |===
 
 Template ids consist of lower-case letters, digits and `-`, at most 64
@@ -60,8 +57,8 @@ layout; a template keeps the kind of its first revision (409 otherwise). A
 layout is previewed with the render endpoints like any template.
 
 A content revision pins the layout revision named in its `template.json`. It
-can be published only if that layout revision is published. A layout that
-content pins cannot be deleted, nor can a pinned layout revision (409).
+is released only if that layout revision is released. A layout that content
+pins cannot be deleted, nor can a pinned layout revision be archived (409).
 `+GET /templates/{id}+` of a layout lists the pinning revisions in `usedBy`.
 
 A revision:
@@ -72,11 +69,11 @@ A revision:
   "template": "invoice",
   "kind": "content",
   "revision": 3,
-  "status": "draft",
+  "status": "published",
   "layout": "corporate@2",
   "sha256": "854ba28b…",
   "createdAt": "2026-09-19T20:30:08.206936Z",
-  "publishedAt": null,
+  "publishedAt": "2026-09-19T20:30:12.010901Z",
   "language": "en",
   "languages": ["de-AT"],
   "formats": ["pdf", "docx", "text"],
@@ -105,8 +102,8 @@ xref:reference/template-files.adoc[Template files]:
 |Descriptor with language, formats and field definitions.
 
 |`example.json`
-|Example data. Required for publishing: the publish checks render it with every
-variant in every offered format.
+|Example data of a content template. Required to release it: the publish checks
+render it with every variant in every offered format.
 
 |`example/<name>.<ext>`
 |Attachments of the example data, referred to as `attachment:<name>`.
@@ -116,8 +113,8 @@ variant in every offered format.
 |===
 
 A layout bundle holds the files described under
-xref:reference/layouts.adoc[Layouts], plus `example.json` for its publish
-checks, which render the layout on its own.
+xref:reference/layouts.adoc[Layouts]. A layout carries no example data of its
+own; its publish checks render it with empty data.
 
 Limits: 50 MB uncompressed, 1000 files (see
 xref:reference/configuration.adoc[Configuration]).
@@ -153,7 +150,7 @@ violation. Against the latest published revision.
 |The document, rendered with the latest published revision.
 
 |`+POST /templates/{id}/revisions/{n}/render+`
-|The document, rendered with any revision, also a draft (preview).
+|The document, rendered with any revision, also an archived one (preview).
 |===
 
 The data is sent either as `application/json`, or as `multipart/form-data`

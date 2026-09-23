@@ -20,4 +20,15 @@
     {/if}
   </tbody>
 </table>
+
+<h2>New template</h2>
+<p class="muted">Upload a bundle (a layout or a content template). It is validated and released for
+use right away; if the checks fail, nothing is stored and the problems are shown.</p>
+<form hx-post="/ui/templates" hx-encoding="multipart/form-data"
+      hx-target="#new-result" hx-swap="innerHTML">
+  <p><input name="id" placeholder="template-id (lower-case, digits, dashes)" required></p>
+  <p><input type="file" name="bundle" accept=".zip,application/zip" required></p>
+  <button>Upload</button>
+</form>
+<div id="new-result"></div>
 {/include}

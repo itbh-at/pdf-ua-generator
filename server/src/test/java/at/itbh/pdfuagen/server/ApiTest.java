@@ -13,6 +13,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,13 +34,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
-/** The API end to end, against PostgreSQL from Dev Services, with the demo template. */
+/**
+ * The API end to end, against PostgreSQL from Dev Services, with the demo template. A bundle is
+ * validated and released for use on upload; a released revision is retired by archiving it.
+ */
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ApiTest {
 
   private static final String PROBLEM = "urn:itbh:pdf-ua-generator:problem:";
+  private static final String ZIP = "application/zip";
   private static final String MULTIPART_ALTERNATIVE = "multipart/alternative";
   private static final String DOCX =
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -49,7 +54,8 @@ class ApiTest {
   // The ordered methods build up revisions from an empty database and assert their
   // numbers, so start from a clean schema. Without this the test fails on a reused
   // Dev Services database (testcontainers.reuse.enable=true) that still holds a
-  // previous run's templates.
+  // previous run's templates. The start-up warm-up is off under %test, so nothing
+  // renders the leftovers concurrently with the tests before this clean runs.
   @BeforeAll
   void resetDatabase() {
     flyway.clean();
@@ -58,53 +64,52 @@ class ApiTest {
 
   @Test
   @Order(0)
-  void publishesALayout() throws Exception {
+  void releasesALayoutOnUpload() throws Exception {
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("Accessible document example"))
         .post("/templates/demo-layout/revisions")
         .then()
-        .statusCode(201)
-        .body("kind", equalTo("layout"))
-        .body("problems.size()", equalTo(0));
-    given()
-        .post("/templates/demo-layout/revisions/1/publish")
-        .then()
         .log()
         .ifValidationFails()
-        .statusCode(200);
+        .statusCode(201)
+        .body("kind", equalTo("layout"))
+        .body("revision", equalTo(1))
+        .body("status", equalTo("published"));
   }
 
   @Test
   @Order(1)
-  void createsADraft() throws Exception {
+  void releasesContentOnUpload() throws Exception {
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(demoBundle(1))
         .post("/templates/demo/revisions")
         .then()
+        .log()
+        .ifValidationFails()
         .statusCode(201)
         .header("Location", containsString("/templates/demo/revisions/1"))
         .body("revision", equalTo(1))
-        .body("status", equalTo("draft"))
+        .body("status", equalTo("published"))
         .body("language", equalTo("en"))
         .body("kind", equalTo("content"))
         .body("layout", equalTo("demo-layout@1"))
         .body("formats", hasItem("docx"))
         .body("problems.size()", equalTo(0));
 
-    // Not published yet.
+    // Released, so its schema is available at once.
     given()
         .get("/templates/demo/schema")
         .then()
-        .statusCode(404)
-        .contentType("application/problem+json")
-        .body("type", equalTo(PROBLEM + "not-found"));
+        .statusCode(200)
+        .contentType("application/schema+json")
+        .body("$schema", equalTo("https://json-schema.org/draft/2020-12/schema"));
   }
 
   @Test
   @Order(2)
-  void rendersADraftAsPreview() throws Exception {
+  void rendersARevisionAsPreview() throws Exception {
     byte[] pdf =
         given()
             .contentType("application/json")
@@ -123,25 +128,21 @@ class ApiTest {
 
   @Test
   @Order(3)
-  void publishes() {
+  void uploadingTheSameFilesAgainChangesNothing() throws Exception {
     given()
-        .post("/templates/demo/revisions/1/publish")
+        .contentType(ZIP)
+        .body(demoBundle(1))
+        .post("/templates/demo/revisions")
         .then()
-        .log()
-        .ifValidationFails()
         .statusCode(200)
+        .header("Content-Location", containsString("/templates/demo/revisions/1"))
+        .body("revision", equalTo(1))
         .body("status", equalTo("published"));
     given()
-        .post("/templates/demo/revisions/1/publish")
+        .get("/templates/demo")
         .then()
-        .statusCode(409)
-        .body("type", equalTo(PROBLEM + "conflict"));
-    given()
-        .get("/templates/demo/schema")
-        .then()
-        .statusCode(200)
-        .contentType("application/schema+json")
-        .body("$schema", equalTo("https://json-schema.org/draft/2020-12/schema"));
+        .body("latestRevision", equalTo(1))
+        .body("publishedRevision", equalTo(1));
   }
 
   @Test
@@ -149,7 +150,7 @@ class ApiTest {
   void validates() throws Exception {
     given()
         .contentType("application/json")
-        .body(data("data.json"))
+        .body(data("example.json"))
         .post("/templates/demo/validate")
         .then()
         .statusCode(204);
@@ -171,8 +172,8 @@ class ApiTest {
   @Order(5)
   void rendersWithAttachmentsAndNegotiatesTheFormat() throws Exception {
     given()
-        .multiPart("data", data("data.json"), "application/json")
-        .multiPart("photo", DEMO.resolve("photo.png").toFile(), "image/png")
+        .multiPart("data", data("example.json"), "application/json")
+        .multiPart("photo", DEMO.resolve("content/example/photo.png").toFile(), "image/png")
         .accept(DOCX)
         .post("/templates/demo/render")
         .then()
@@ -191,7 +192,7 @@ class ApiTest {
 
     given()
         .contentType("application/json")
-        .body(data("data.json"))
+        .body(data("example.json"))
         .post("/templates/demo/render?format=pdf")
         .then()
         .statusCode(422)
@@ -233,13 +234,13 @@ class ApiTest {
     files.put("template.de.xhtml", page("de", "Hallo {name}"));
     files.put("example.json", "{\"name\": \"Jane\"}".getBytes(StandardCharsets.UTF_8));
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(Bundle.write(files))
         .post("/templates/greeting/revisions")
         .then()
         .statusCode(201)
+        .body("status", equalTo("published"))
         .body("languages", hasItem("de"));
-    given().post("/templates/greeting/revisions/1/publish").then().statusCode(200);
 
     Response german =
         given()
@@ -264,13 +265,13 @@ class ApiTest {
   @Order(8)
   void aLayoutChangeReachesContentOnlyWhenItMovesToTheNewRevision() throws Exception {
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("Changed header"))
         .post("/templates/demo-layout/revisions")
         .then()
         .statusCode(201)
-        .body("revision", equalTo(2));
-    given().post("/templates/demo-layout/revisions/2/publish").then().statusCode(200);
+        .body("revision", equalTo(2))
+        .body("status", equalTo("published"));
 
     // demo still pins revision 1 of the layout.
     String before = xhtml("demo");
@@ -278,14 +279,14 @@ class ApiTest {
     assertTrue(!before.contains("Changed header"));
 
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(demoBundle(2))
         .post("/templates/demo/revisions")
         .then()
         .statusCode(201)
         .body("revision", equalTo(2))
+        .body("status", equalTo("published"))
         .body("layout", equalTo("demo-layout@2"));
-    given().post("/templates/demo/revisions/2/publish").then().statusCode(200);
     assertTrue(xhtml("demo").contains("Changed header"));
 
     given()
@@ -295,6 +296,7 @@ class ApiTest {
         .body("kind", equalTo("layout"))
         .body("usedBy.find { it.revision == 1 }.layoutRevision", equalTo(1))
         .body("usedBy.find { it.revision == 2 }.layoutRevision", equalTo(2));
+    // A referenced layout cannot be deleted, nor a pinned revision archived.
     given()
         .delete("/templates/demo-layout")
         .then()
@@ -305,29 +307,21 @@ class ApiTest {
 
   @Test
   @Order(9)
-  void contentPinsOnlyPublishedLayouts() throws Exception {
+  void rejectsContentThatPinsAMissingLayoutAndKeepsTheKind() throws Exception {
+    // A content bundle pinning a layout revision that does not exist is rejected; nothing is kept.
     given()
-        .contentType("application/zip")
-        .body(layoutBundle("Draft header"))
-        .post("/templates/demo-layout/revisions")
-        .then()
-        .statusCode(201)
-        .body("revision", equalTo(3));
-    given()
-        .contentType("application/zip")
-        .body(demoBundle(3))
-        .post("/templates/demo/revisions")
-        .then()
-        .statusCode(201);
-    given()
-        .post("/templates/demo/revisions/3/publish")
+        .contentType(ZIP)
+        .body(demoBundle("demo-layout@99"))
+        .post("/templates/demo-missing/revisions")
         .then()
         .statusCode(422)
         .body("type", equalTo(PROBLEM + "publish-rejected"))
-        .body("errors[0].detail", containsString("demo-layout@3 is not published"));
-    // A template keeps its kind.
+        .body("errors[0].detail", containsString("demo-layout@99 does not exist"));
+    given().get("/templates/demo-missing").then().statusCode(404);
+
+    // A template keeps the kind of its first revision.
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("x"))
         .post("/templates/demo/revisions")
         .then()
@@ -338,24 +332,21 @@ class ApiTest {
   @Order(10)
   void rendersTheSameDocumentInAnotherLayout() throws Exception {
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("layout-memo", "Internal memo"))
         .post("/templates/memo-layout/revisions")
         .then()
-        .statusCode(201);
-    given().post("/templates/memo-layout/revisions/1/publish").then().statusCode(200);
+        .statusCode(201)
+        .body("status", equalTo("published"));
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(demoBundle("memo-layout@1"))
         .post("/templates/demo-memo/revisions")
         .then()
-        .statusCode(201);
-    given()
-        .post("/templates/demo-memo/revisions/1/publish")
-        .then()
         .log()
         .ifValidationFails()
-        .statusCode(200);
+        .statusCode(201)
+        .body("status", equalTo("published"));
 
     String memo = xhtml("demo-memo");
     String plain = xhtml("demo");
@@ -363,54 +354,77 @@ class ApiTest {
     assertTrue(!plain.contains("MEMORANDUM") && plain.contains("Hello Jane Doe."), plain);
   }
 
-  /** What the import job of the chart does: upload and publish in one call, repeatedly. */
+  @Test
+  @Order(11)
+  void rejectsBadInput() {
+    given()
+        .contentType(ZIP)
+        .body("not a zip".getBytes(StandardCharsets.UTF_8))
+        .post("/templates/broken/revisions")
+        .then()
+        .statusCode(400)
+        .body("type", equalTo(PROBLEM + "invalid-bundle"));
+    given()
+        .contentType(ZIP)
+        .body(new byte[0])
+        .post("/templates/Not_Valid/revisions")
+        .then()
+        .statusCode(400)
+        .body("type", equalTo(PROBLEM + "invalid-request"));
+    given().get("/templates/missing").then().statusCode(404);
+    given().get("/assets/" + "0".repeat(64)).then().statusCode(404);
+  }
+
+  @Test
+  @Order(12)
+  void reportsReady() {
+    given().get("/q/health/ready").then().statusCode(200);
+    given().get("/q/health/live").then().statusCode(200);
+  }
+
+  /**
+   * What the import job of the chart does: upload releases at once, and repeats without a change.
+   */
   @Test
   @Order(13)
-  void uploadsAndPublishesInOneCallAndRepeatsWithoutAChange() throws Exception {
+  void importsAndRepeatsWithoutAChange() throws Exception {
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("Imported"))
-        .post("/templates/imported-layout/revisions?publish=true")
+        .post("/templates/imported-layout/revisions")
         .then()
-        .log()
-        .ifValidationFails()
         .statusCode(201)
         .body("revision", equalTo(1))
         .body("status", equalTo("published"));
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(demoBundle("imported-layout@1"))
-        .post("/templates/imported/revisions?publish=true")
+        .post("/templates/imported/revisions")
         .then()
         .statusCode(201)
         .body("status", equalTo("published"));
 
-    // The same bundles again: the stored revision, no new one, nothing to publish.
+    // The same bundle again: the stored revision, no new one.
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(demoBundle("imported-layout@1"))
-        .post("/templates/imported/revisions?publish=true")
+        .post("/templates/imported/revisions")
         .then()
         .statusCode(200)
         .header("Content-Location", containsString("/templates/imported/revisions/1"))
         .body("revision", equalTo(1))
         .body("status", equalTo("published"));
-    given()
-        .get("/templates/imported")
-        .then()
-        .body("latestRevision", equalTo(1))
-        .body("publishedRevision", equalTo(1));
 
-    // Changed files are a new revision, published by the same call.
+    // Changed files are a new revision, released by the same call.
     given()
-        .contentType("application/zip")
+        .contentType(ZIP)
         .body(layoutBundle("Imported again"))
-        .post("/templates/imported-layout/revisions?publish=true")
+        .post("/templates/imported-layout/revisions")
         .then()
         .statusCode(201)
         .body("revision", equalTo(2))
         .body("status", equalTo("published"));
-    // The published content keeps the layout revision it pins.
+    // The released content keeps the layout revision it pins.
     given().get("/templates/imported").then().body("publishedRevision", equalTo(1));
   }
 
@@ -437,31 +451,29 @@ class ApiTest {
   }
 
   @Test
-  @Order(11)
-  void rejectsBadInput() {
+  @Order(15)
+  void archivesReactivatesAndDeletes() throws Exception {
+    // A content revision can be archived (retired); it is kept as history.
     given()
-        .contentType("application/zip")
-        .body("not a zip".getBytes(StandardCharsets.UTF_8))
-        .post("/templates/broken/revisions")
+        .delete("/templates/imported/revisions/1")
         .then()
-        .statusCode(400)
-        .body("type", equalTo(PROBLEM + "invalid-bundle"));
-    given()
-        .contentType("application/zip")
-        .body(new byte[0])
-        .post("/templates/Not_Valid/revisions")
-        .then()
-        .statusCode(400)
-        .body("type", equalTo(PROBLEM + "invalid-request"));
-    given().get("/templates/missing").then().statusCode(404);
-    given().get("/assets/" + "0".repeat(64)).then().statusCode(404);
-  }
+        .statusCode(200)
+        .body("status", equalTo("archived"));
+    given().get("/templates/imported").then().body("publishedRevision", nullValue());
 
-  @Test
-  @Order(12)
-  void reportsReady() {
-    given().get("/q/health/ready").then().statusCode(200);
-    given().get("/q/health/live").then().statusCode(200);
+    // Uploading the same files again releases it once more.
+    given()
+        .contentType(ZIP)
+        .body(demoBundle("imported-layout@1"))
+        .post("/templates/imported/revisions")
+        .then()
+        .statusCode(200)
+        .body("status", equalTo("published"));
+
+    // The content is deleted; then its layout, which nothing references any more.
+    given().delete("/templates/imported").then().statusCode(204);
+    given().delete("/templates/imported-layout").then().statusCode(204);
+    given().get("/templates/imported").then().statusCode(404);
   }
 
   private static byte[] page(String lang, String body) {

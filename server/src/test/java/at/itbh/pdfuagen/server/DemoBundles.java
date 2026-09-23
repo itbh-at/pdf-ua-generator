@@ -16,6 +16,7 @@ import java.util.TreeMap;
 final class DemoBundles {
 
   static final Path DEMO = Path.of("..", "demo");
+  static final Path CONTENT = DEMO.resolve("content");
 
   private DemoBundles() {}
 
@@ -26,14 +27,14 @@ final class DemoBundles {
   /** The demo content, pinning the given layout revision. */
   static byte[] demoBundle(String layout) throws Exception {
     Map<String, byte[]> files = new TreeMap<>();
-    files.put("template.xhtml", Files.readAllBytes(DEMO.resolve("demo.xhtml")));
+    files.put("template.xhtml", Files.readAllBytes(CONTENT.resolve("template.xhtml")));
     files.put(
         "template.json",
-        Files.readString(DEMO.resolve("demo.json"))
+        Files.readString(CONTENT.resolve("template.json"))
             .replace("demo-layout@1", layout)
             .getBytes(StandardCharsets.UTF_8));
-    files.put("example.json", Files.readAllBytes(DEMO.resolve("data.json")));
-    files.put("example/photo.png", Files.readAllBytes(DEMO.resolve("photo.png")));
+    files.put("example.json", Files.readAllBytes(CONTENT.resolve("example.json")));
+    files.put("example/photo.png", Files.readAllBytes(CONTENT.resolve("example/photo.png")));
     return Bundle.write(files);
   }
 
@@ -55,12 +56,12 @@ final class DemoBundles {
         Files.readString(layout.resolve("messages.json"))
             .replace("Accessible document example", header)
             .getBytes(StandardCharsets.UTF_8));
-    files.put("example.json", "{}".getBytes(StandardCharsets.UTF_8));
+    // A layout carries no example data of its own; it is checked with empty data.
     return Bundle.write(files);
   }
 
-  /** A data file of the demo, e.g. {@code data-email.json}. */
+  /** A data file of the demo content, e.g. {@code example.json} or {@code data-email.json}. */
   static String data(String file) throws Exception {
-    return Files.readString(DEMO.resolve(file), StandardCharsets.UTF_8);
+    return Files.readString(CONTENT.resolve(file), StandardCharsets.UTF_8);
   }
 }

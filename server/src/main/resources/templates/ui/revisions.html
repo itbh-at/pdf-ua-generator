@@ -22,12 +22,10 @@
         <td class="muted">{r.createdAt}</td>
         <td class="muted">{#if r.publishedAt}{r.publishedAt}{#else}—{/if}</td>
         <td class="actions">
-          {#if !r.published}
-          <button hx-post="/ui/templates/{template.id}/revisions/{r.number}/publish"
-                  hx-target="#revisions" hx-swap="outerHTML">Publish</button>
-          <button class="danger" hx-post="/ui/templates/{template.id}/revisions/{r.number}/delete"
+          {#if r.published}
+          <button class="danger" hx-post="/ui/templates/{template.id}/revisions/{r.number}/archive"
                   hx-target="#revisions" hx-swap="outerHTML"
-                  hx-confirm="Delete draft {r.number}?">Delete</button>
+                  hx-confirm="Archive revision {r.number}? It is retired but kept as history.">Archive</button>
           {/if}
         </td>
       </tr>

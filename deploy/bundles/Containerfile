@@ -21,18 +21,11 @@ RUN apk add --no-cache zip
 COPY demo /demo
 RUN set -eu; \
     mkdir -p /bundles; \
-    # The content: the demo document, its descriptor and its example data.
-    mkdir -p /content/example; \
-    cp /demo/demo.xhtml /content/template.xhtml; \
-    cp /demo/demo.json /content/template.json; \
-    cp /demo/data.json /content/example.json; \
-    cp /demo/photo.png /content/example/photo.png; \
-    (cd /content && zip -Xrq /bundles/demo.zip .); \
-    # The layouts, each with its own example data; a layout renders on its own.
+    # Each demo is a self-contained bundle dir; zip it as is. data-email.json is
+    # a render input for the format check, not part of the shipped bundle.
+    (cd /demo/content && zip -Xrq /bundles/demo.zip . -x data-email.json); \
     for layout in layout layout-memo; do \
-        rm -rf /layout; cp -a "/demo/$layout" /layout; \
-        echo '{}' > /layout/example.json; \
-        (cd /layout && zip -Xrq "/bundles/demo-$layout.zip" .); \
+        (cd "/demo/$layout" && zip -Xrq "/bundles/demo-$layout.zip" .); \
     done
 
 FROM ${BASE}

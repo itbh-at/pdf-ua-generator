@@ -44,14 +44,12 @@ class ApiIT {
         .post("/templates/" + LAYOUT + "/revisions")
         .then()
         .statusCode(201);
-    given().post("/templates/" + LAYOUT + "/revisions/1/publish").then().statusCode(200);
     given()
         .contentType("application/zip")
         .body(demoBundle(LAYOUT + "@1"))
         .post("/templates/" + TEMPLATE + "/revisions")
         .then()
         .statusCode(201);
-    given().post("/templates/" + TEMPLATE + "/revisions/1/publish").then().statusCode(200);
 
     for (String format : new String[] {"pdf", "xhtml", "email-html", "text", "docx", "odt"}) {
       byte[] document =
@@ -86,6 +84,6 @@ class ApiIT {
   }
 
   private static byte[] data() throws Exception {
-    return java.nio.file.Files.readAllBytes(DemoBundles.DEMO.resolve("data-email.json"));
+    return java.nio.file.Files.readAllBytes(DemoBundles.CONTENT.resolve("data-email.json"));
   }
 }

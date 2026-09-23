@@ -26,16 +26,16 @@ class OfficeTemplateTest {
 
   private byte[] render(String layout, OutputFormat format) throws Exception {
     Map<String, Object> data;
-    try (InputStream in = Files.newInputStream(Demo.DIR.resolve("data.json"))) {
+    try (InputStream in = Files.newInputStream(Demo.CONTENT.resolve("example.json"))) {
       data = JsonData.parse(in);
     }
     return renderer
         .render(
             new RenderRequest(
-                "demo.xhtml",
+                "template.xhtml",
                 Demo.repository(layout),
                 data,
-                Map.of("photo", Files.readAllBytes(Demo.DIR.resolve("photo.png")))),
+                Map.of("photo", Files.readAllBytes(Demo.CONTENT.resolve("example/photo.png")))),
             format)
         .content();
   }

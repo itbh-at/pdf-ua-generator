@@ -13,6 +13,9 @@ public final class Demo {
 
   public static final Path DIR = Path.of("..", "demo");
 
+  /** The content template bundle: {@code demo/content/}. */
+  public static final Path CONTENT = DIR.resolve("content");
+
   private Demo() {}
 
   /** The demo layouts: {@code layout/} and {@code layout-memo/}. */
@@ -25,7 +28,7 @@ public final class Demo {
   /** The demo content with one of the demo layouts. */
   public static TemplateRepository repository(String layout) {
     return new ComposedTemplateRepository(
-        new DirectoryTemplateRepository(DIR, List.of()),
+        new DirectoryTemplateRepository(CONTENT, List.of()),
         new DirectoryTemplateRepository(DIR.resolve(layout), List.of()));
   }
 }

@@ -145,3 +145,51 @@ button.danger {
 ul.problems {
   margin: 0 0 12px;
 }
+
+input[type="text"],
+input:not([type]),
+select,
+textarea {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+input[type="file"] {
+  font: inherit;
+}
+
+textarea {
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+iframe[name="preview"] {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+form p {
+  margin: 8px 0;
+}
+
+details.schema {
+  margin: 12px 0;
+}
+
+details.schema summary {
+  cursor: pointer;
+  color: var(--accent);
+}
+
+details.schema pre {
+  max-height: 260px;
+  overflow: auto;
+  background: #f6f6f6;
+  padding: 10px 12px;
+  border-radius: 6px;
+}

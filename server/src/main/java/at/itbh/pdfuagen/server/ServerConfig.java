@@ -29,6 +29,17 @@ public interface ServerConfig {
 
   Bundle bundle();
 
+  Warmup warmup();
+
+  interface Warmup {
+    /**
+     * Render the latest published revision of every template at start-up, so the first request is
+     * warm. Turned off under the test profile.
+     */
+    @WithDefault("true")
+    boolean enabled();
+  }
+
   interface Render {
     /** Rendering threads. Default: the number of CPU cores. */
     OptionalInt threads();

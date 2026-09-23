@@ -12,14 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class TemplateCheckTest {
 
-  private static final Path DEMO = Path.of("..", "demo");
   private static final String DESCRIPTOR =
       "{\"language\": \"en\", \"formats\": [\"pdf\", \"text\"],"
           + " \"fields\": {\"name\": {\"type\": \"text\"}}}";
@@ -37,16 +35,16 @@ class TemplateCheckTest {
   @Test
   void demoPasses() throws Exception {
     Map<String, Object> data;
-    try (InputStream in = Files.newInputStream(DEMO.resolve("data.json"))) {
+    try (InputStream in = Files.newInputStream(Demo.CONTENT.resolve("example.json"))) {
       data = JsonData.parse(in);
     }
     TemplateCheck.Report report =
         TemplateCheck.check(
             renderer,
             Demo.repository(),
-            "demo.xhtml",
+            "template.xhtml",
             data,
-            Map.of("photo", Files.readAllBytes(DEMO.resolve("photo.png"))));
+            Map.of("photo", Files.readAllBytes(Demo.CONTENT.resolve("example/photo.png"))));
     assertTrue(report.passed(), report.problems()::toString);
     assertEquals(
         List.of(

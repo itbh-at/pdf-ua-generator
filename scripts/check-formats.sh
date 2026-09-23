@@ -32,13 +32,15 @@ layouts=(layout layout-memo)
 step "Rendering"
 for layout in "${layouts[@]}"; do
   dir="$out/$layout" && mkdir -p "$dir"
-  demo=(-t demo/demo.xhtml --layout "demo/$layout" -d demo/data.json -a photo=demo/photo.png)
+  demo=(-t demo/content/template.xhtml --layout "demo/$layout" -d demo/content/example.json \
+    -a photo=demo/content/example/photo.png)
   for format in pdf xhtml text docx odt; do
     ext=$format; [ "$format" = text ] && ext=txt
     check cli render "${demo[@]}" -f "$format" -o "$dir/demo.$ext"
   done
   # Email HTML cannot use request attachments, so it is rendered without the photo.
-  check cli render -t demo/demo.xhtml --layout "demo/$layout" -d demo/data-email.json -f email-html \
+  check cli render -t demo/content/template.xhtml --layout "demo/$layout" \
+    -d demo/content/data-email.json -f email-html \
     --public-base-url https://assets.example.invalid -o "$dir/demo.email.html"
 done
 

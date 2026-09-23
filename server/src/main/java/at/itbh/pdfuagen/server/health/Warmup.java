@@ -40,10 +40,16 @@ public class Warmup implements HealthCheck {
 
   @Inject TemplateStore store;
   @Inject RenderService service;
+  @Inject at.itbh.pdfuagen.server.ServerConfig config;
 
   private volatile boolean done;
 
   void start(@Observes StartupEvent event) {
+    // Off under %test, where a shared Dev Services database would warm leftover templates.
+    if (!config.warmup().enabled()) {
+      done = true;
+      return;
+    }
     Thread.ofVirtual().name("warmup").start(this::run);
   }
 
