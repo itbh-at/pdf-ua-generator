@@ -18,6 +18,7 @@
 * xref:reference/configuration.adoc[Configuration]
 * xref:reference/building-blocks.adoc[Template building blocks]
 * xref:reference/problem-types.adoc[Problem types]
+* xref:reference/glossary.adoc[Glossary]
 
 .Explanation
 * xref:explanation/architecture.adoc[Architecture]

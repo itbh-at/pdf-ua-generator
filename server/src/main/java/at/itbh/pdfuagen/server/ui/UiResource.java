@@ -90,9 +90,34 @@ public class UiResource {
   @Location("ui/problems.html")
   Template problemsFragment;
 
+  /** Document templates and layouts live on pages of their own; the start page is the first. */
   @GET
-  public TemplateInstance list() {
-    return templatesPage.data("templates", store.list());
+  public Response start() {
+    return Response.seeOther(java.net.URI.create("/ui/documents")).build();
+  }
+
+  @GET
+  @Path("/documents")
+  public TemplateInstance documents() {
+    return list(TemplateStore.CONTENT);
+  }
+
+  @GET
+  @Path("/layouts")
+  public TemplateInstance layouts() {
+    return list(TemplateStore.LAYOUT);
+  }
+
+  private TemplateInstance list(String kind) {
+    return templatesPage
+        .data("kind", kind)
+        .data("layouts", TemplateStore.LAYOUT.equals(kind))
+        .data("templates", store.list().stream().filter(t -> t.kind().equals(kind)).toList());
+  }
+
+  /** The page listing templates of a kind. */
+  static String listPage(String kind) {
+    return TemplateStore.LAYOUT.equals(kind) ? "/ui/layouts" : "/ui/documents";
   }
 
   @POST
@@ -100,7 +125,10 @@ public class UiResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Blocking
   public Response create(
-      @RestForm String id, @RestForm("bundle") FileUpload bundle, @Context UriInfo uri)
+      @RestForm String id,
+      @RestForm("bundle") FileUpload bundle,
+      @RestForm String kind,
+      @Context UriInfo uri)
       throws IOException {
     if (id == null || !TemplateStore.ID.matcher(id).matches()) {
       return html(problemsFragment.data("problems", problem("invalid template id")));
@@ -110,7 +138,8 @@ public class UiResource {
     }
     try (InputStream in = Files.newInputStream(bundle.uploadedFile())) {
       java.net.URI publicBase = config.publicBaseUrl().orElse(uri.getBaseUri());
-      return switch (actions.create(id, in, publicBase)) {
+      String expected = kind == null || kind.isBlank() ? null : kind;
+      return switch (actions.create(id, in, publicBase, expected)) {
         // Validated and released: let htmx navigate to the new template's page.
         case TemplateActions.Created c ->
             Response.ok().header("HX-Redirect", "/ui/templates/" + id).build();
@@ -161,9 +190,10 @@ public class UiResource {
   @POST
   @Path("/templates/{id}/delete")
   public Response delete(@PathParam("id") String id) {
+    String list = listPage(templateOf(id).kind());
     return switch (actions.deleteTemplate(id)) {
-      // Deleted: leave the template page for the catalogue.
-      case TemplateActions.Deleted d -> Response.ok().header("HX-Redirect", "/ui").build();
+      // Deleted: leave the template page for the list it was on.
+      case TemplateActions.Deleted d -> Response.ok().header("HX-Redirect", list).build();
       case TemplateActions.CannotDelete c ->
           html(problemsFragment.data("problems", problem(c.detail())));
       case TemplateActions.Missing m -> throw new NotFoundException(m.detail());

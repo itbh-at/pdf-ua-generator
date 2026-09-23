@@ -27,10 +27,24 @@ header {
   padding: 12px 24px;
 }
 
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 24px;
+}
+
 header a {
-  font-weight: 600;
   text-decoration: none;
   color: var(--fg);
+}
+
+header a.brand {
+  font-weight: 600;
+}
+
+header nav a {
+  margin-right: 16px;
+  color: var(--accent);
 }
 
 main {

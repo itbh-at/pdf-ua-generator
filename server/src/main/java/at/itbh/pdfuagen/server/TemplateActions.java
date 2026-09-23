@@ -64,6 +64,18 @@ public class TemplateActions {
    */
   public CreateResult create(String id, InputStream zip, URI publicBase)
       throws java.io.IOException {
+    return create(id, zip, publicBase, null);
+  }
+
+  /**
+   * As {@link #create(String, InputStream, URI)}, refusing a bundle of another kind than expected
+   * before anything is stored.
+   *
+   * @param expectedKind {@link TemplateStore#CONTENT}, {@link TemplateStore#LAYOUT}, or {@code
+   *     null} for either
+   */
+  public CreateResult create(String id, InputStream zip, URI publicBase, String expectedKind)
+      throws java.io.IOException {
     Map<String, byte[]> files;
     try {
       files = Bundle.read(zip, config.bundle().maxSize(), config.bundle().maxFiles());
@@ -72,6 +84,16 @@ public class TemplateActions {
     }
     String kind =
         files.containsKey(LayoutDescriptor.FILE) ? TemplateStore.LAYOUT : TemplateStore.CONTENT;
+    if (expectedKind != null && !expectedKind.equals(kind)) {
+      return new KindMismatch(
+          kind.equals(TemplateStore.LAYOUT)
+              ? "the bundle is a layout (it has "
+                  + LayoutDescriptor.FILE
+                  + "), not a document template"
+              : "the bundle is a document template (it has no "
+                  + LayoutDescriptor.FILE
+                  + "), not a layout");
+    }
     List<TemplateStore.LayoutPin> layouts = List.of();
     byte[] descriptor = files.get(LanguageVariants.descriptorPath(Bundle.TEMPLATE));
     if (kind.equals(TemplateStore.CONTENT) && descriptor != null) {

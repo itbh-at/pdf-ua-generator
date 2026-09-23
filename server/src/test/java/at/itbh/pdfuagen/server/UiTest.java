@@ -9,6 +9,7 @@ import static at.itbh.pdfuagen.server.DemoBundles.demoBundle;
 import static at.itbh.pdfuagen.server.DemoBundles.layoutBundle;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 
 import io.quarkus.test.junit.QuarkusTest;
@@ -25,24 +26,45 @@ class UiTest {
   void listsArchivesAndDeletes() throws Exception {
     String layout = ID + "-layout";
 
-    // Upload validates and releases in one step; htmx navigates to the new template.
+    // The layouts page takes only layouts: a document template is refused, nothing stored.
     given()
         .multiPart("id", layout)
+        .multiPart("kind", "layout")
+        .multiPart("bundle", "bundle.zip", demoBundle("demo-layout@1"), "application/zip")
+        .post("/ui/templates")
+        .then()
+        .statusCode(200)
+        .body(containsString("is a document template"));
+    given().accept("text/html").get("/ui/templates/" + layout).then().statusCode(404);
+
+    // Upload validates and releases in one step; htmx navigates to the new layout.
+    given()
+        .multiPart("id", layout)
+        .multiPart("kind", "layout")
         .multiPart("bundle", "bundle.zip", layoutBundle("Example"), "application/zip")
         .post("/ui/templates")
         .then()
         .statusCode(200)
         .header("HX-Redirect", "/ui/templates/" + layout);
 
-    // Catalogue: HTML with the bundle and the new template linked.
+    // Layouts and document templates are listed on pages of their own; /ui starts with the
+    // document templates.
+    given()
+        .accept("text/html")
+        .get("/ui/layouts")
+        .then()
+        .statusCode(200)
+        .contentType(startsWith("text/html"))
+        .body(containsString("<script"))
+        .body(containsString("<h1>Layouts</h1>"))
+        .body(containsString("/ui/templates/" + layout));
     given()
         .accept("text/html")
         .get("/ui")
         .then()
         .statusCode(200)
-        .contentType(startsWith("text/html"))
-        .body(containsString("<script"))
-        .body(containsString("/ui/templates/" + layout));
+        .body(containsString("<h1>Document templates</h1>"))
+        .body(not(containsString("/ui/templates/" + layout)));
 
     // Template detail: the revisions panel with the released revision, an archive action and
     // delete.
@@ -54,7 +76,8 @@ class UiTest {
         .body(containsString("id=\"revisions\""))
         .body(containsString("published"))
         .body(containsString("hx-post"))
-        .body(containsString("Delete template"));
+        .body(containsString("← Layouts"))
+        .body(containsString("Delete</button>"));
 
     // Revision detail: the files of the revision.
     given()
@@ -74,13 +97,13 @@ class UiTest {
         .body(containsString("archived"))
         .body(containsString("Revision 1 archived."));
 
-    // Delete the whole template (nothing references it) through the UI.
+    // Delete the layout (nothing lists it) through the UI; back to the layouts page.
     given()
         .accept("text/html")
         .post("/ui/templates/" + layout + "/delete")
         .then()
         .statusCode(200)
-        .header("HX-Redirect", "/ui");
+        .header("HX-Redirect", "/ui/layouts");
     given().accept("text/html").get("/ui/templates/" + layout).then().statusCode(404);
   }
 
@@ -155,7 +178,7 @@ class UiTest {
         .then()
         .statusCode(200)
         .body(containsString("published"))
-        .body(containsString("Generate a document"));
+        .body(containsString("Preview the layout"));
 
     // The generate form offers the template's formats.
     given()

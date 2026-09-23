@@ -1,32 +1,33 @@
 {#include ui/base}
-{#title}Templates{/title}
-<h1>Templates</h1>
+{#title}{#if layouts}Layouts{#else}Document templates{/if}{/title}
+<h1>{#if layouts}Layouts{#else}Document templates{/if}</h1>
 <table>
   <thead>
-    <tr><th>ID</th><th>Kind</th><th>Latest</th><th>Published</th><th>Created</th></tr>
+    <tr><th>ID</th><th>Latest</th><th>Published</th><th>Created</th></tr>
   </thead>
   <tbody>
     {#for t in templates}
     <tr>
       <td><a href="/ui/templates/{t.id}">{t.id}</a></td>
-      <td>{t.kind}</td>
       <td>{t.latest}</td>
       <td>{#if t.latestPublished}{t.latestPublished}{#else}<span class="muted">—</span>{/if}</td>
       <td class="muted">{t.createdAt}</td>
     </tr>
     {/for}
     {#if templates.isEmpty()}
-    <tr><td colspan="5" class="muted">No templates yet.</td></tr>
+    <tr><td colspan="4" class="muted">{#if layouts}No layouts yet.{#else}No document templates yet.{/if}</td></tr>
     {/if}
   </tbody>
 </table>
 
-<h2>New template</h2>
-<p class="muted">Upload a bundle (a layout or a content template). It is validated and released for
-use right away; if the checks fail, nothing is stored and the problems are shown.</p>
+<h2>{#if layouts}New layout{#else}New document template{/if}</h2>
+<p class="muted">Upload a bundle: the zipped folder of {#if layouts}a layout{#else}a document template{/if}.
+It is validated and released for use right away; if the checks fail, nothing is stored and the
+problems are shown.</p>
 <form hx-post="/ui/templates" hx-encoding="multipart/form-data"
       hx-target="#new-result" hx-swap="innerHTML">
-  <p><input name="id" placeholder="template-id (lower-case, digits, dashes)" required></p>
+  <input type="hidden" name="kind" value="{kind}">
+  <p><input name="id" placeholder="id (lower-case, digits, dashes)" required></p>
   <p><input type="file" name="bundle" accept=".zip,application/zip" required></p>
   <button>Upload</button>
 </form>

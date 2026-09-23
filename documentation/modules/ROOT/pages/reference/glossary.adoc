@@ -1,0 +1,49 @@
+////
+  // SPDX-License-Identifier: Apache-2.0
+  // Copyright 2026 IT Beratung Hermann GmbH
+////
+
+= Glossary
+:description: The terms used in the docs, the UI and the API, each for one thing only.
+
+[cols="1,3,1",options="header"]
+|===
+|Term |What it is |Example
+
+|Document template
+|The unit with an id that supplies the text: data model, list of layouts,
+example data and all language variants; on the server, with revisions.
+|`demo`
+
+|Layout
+|The unit with an id that decides only the look: styles, page frame, fonts and
+the texts of the page frame.
+|`demo-layout`
+
+|Language variant
+|The XHTML file of one language within a document template.
+|`template.de.xhtml`
+
+|Default variant
+|The language variant in the default language of the document template.
+|`template.xhtml`
+
+|Document
+|The result of rendering: a document template with data, in one layout, one
+language and one format.
+|the PDF, the DOCX
+
+|Revision
+|An immutable state of a document template or a layout on the server.
+|`demo@2`
+
+|Bundle
+|The ZIP file of a revision: the zipped folder of a document template or a
+layout.
+|`demo.zip`
+|===
+
+"Template" alone names neither: a file is a language variant, the unit is a
+document template or a layout. In the REST API, `/templates` covers both, and
+the field `kind` tells them apart: `content` is a document template, `layout` a
+layout.

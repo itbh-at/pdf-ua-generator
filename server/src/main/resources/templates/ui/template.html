@@ -1,8 +1,14 @@
 {#include ui/base}
 {#title}{template.id}{/title}
-<p><a href="/ui">← Templates</a></p>
-<h1>{template.id} <small>{template.kind}</small></h1>
+{#if template.kind == 'layout'}
+<p><a href="/ui/layouts">← Layouts</a></p>
+<h1>{template.id} <small>layout</small></h1>
+{#if template.latestPublished}<p><a href="/ui/templates/{template.id}/render">Preview the layout →</a></p>{/if}
+{#else}
+<p><a href="/ui/documents">← Document templates</a></p>
+<h1>{template.id} <small>document template</small></h1>
 {#if template.latestPublished}<p><a href="/ui/templates/{template.id}/render">Generate a document →</a></p>{/if}
+{/if}
 
 <h2>Revisions</h2>
 {#include ui/revisions /}
@@ -27,11 +33,11 @@
 {/if}
 
 <h2>Delete</h2>
-<p class="muted">Removes the template with all its revisions. A layout can be deleted only while no
-content references it.</p>
+<p class="muted">Removes it with all its revisions. A layout can be deleted only while no document
+template lists it.</p>
 <form hx-post="/ui/templates/{template.id}/delete" hx-target="#delete-result" hx-swap="innerHTML"
-      hx-confirm="Delete template {template.id} with all its revisions?">
-  <button class="danger">Delete template</button>
+      hx-confirm="Delete {template.id} with all its revisions?">
+  <button class="danger">Delete</button>
 </form>
 <div id="delete-result"></div>
 {/include}
