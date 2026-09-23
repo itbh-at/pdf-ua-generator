@@ -10,6 +10,7 @@ import static at.itbh.pdfuagen.server.DemoBundles.data;
 import static at.itbh.pdfuagen.server.DemoBundles.demoBundle;
 import static at.itbh.pdfuagen.server.DemoBundles.layoutBundle;
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -94,7 +95,7 @@ class ApiTest {
         .body("status", equalTo("published"))
         .body("language", equalTo("en"))
         .body("kind", equalTo("content"))
-        .body("layout", equalTo("demo-layout@1"))
+        .body("layouts", contains("demo-layout@1"))
         .body("formats", hasItem("docx"))
         .body("problems.size()", equalTo(0));
 
@@ -286,7 +287,7 @@ class ApiTest {
         .statusCode(201)
         .body("revision", equalTo(2))
         .body("status", equalTo("published"))
-        .body("layout", equalTo("demo-layout@2"));
+        .body("layouts", contains("demo-layout@2"));
     assertTrue(xhtml("demo").contains("Changed header"));
 
     given()
@@ -352,6 +353,53 @@ class ApiTest {
     String plain = xhtml("demo");
     assertTrue(memo.contains("MEMORANDUM") && memo.contains("Hello Jane Doe."), memo);
     assertTrue(!plain.contains("MEMORANDUM") && plain.contains("Hello Jane Doe."), plain);
+  }
+
+  @Test
+  @Order(16)
+  void rendersWithAnyListedLayout() throws Exception {
+    // One revision listing both layouts: checked with each on upload, the first is the default.
+    given()
+        .contentType(ZIP)
+        .body(demoBundle("demo-layout@2", "memo-layout@1"))
+        .post("/templates/demo/revisions")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(201)
+        .body("revision", equalTo(3))
+        .body("layouts", contains("demo-layout@2", "memo-layout@1"));
+
+    Response byDefault = render("demo", "");
+    byDefault.then().statusCode(200).header("Template-Layout", "demo-layout@2");
+    assertTrue(!byDefault.asString().contains("MEMORANDUM"));
+    Response memo = render("demo", "memo-layout");
+    memo.then().statusCode(200).header("Template-Layout", "memo-layout@1");
+    assertTrue(memo.asString().contains("MEMORANDUM"), memo.asString());
+    render("demo", "memo-layout@1").then().statusCode(200);
+
+    render("demo", "unknown-layout")
+        .then()
+        .statusCode(400)
+        .body("type", equalTo(PROBLEM + "invalid-request"))
+        .body("detail", containsString("demo-layout@2, memo-layout@1"));
+
+    // A listed layout revision cannot be archived while released content lists it.
+    given().delete("/templates/memo-layout/revisions/1").then().statusCode(409);
+  }
+
+  @Test
+  @Order(17)
+  void rejectsContentWhenOneListedLayoutIsMissing() throws Exception {
+    given()
+        .contentType(ZIP)
+        .body(demoBundle("demo-layout@2", "missing-layout@1"))
+        .post("/templates/demo-partial/revisions")
+        .then()
+        .statusCode(422)
+        .body("errors[0].detail", containsString("missing-layout@1 does not exist"))
+        .body("errors[0].location", equalTo("template.json#/layouts/1"));
+    given().get("/templates/demo-partial").then().statusCode(404);
   }
 
   @Test
@@ -483,6 +531,18 @@ class ApiTest {
             + body
             + "</p></body></html>")
         .getBytes(StandardCharsets.UTF_8);
+  }
+
+  /** Renders the template as XHTML with a listed layout; {@code ""} for the default. */
+  private static Response render(String template, String layout) throws Exception {
+    return given()
+        .contentType("application/json")
+        .body(data("data-email.json"))
+        .post(
+            "/templates/"
+                + template
+                + "/render?format=xhtml"
+                + (layout.isEmpty() ? "" : "&layout=" + layout));
   }
 
   private static String xhtml(String template) throws Exception {

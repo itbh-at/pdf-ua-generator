@@ -21,6 +21,7 @@ import jakarta.inject.Inject;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,24 +72,21 @@ public class TemplateActions {
     }
     String kind =
         files.containsKey(LayoutDescriptor.FILE) ? TemplateStore.LAYOUT : TemplateStore.CONTENT;
-    TemplateDescriptor.LayoutRef layout = null;
+    List<TemplateStore.LayoutPin> layouts = List.of();
     byte[] descriptor = files.get(LanguageVariants.descriptorPath(Bundle.TEMPLATE));
     if (kind.equals(TemplateStore.CONTENT) && descriptor != null) {
       try {
-        layout = TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE).layout();
+        layouts =
+            TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE).layouts().stream()
+                .map(l -> new TemplateStore.LayoutPin(l.id(), l.revision()))
+                .toList();
       } catch (RenderException e) {
         // A malformed descriptor is reported by the publish check below.
       }
     }
     TemplateStore.Stored stored;
     try {
-      stored =
-          store.createRevision(
-              id,
-              files,
-              kind,
-              layout == null ? null : layout.id(),
-              layout == null ? null : layout.revision());
+      stored = store.createRevision(id, files, kind, layouts);
     } catch (TemplateStore.KindMismatchException e) {
       return new KindMismatch(e.getMessage());
     }
@@ -130,7 +128,7 @@ public class TemplateActions {
   /**
    * Runs the publish checks and, if they pass, releases the revision. A layout is checked with
    * empty data ({@code {}}) — it carries no example data of its own; a content template is checked
-   * with its {@code example.json}.
+   * with its {@code example.json}, once with every layout it lists.
    */
   private ReleaseResult release(TemplateStore.Revision draft, URI publicBase) {
     Optional<TemplateStore.Revision> found = store.revision(draft.templateId(), draft.number());
@@ -143,23 +141,30 @@ public class TemplateActions {
       return new Conflict("revision " + revision.number() + " is already published");
     }
     boolean isLayout = revision.files().containsKey(LayoutDescriptor.FILE);
-    TemplateStore.Revision layout = layout(revision).orElse(null);
-    if (revision.layoutId() != null) {
-      String pinned = revision.layoutId() + "@" + revision.layoutRevision();
+    // Every listed layout must exist and be released.
+    List<TemplateStore.Revision> layouts = new ArrayList<>();
+    List<Problem> unavailable = new ArrayList<>();
+    for (int i = 0; i < revision.layouts().size(); i++) {
+      TemplateStore.LayoutPin pin = revision.layouts().get(i);
+      Optional<TemplateStore.Revision> layout = layout(pin);
       String problem =
-          layout == null
-              ? "the layout " + pinned + " does not exist"
-              : layout.published() ? null : "the layout " + pinned + " is not published";
-      if (problem != null) {
-        return new Rejected2(
-            List.of(
-                new Problem(
-                    Problem.TEMPLATE_ERROR,
-                    problem + "; upload it first, or pin a released one",
-                    "template.json#/layout")));
+          layout.isEmpty()
+              ? "the layout " + pin + " does not exist"
+              : layout.get().published() ? null : "the layout " + pin + " is not published";
+      if (problem == null) {
+        layouts.add(layout.get());
+      } else {
+        unavailable.add(
+            new Problem(
+                Problem.TEMPLATE_ERROR,
+                problem + "; upload it first, or list a released one",
+                "template.json#/layouts/" + i));
       }
     }
-    TemplateRepository repository = service.repository(revision, layout);
+    if (!unavailable.isEmpty()) {
+      return new Rejected2(unavailable);
+    }
+    TemplateRepository own = service.repository(revision, null);
     Map<String, Object> data;
     Map<String, byte[]> attachments;
     if (isLayout) {
@@ -167,7 +172,7 @@ public class TemplateActions {
       data = Map.of();
       attachments = Map.of();
     } else {
-      Optional<byte[]> example = repository.resource(Bundle.EXAMPLE);
+      Optional<byte[]> example = own.resource(Bundle.EXAMPLE);
       if (example.isEmpty()) {
         return new Rejected2(
             List.of(
@@ -182,14 +187,38 @@ public class TemplateActions {
         return new Rejected2(e.problems());
       }
       attachments =
-          Bundle.exampleAttachments(
-              revision.files().keySet(), p -> repository.resource(p).orElseThrow());
+          Bundle.exampleAttachments(revision.files().keySet(), p -> own.resource(p).orElseThrow());
     }
-    TemplateCheck.Report report =
-        TemplateCheck.check(
-            service.renderer(), repository, Bundle.TEMPLATE, data, attachments, publicBase);
-    if (!report.passed()) {
-      return new Rejected2(report.problems());
+    // A template without layouts is checked on its own; one with layouts with each of them.
+    List<TemplateStore.Revision> checked =
+        layouts.isEmpty() ? java.util.Arrays.asList((TemplateStore.Revision) null) : layouts;
+    List<Problem> problems = new ArrayList<>();
+    for (TemplateStore.Revision layout : checked) {
+      TemplateCheck.Report report =
+          TemplateCheck.check(
+              service.renderer(),
+              service.repository(revision, layout),
+              Bundle.TEMPLATE,
+              data,
+              attachments,
+              publicBase);
+      for (Problem p : report.problems()) {
+        problems.add(
+            checked.size() == 1
+                ? p
+                : new Problem(
+                    p.type(),
+                    "with layout "
+                        + layout.templateId()
+                        + "@"
+                        + layout.number()
+                        + ": "
+                        + p.detail(),
+                    p.location()));
+      }
+    }
+    if (!problems.isEmpty()) {
+      return new Rejected2(problems.stream().distinct().toList());
     }
     if (!store.release(revision.templateId(), revision.number())) {
       return new Conflict("revision " + revision.number() + " is already published");
@@ -249,19 +278,14 @@ public class TemplateActions {
             .toList();
     if (!users.isEmpty()) {
       return new CannotDelete(
-          "the layout is still referenced by "
-              + String.join(", ", users)
-              + "; archive those first");
+          "the layout is still referenced by " + String.join(", ", users) + "; delete those first");
     }
     return store.deleteTemplate(id) ? new Deleted() : new Missing("no template '" + id + "'");
   }
 
-  private Optional<TemplateStore.Revision> layout(TemplateStore.Revision revision) {
-    if (revision.layoutId() == null) {
-      return Optional.empty();
-    }
+  private Optional<TemplateStore.Revision> layout(TemplateStore.LayoutPin pin) {
     return store
-        .revision(revision.layoutId(), revision.layoutRevision())
+        .revision(pin.id(), pin.revision())
         .filter(l -> l.files().containsKey(LayoutDescriptor.FILE));
   }
 

@@ -70,10 +70,12 @@ text.
 |BCP 47 tag of the default variant. Required. Values of the default variant are
 formatted for this language.
 
-|`layout`
-|The layout revision the template fills, e.g. `"corporate@3"`. Optional; see
-xref:reference/layouts.adoc[Layouts]. Without it the template brings its own
-styling (written by developers).
+|`layouts`
+|The layout revisions the template may be rendered with, e.g.
+`["corporate@3", "memo@1"]`; the first is the default, and at most one
+revision per layout. Optional; see xref:reference/layouts.adoc[Layouts].
+Without it the template brings its own styling (written by developers). A
+single layout may also be written `"layout": "corporate@3"`; not both keys.
 
 |`styling`
 |`"catalog"` (default) or `"free"` for a template with a layout; see

@@ -87,7 +87,7 @@ plain text).
   there is no separate publish step and no resting draft. A released revision is
   not deleted but archived (retired, kept as history); a whole template is
   deleted only while nothing references it. A layout revision cannot be archived,
-  nor its template deleted, while released content pins it. Status values are
+  nor its template deleted, while released content lists it. Status values are
   `published` (released) and `archived`; `draft` is only transient during an
   upload.
 - Caching is done with `quarkus-cache`, never hand-rolled. The files of a
@@ -97,7 +97,7 @@ plain text).
   font metrics, schemas) stays in the renderer, keyed by
   `TemplateRepository.contentKey()` and never by the repository object.
 - Database columns derived from bundle files (`template.kind`,
-  `revision.layout_id`, `layout_revision`) are an index, never a second source.
+  `revision_layout`) are an index, never a second source.
   When the way they are derived changes, a Flyway migration recomputes them
   from the stored files.
 
@@ -108,9 +108,12 @@ plain text).
   fields), `template.xhtml` with `{#insert}` areas, `components/<name>.xhtml`,
   `messages.json` plus `messages.<tag>.json`, `email.css`, and optionally
   `layout.dotx` and `layout.ott`.
-- A content template's descriptor pins one layout revision
-  (`"layout": "corporate@3"`); the content is one `{#include layout}` filling
-  declared areas. The layout's files appear under `layout/`.
+- A content template's descriptor lists the layout revisions it may be rendered
+  with (`"layouts": ["corporate@3", "memo@1"]`, at most one revision per layout);
+  the first is the default, a render request may choose another listed one
+  (`layout` parameter), and anything else is refused. The publish check renders
+  the content with every listed layout. The content is one `{#include layout}`
+  filling declared areas. The layout's files appear under `layout/`.
 - Default: content templates are styled only through the style catalog (named
   CSS classes) and the components (Qute user tags) of their layout. No `style`
   attribute, no `<style>` block, no `<link>`, no font declarations; class

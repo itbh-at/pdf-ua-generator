@@ -23,8 +23,9 @@ metadata:
 data:
   import.sh: |
     #!/bin/sh
-    # Uploads and publishes every bundle. Two passes: content whose layout is
-    # published only in the first pass succeeds in the second.
+    # Uploads every bundle; an upload validates and releases it. Two passes:
+    # content whose layouts are released only in the first pass succeeds in the
+    # second.
     set -eu
     bundles=${BUNDLES:-/bundles}
     echo "waiting for $SERVICE_URL"

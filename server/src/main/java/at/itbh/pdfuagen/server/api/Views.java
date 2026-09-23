@@ -28,7 +28,7 @@ final class Views {
   /**
    * A stored revision with its files ready to render.
    *
-   * @param layout the layout revision the content pins, or {@code null}
+   * @param layout the layout revision the content is composed with, or {@code null}
    */
   record Target(
       TemplateStore.Revision revision,
@@ -52,9 +52,10 @@ final class Views {
   record RevisionSummary(
       int revision,
       String status,
-      String layout,
+      List<String> layouts,
       OffsetDateTime createdAt,
-      OffsetDateTime publishedAt) {}
+      OffsetDateTime publishedAt,
+      OffsetDateTime archivedAt) {}
 
   record UsedBy(String template, int revision, String status, int layoutRevision) {}
 
@@ -82,10 +83,11 @@ final class Views {
       String kind,
       int revision,
       String status,
-      String layout,
+      List<String> layouts,
       String sha256,
       OffsetDateTime createdAt,
       OffsetDateTime publishedAt,
+      OffsetDateTime archivedAt,
       String language,
       List<String> languages,
       List<String> formats,
@@ -109,7 +111,12 @@ final class Views {
                 .map(
                     r ->
                         new RevisionSummary(
-                            r.number(), r.status(), layout(r), r.createdAt(), r.publishedAt()))
+                            r.number(),
+                            r.status(),
+                            layouts(r),
+                            r.createdAt(),
+                            r.publishedAt(),
+                            r.archivedAt()))
                 .toList(),
         dependents == null
             ? null
@@ -118,8 +125,9 @@ final class Views {
                 .toList());
   }
 
-  static String layout(TemplateStore.Revision r) {
-    return r.layoutId() == null ? null : r.layoutId() + "@" + r.layoutRevision();
+  /** The layouts a content revision lists, the default first; {@code null} if none. */
+  static List<String> layouts(TemplateStore.Revision r) {
+    return r.layouts().isEmpty() ? null : r.layouts().stream().map(Object::toString).toList();
   }
 
   static RevisionView revision(Target target, RenderService service) {
@@ -140,10 +148,11 @@ final class Views {
             : TemplateStore.CONTENT,
         revision.number(),
         revision.status(),
-        layout(revision),
+        layouts(revision),
         revision.sha256(),
         revision.createdAt(),
         revision.publishedAt(),
+        revision.archivedAt(),
         language.toLanguageTag().equals("und") ? null : language.toLanguageTag(),
         List.copyOf(repository.languages(Bundle.TEMPLATE)),
         renderer.formats(repository, Bundle.TEMPLATE).stream().map(OutputFormat::id).toList(),

@@ -134,12 +134,16 @@ in their markup; their `<style>` may use Qute, so page headers and footers can
 take texts from the layout's message files (`+{msg:page}+`) and the document
 language from `+{doc:lang}+`.
 
-A content revision pins one layout revision (`corporate@3`). A new layout
-revision changes nothing for the content that pins an older one; moving to it
-is a new content revision, which re-runs the publish checks. A layout revision
-that published content pins cannot be deleted, and content can be published
-only with a published layout revision. So a layout change never alters a
-published document unnoticed.
+A content revision lists the layout revisions it may be rendered with
+(`["corporate@3", "memo@1"]`); the first is the default, and a render request
+may choose another listed one. The list is the compatibility matrix: the
+publish checks render the content with every listed layout, so no combination
+is used before it has passed them. A new layout revision changes nothing for
+the content that lists an older one; moving to it is a new content revision,
+which re-runs the checks. A layout revision that released content lists cannot
+be archived, and content is released only with released layout revisions. So a
+layout change never alters a released document unnoticed, and a new layout
+never widens what existing content may be rendered with.
 
 == Language variants
 

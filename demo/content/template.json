@@ -1,6 +1,6 @@
 {
   "language": "en",
-  "layout": "demo-layout@1",
+  "layouts": ["demo-layout@1", "memo-layout@1"],
   "fields": {
     "customer": {
       "type": "object",

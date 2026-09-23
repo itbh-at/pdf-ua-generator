@@ -5,6 +5,7 @@
 
 package at.itbh.pdfuagen.server;
 
+import static at.itbh.pdfuagen.server.DemoBundles.demoBundle;
 import static at.itbh.pdfuagen.server.DemoBundles.layoutBundle;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
@@ -81,6 +82,45 @@ class UiTest {
         .statusCode(200)
         .header("HX-Redirect", "/ui");
     given().accept("text/html").get("/ui/templates/" + layout).then().statusCode(404);
+  }
+
+  @Test
+  void generatesWithAChosenLayout() throws Exception {
+    String plain = ID + "-plain";
+    String memo = ID + "-memo";
+    String content = ID + "-content";
+    upload(plain, layoutBundle("Plain"));
+    upload(memo, layoutBundle("layout-memo", "Internal memo"));
+    upload(content, demoBundle(plain + "@1", memo + "@1"));
+
+    // The form offers the listed layouts, the first as the default.
+    given()
+        .accept("text/html")
+        .get("/ui/templates/" + content + "/render")
+        .then()
+        .statusCode(200)
+        .body(containsString("<select name=\"layout\">"))
+        .body(containsString(plain + "@1 (default)"))
+        .body(containsString(memo + "@1"));
+
+    given()
+        .multiPart("data", DemoBundles.data("data-email.json"))
+        .multiPart("format", "xhtml")
+        .multiPart("layout", memo + "@1")
+        .post("/ui/templates/" + content + "/render")
+        .then()
+        .statusCode(200)
+        .body(containsString("MEMORANDUM"));
+  }
+
+  private static void upload(String id, byte[] bundle) {
+    given()
+        .multiPart("id", id)
+        .multiPart("bundle", "bundle.zip", bundle, "application/zip")
+        .post("/ui/templates")
+        .then()
+        .statusCode(200)
+        .header("HX-Redirect", "/ui/templates/" + id);
   }
 
   @Test

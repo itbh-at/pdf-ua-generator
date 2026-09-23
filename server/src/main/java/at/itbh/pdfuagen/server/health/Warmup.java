@@ -69,11 +69,18 @@ public class Warmup implements HealthCheck {
     }
   }
 
+  /** Warms the revision with every layout it lists, or on its own if it lists none. */
   private void warm(TemplateStore.Revision revision) {
-    TemplateStore.Revision layout =
-        revision.layoutId() == null
-            ? null
-            : store.revision(revision.layoutId(), revision.layoutRevision()).orElse(null);
+    if (revision.layouts().isEmpty()) {
+      warm(revision, null);
+      return;
+    }
+    for (TemplateStore.LayoutPin pin : revision.layouts()) {
+      warm(revision, store.revision(pin.id(), pin.revision()).orElse(null));
+    }
+  }
+
+  private void warm(TemplateStore.Revision revision, TemplateStore.Revision layout) {
     TemplateRepository repository = service.repository(revision, layout);
     Optional<byte[]> example = repository.resource(Bundle.EXAMPLE);
     if (example.isEmpty()) {

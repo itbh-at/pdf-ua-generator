@@ -46,7 +46,7 @@ checked with empty data; a content template is checked with its `example.json`.
 
 |`+DELETE /templates/{id}/revisions/{n}+`
 |The archived revision. Retires (archives) a released revision, keeping it as
-history; a layout revision that released content still pins gives 409.
+history; a layout revision that released content still lists gives 409.
 |===
 
 Template ids consist of lower-case letters, digits and `-`, at most 64
@@ -56,10 +56,12 @@ Templates and layouts share these endpoints. A bundle with `layout.json` is a
 layout; a template keeps the kind of its first revision (409 otherwise). A
 layout is previewed with the render endpoints like any template.
 
-A content revision pins the layout revision named in its `template.json`. It
-is released only if that layout revision is released. A layout that content
-pins cannot be deleted, nor can a pinned layout revision be archived (409).
-`+GET /templates/{id}+` of a layout lists the pinning revisions in `usedBy`.
+A content revision lists the layout revisions named in its `template.json`
+(`layouts`, the default first). It is released only if every listed layout
+revision is released, and the publish checks render it with each of them. A
+layout that content lists cannot be deleted, nor can a listed layout revision be
+archived (409). `+GET /templates/{id}+` of a layout lists the content revisions
+that list it in `usedBy`.
 
 A revision:
 
@@ -70,7 +72,7 @@ A revision:
   "kind": "content",
   "revision": 3,
   "status": "published",
-  "layout": "corporate@2",
+  "layouts": ["corporate@2", "memo@1"],
   "sha256": "854ba28b…",
   "createdAt": "2026-09-19T20:30:08.206936Z",
   "publishedAt": "2026-09-19T20:30:12.010901Z",
@@ -82,6 +84,8 @@ A revision:
   "warnings": ["field 'notes' is defined but not used by the template"]
 }
 ----
+
+An archived revision also carries `archivedAt`.
 
 === Bundle
 
@@ -140,6 +144,9 @@ violation. Against the latest published revision.
 |The same against any revision.
 |===
 
+A layout may add fields to the data model, so these follow the `layout` query
+parameter like rendering (see below); without it, the default layout.
+
 == Rendering
 
 [cols="3,5",options="header"]
@@ -156,6 +163,11 @@ violation. Against the latest published revision.
 The data is sent either as `application/json`, or as `multipart/form-data`
 with the JSON in the part `data` and each attachment in a part named after it:
 the part `photo` is `attachment:photo`.
+
+Layout:: The query parameter `layout`, one of the layouts the revision lists,
+as `memo` or `memo@1`; otherwise the default (the first listed). A layout the
+revision does not list gives 400 `invalid-request`. The response carries the
+layout used in `Template-Layout` (e.g. `memo@1`), next to `Template-Revision`.
 
 Format:: The query parameter `format` (`pdf`, `xhtml`, `email-html`, `text`,
 `docx`, `odt`), otherwise the first media type in `Accept` that the template

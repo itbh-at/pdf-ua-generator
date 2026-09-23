@@ -22,6 +22,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -151,33 +152,40 @@ public class TemplateResource {
     };
   }
 
+  /** The data model; a layout may add fields, so it follows {@code ?layout=} like rendering. */
   @GET
   @Path("/{id}/schema")
   @Produces(SCHEMA_JSON)
-  public String schema(@PathParam("id") String id) {
-    return schema(targets.published(id));
+  public String schema(@PathParam("id") String id, @QueryParam("layout") String layout) {
+    return schema(targets.published(id, layout));
   }
 
   @GET
   @Path("/{id}/revisions/{n}/schema")
   @Produces(SCHEMA_JSON)
-  public String revisionSchema(@PathParam("id") String id, @PathParam("n") int n) {
-    return schema(targets.revision(id, n));
+  public String revisionSchema(
+      @PathParam("id") String id, @PathParam("n") int n, @QueryParam("layout") String layout) {
+    return schema(targets.revision(id, n, layout));
   }
 
   /** Validates data against the schema of the latest published revision; 204 if valid. */
   @POST
   @Path("/{id}/validate")
   @Consumes(MediaType.APPLICATION_JSON)
-  public Response validate(@PathParam("id") String id, byte[] data) {
-    return validate(targets.published(id), data);
+  public Response validate(
+      @PathParam("id") String id, @QueryParam("layout") String layout, byte[] data) {
+    return validate(targets.published(id, layout), data);
   }
 
   @POST
   @Path("/{id}/revisions/{n}/validate")
   @Consumes(MediaType.APPLICATION_JSON)
-  public Response validateRevision(@PathParam("id") String id, @PathParam("n") int n, byte[] data) {
-    return validate(targets.revision(id, n), data);
+  public Response validateRevision(
+      @PathParam("id") String id,
+      @PathParam("n") int n,
+      @QueryParam("layout") String layout,
+      byte[] data) {
+    return validate(targets.revision(id, n, layout), data);
   }
 
   private Response validate(Views.Target loaded, byte[] data) {

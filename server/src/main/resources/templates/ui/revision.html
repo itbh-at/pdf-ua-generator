@@ -6,7 +6,7 @@
 <table class="fields">
   <tbody>
     <tr><th>Status</th><td><span class="status {revision.status}">{revision.status}</span></td></tr>
-    <tr><th>Layout</th><td>{#if revision.layoutId}{revision.layoutId}@{revision.layoutRevision}{#else}<span class="muted">—</span>{/if}</td></tr>
+    <tr><th>Layouts</th><td>{#if revision.layouts.isEmpty()}<span class="muted">—</span>{#else}{#each revision.layouts}{it}{#if it_isFirst} <span class="muted">(default)</span>{/if}{#if it_hasNext}, {/if}{/each}{/if}</td></tr>
     <tr><th>Created</th><td class="muted">{revision.createdAt}</td></tr>
     <tr><th>Published</th><td class="muted">{#if revision.publishedAt}{revision.publishedAt}{#else}—{/if}</td></tr>
     <tr><th>Content hash</th><td class="muted mono">{revision.sha256}</td></tr>

@@ -53,9 +53,17 @@ public class TemplateStore {
     }
   }
 
+  /** A layout revision a content revision may be rendered with, written {@code corporate@3}. */
+  public record LayoutPin(String id, int revision) {
+    @Override
+    public String toString() {
+      return id + "@" + revision;
+    }
+  }
+
   /**
-   * @param layoutId the layout this content revision pins, or {@code null}
-   * @param layoutRevision the pinned layout revision, or {@code null}
+   * @param layouts the layout revisions this content revision may be rendered with, the default
+   *     first; empty for a layout or a template without one
    * @param files content hash by path
    */
   public record Revision(
@@ -66,8 +74,7 @@ public class TemplateStore {
       OffsetDateTime createdAt,
       OffsetDateTime publishedAt,
       OffsetDateTime archivedAt,
-      String layoutId,
-      Integer layoutRevision,
+      List<LayoutPin> layouts,
       Map<String, String> files) {
 
     /** Released for use. */
@@ -78,6 +85,11 @@ public class TemplateStore {
     /** Retired: it existed and is kept as history, but is no longer current. */
     public boolean archived() {
       return ARCHIVED.equals(status);
+    }
+
+    /** The default layout, or {@code null}. */
+    public LayoutPin defaultLayout() {
+      return layouts.isEmpty() ? null : layouts.getFirst();
     }
   }
 
@@ -95,7 +107,7 @@ public class TemplateStore {
    */
   public record Stored(Revision revision, boolean created) {}
 
-  /** A content revision that pins a layout revision. */
+  /** A content revision that lists a layout revision. */
   public record Dependent(String templateId, int number, String status, int layoutRevision) {}
 
   /** A stored file, served publicly if it is an image. */
@@ -135,15 +147,11 @@ public class TemplateStore {
    * bundle twice changes nothing.
    *
    * @param kind {@link #CONTENT} or {@link #LAYOUT}; must match the template's earlier revisions
-   * @param layoutId the layout a content revision pins, or {@code null}
+   * @param layouts the layout revisions a content revision lists, the default first
    * @throws KindMismatchException if the template is of the other kind
    */
   public Stored createRevision(
-      String templateId,
-      Map<String, byte[]> files,
-      String kind,
-      String layoutId,
-      Integer layoutRevision) {
+      String templateId, Map<String, byte[]> files, String kind, List<LayoutPin> layouts) {
     return transaction(
         c -> {
           update(
@@ -206,14 +214,22 @@ public class TemplateStore {
           }
           update(
               c,
-              "insert into revision (template_id, number, status, sha256, layout_id,"
-                  + " layout_revision) values (?, ?, ?, ?, ?, ?)",
+              "insert into revision (template_id, number, status, sha256) values (?, ?, ?, ?)",
               templateId,
               number,
               DRAFT,
-              manifest,
-              layoutId,
-              layoutRevision);
+              manifest);
+          for (int position = 0; position < layouts.size(); position++) {
+            update(
+                c,
+                "insert into revision_layout (template_id, number, position, layout_id,"
+                    + " layout_revision) values (?, ?, ?, ?, ?)",
+                templateId,
+                number,
+                position,
+                layouts.get(position).id(),
+                layouts.get(position).revision());
+          }
           try (PreparedStatement s =
               c.prepareStatement(
                   "insert into revision_file (template_id, number, path, asset_sha256)"
@@ -317,11 +333,12 @@ public class TemplateStore {
         == 1;
   }
 
-  /** The content revisions that pin a revision of a layout. */
+  /** The content revisions that list a revision of a layout. */
   public List<Dependent> dependents(String layoutId) {
     return query(
-        "select template_id, number, status, layout_revision from revision where layout_id = ?"
-            + " order by template_id, number",
+        "select r.template_id, r.number, r.status, l.layout_revision from revision_layout l"
+            + " join revision r on r.template_id = l.template_id and r.number = l.number"
+            + " where l.layout_id = ? order by r.template_id, r.number",
         List.of(layoutId),
         r -> new Dependent(r.getString(1), r.getInt(2), r.getString(3), r.getInt(4)));
   }
@@ -364,10 +381,22 @@ public class TemplateStore {
         }
       }
     }
+    List<LayoutPin> layouts = new ArrayList<>();
     try (PreparedStatement s =
         c.prepareStatement(
-            "select status, sha256, created_at, published_at, archived_at, layout_id,"
-                + " layout_revision from revision"
+            "select layout_id, layout_revision from revision_layout"
+                + " where template_id = ? and number = ? order by position")) {
+      s.setString(1, templateId);
+      s.setInt(2, number);
+      try (ResultSet r = s.executeQuery()) {
+        while (r.next()) {
+          layouts.add(new LayoutPin(r.getString(1), r.getInt(2)));
+        }
+      }
+    }
+    try (PreparedStatement s =
+        c.prepareStatement(
+            "select status, sha256, created_at, published_at, archived_at from revision"
                 + " where template_id = ? and number = ?")) {
       s.setString(1, templateId);
       s.setInt(2, number);
@@ -384,8 +413,7 @@ public class TemplateStore {
                 r.getObject(3, OffsetDateTime.class),
                 r.getObject(4, OffsetDateTime.class),
                 r.getObject(5, OffsetDateTime.class),
-                r.getString(6),
-                (Integer) r.getObject(7),
+                List.copyOf(layouts),
                 java.util.Collections.unmodifiableMap(files)));
       }
     }

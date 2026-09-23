@@ -177,11 +177,13 @@ public class UiResource {
     Integer published = template.latestPublished();
     List<String> formats = List.of();
     List<String> attachments = List.of();
+    List<String> layouts = List.of();
     String example = "";
     String schema = "";
     if (published != null) {
       TemplateStore.Revision revision = store.revision(id, published).orElseThrow();
-      TemplateRepository repository = renderers.repository(revision, layoutOf(revision));
+      layouts = revision.layouts().stream().map(Object::toString).toList();
+      TemplateRepository repository = renderers.repository(revision, layoutOf(revision, null));
       formats =
           renderers.renderer().formats(repository, Bundle.TEMPLATE).stream()
               .map(OutputFormat::id)
@@ -203,6 +205,7 @@ public class UiResource {
         .data("template", template)
         .data("published", published)
         .data("formats", formats)
+        .data("layouts", layouts)
         .data("attachments", attachments)
         .data("example", example)
         .data("schema", schema);
@@ -230,6 +233,7 @@ public class UiResource {
       @PathParam("id") String id,
       @RestForm String data,
       @RestForm String format,
+      @RestForm String layout,
       @RestForm(FileUpload.ALL) List<FileUpload> uploads,
       @Context UriInfo uri)
       throws IOException {
@@ -240,7 +244,19 @@ public class UiResource {
           problemsFragment.data("problems", problem("the template has no published revision")));
     }
     TemplateStore.Revision revision = store.revision(id, published).orElseThrow();
-    TemplateRepository repository = renderers.repository(revision, layoutOf(revision));
+    TemplateStore.LayoutPin pin =
+        layout == null || layout.isBlank()
+            ? revision.defaultLayout()
+            : revision.layouts().stream()
+                .filter(l -> l.toString().equals(layout) || l.id().equals(layout))
+                .findFirst()
+                .orElse(null);
+    if (pin == null && !revision.layouts().isEmpty()) {
+      return html(
+          problemsFragment.data(
+              "problems", problem("the template does not list the layout '" + layout + "'")));
+    }
+    TemplateRepository repository = renderers.repository(revision, layoutOf(revision, pin));
     OutputFormat out = OutputFormat.of(format).orElse(OutputFormat.PDF);
     // The example attachments are the default; an uploaded file for an attachment overrides it.
     Map<String, byte[]> attachments =
@@ -298,12 +314,15 @@ public class UiResource {
     return store.find(id).orElseThrow(() -> new NotFoundException("no template '" + id + "'"));
   }
 
-  private TemplateStore.Revision layoutOf(TemplateStore.Revision revision) {
-    if (revision.layoutId() == null) {
+  /** The given layout revision, or the revision's default if {@code pin} is {@code null}. */
+  private TemplateStore.Revision layoutOf(
+      TemplateStore.Revision revision, TemplateStore.LayoutPin pin) {
+    TemplateStore.LayoutPin chosen = pin == null ? revision.defaultLayout() : pin;
+    if (chosen == null) {
       return null;
     }
     return store
-        .revision(revision.layoutId(), revision.layoutRevision())
+        .revision(chosen.id(), chosen.revision())
         .filter(l -> l.files().containsKey(LayoutDescriptor.FILE))
         .orElse(null);
   }

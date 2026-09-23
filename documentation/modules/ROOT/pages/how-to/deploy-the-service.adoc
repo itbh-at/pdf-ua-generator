@@ -53,7 +53,7 @@ podman push registry.example.org/bundles:1
 ----
 
 Bundle ids are file names: `demo-layout.zip` becomes the template `demo-layout`,
-which content pins as `"layout": "demo-layout@1"`.
+which content lists as `"layouts": ["demo-layout@1", "memo-layout@1"]`.
 
 == Run it on one machine with podman
 

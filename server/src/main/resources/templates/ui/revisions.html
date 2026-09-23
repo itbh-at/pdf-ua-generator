@@ -11,14 +11,14 @@
   {/if}
   <table>
     <thead>
-      <tr><th>#</th><th>Status</th><th>Layout</th><th>Created</th><th>Published</th><th></th></tr>
+      <tr><th>#</th><th>Status</th><th>Layouts</th><th>Created</th><th>Published</th><th></th></tr>
     </thead>
     <tbody>
       {#for r in revisions}
       <tr>
         <td><a href="/ui/templates/{template.id}/revisions/{r.number}">{r.number}</a></td>
         <td><span class="status {r.status}">{r.status}</span></td>
-        <td>{#if r.layoutId}{r.layoutId}@{r.layoutRevision}{#else}<span class="muted">—</span>{/if}</td>
+        <td>{#if r.layouts.isEmpty()}<span class="muted">—</span>{#else}{#each r.layouts}{it}{#if it_hasNext}, {/if}{/each}{/if}</td>
         <td class="muted">{r.createdAt}</td>
         <td class="muted">{#if r.publishedAt}{r.publishedAt}{#else}—{/if}</td>
         <td class="actions">

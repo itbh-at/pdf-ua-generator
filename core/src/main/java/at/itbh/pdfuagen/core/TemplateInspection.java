@@ -71,7 +71,7 @@ record TemplateInspection(
         descriptor =
             new TemplateDescriptor(
                 layout.language(),
-                null,
+                java.util.List.of(),
                 TemplateDescriptor.Styling.CATALOG,
                 EnumSet.allOf(OutputFormat.class),
                 layout.fields());
@@ -97,7 +97,7 @@ record TemplateInspection(
         problems.add(
             new Problem(
                 Problem.TEMPLATE_ERROR,
-                "a layout is given, but the template names none; add \"layout\" to "
+                "a layout is given, but the template names none; add \"layouts\" to "
                     + descriptorPath,
                 descriptorPath));
       }

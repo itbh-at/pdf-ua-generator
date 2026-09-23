@@ -47,8 +47,10 @@ import org.jboss.resteasy.reactive.multipart.FileUpload;
 /**
  * Renders a template with JSON data. The format follows the {@code format} query parameter or the
  * {@code Accept} header; the language variant follows the {@code lang} query parameter or {@code
- * Accept-Language}. Data comes as {@code application/json}, or as {@code multipart/form-data} with
- * the JSON in the part {@code data} and every other part an attachment named after its part.
+ * Accept-Language}; the layout follows the {@code layout} query parameter ({@code memo} or {@code
+ * memo@1}, one the template lists), otherwise the template's default layout. Data comes as {@code
+ * application/json}, or as {@code multipart/form-data} with the JSON in the part {@code data} and
+ * every other part an attachment named after its part.
  */
 @Path("/templates/{id}")
 public class RenderResource {
@@ -67,10 +69,11 @@ public class RenderResource {
       @PathParam("id") String id,
       @QueryParam("format") String format,
       @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       byte[] data) {
-    return render(() -> targets.published(id), format, lang, headers, uri, data, Map.of());
+    return render(() -> targets.published(id, layout), format, lang, headers, uri, data, Map.of());
   }
 
   @POST
@@ -81,15 +84,17 @@ public class RenderResource {
       @PathParam("id") String id,
       @QueryParam("format") String format,
       @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       @RestForm(DATA_PART) String data,
       @RestForm(FileUpload.ALL) List<FileUpload> parts)
       throws IOException {
-    return renderParts(() -> targets.published(id), format, lang, headers, uri, data, parts);
+    return renderParts(
+        () -> targets.published(id, layout), format, lang, headers, uri, data, parts);
   }
 
-  /** Renders a specific revision, also a draft, e.g. as a preview. */
+  /** Renders a specific revision, also an archived one, e.g. as a preview. */
   @POST
   @Path("/revisions/{n}/render")
   @Consumes(MediaType.APPLICATION_JSON)
@@ -98,10 +103,12 @@ public class RenderResource {
       @PathParam("n") int n,
       @QueryParam("format") String format,
       @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       byte[] data) {
-    return render(() -> targets.revision(id, n), format, lang, headers, uri, data, Map.of());
+    return render(
+        () -> targets.revision(id, n, layout), format, lang, headers, uri, data, Map.of());
   }
 
   @POST
@@ -113,12 +120,14 @@ public class RenderResource {
       @PathParam("n") int n,
       @QueryParam("format") String format,
       @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
       @Context HttpHeaders headers,
       @Context UriInfo uri,
       @RestForm(DATA_PART) String data,
       @RestForm(FileUpload.ALL) List<FileUpload> parts)
       throws IOException {
-    return renderParts(() -> targets.revision(id, n), format, lang, headers, uri, data, parts);
+    return renderParts(
+        () -> targets.revision(id, n, layout), format, lang, headers, uri, data, parts);
   }
 
   private CompletionStage<Response> renderParts(
@@ -192,6 +201,11 @@ public class RenderResource {
           response
               .header("Vary", "Accept, Accept-Language")
               .header("Template-Revision", resolved.revision().number());
+          if (resolved.layout() != null) {
+            response.header(
+                "Template-Layout",
+                resolved.layout().templateId() + "@" + resolved.layout().number());
+          }
           Locale language = renderer.language(repository, variant);
           if (!language.equals(Locale.ROOT)) {
             response.header("Content-Language", language.toLanguageTag());

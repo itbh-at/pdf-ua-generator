@@ -21,12 +21,12 @@ RUN apk add --no-cache zip
 COPY demo /demo
 RUN set -eu; \
     mkdir -p /bundles; \
-    # Each demo is a self-contained bundle dir; zip it as is. data-email.json is
-    # a render input for the format check, not part of the shipped bundle.
+    # Each demo is a self-contained bundle dir; zip it as is, named after the
+    # template id the content lists. data-email.json is a render input for the
+    # format check, not part of the shipped bundle.
     (cd /demo/content && zip -Xrq /bundles/demo.zip . -x data-email.json); \
-    for layout in layout layout-memo; do \
-        (cd "/demo/$layout" && zip -Xrq "/bundles/demo-$layout.zip" .); \
-    done
+    (cd /demo/layout && zip -Xrq /bundles/demo-layout.zip .); \
+    (cd /demo/layout-memo && zip -Xrq /bundles/memo-layout.zip .)
 
 FROM ${BASE}
 RUN apk add --no-cache curl
