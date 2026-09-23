@@ -13,11 +13,6 @@ on:
   schedule:
     - cron: "0 3 * * *" # nightly, 03:00 UTC
   workflow_dispatch:
-  # TEMPORARY: run on epic/rebuild pushes so the smoke test can be validated
-  # before the epic reaches main (where schedule/workflow_dispatch activate).
-  # Remove this trigger before merging the epic.
-  push:
-    branches: ["epic/**"]
 
 permissions:
   contents: read
@@ -59,6 +54,42 @@ jobs:
         with:
           version: 2026.6.10 # pin mise; see ci.yml
 
+      - name: Install a current podman
+        # ubuntu-latest ships podman 4.9.3, whose `kube play` does not run
+        # Kubernetes Job resources (the chart imports the bundles with a Job) --
+        # that landed in podman 5. Install a pinned static build (podman + crun +
+        # conmon + netavark + aardvark-dns) so the runner matches a real
+        # deployment. Verified by checksum; the version tracks with the URL.
+        env:
+          PODMAN_VERSION: v6.1.2
+          PODMAN_SHA256: 481b6f5a57919aea837b54df1eaa6a5b968df505eedbdd78356e80306af676f1
+        run: |
+          curl -fsSL -o /tmp/podman.tar.gz \
+            "https://github.com/mgoltzsche/podman-static/releases/download/${PODMAN_VERSION}/podman-linux-amd64.tar.gz"
+          echo "${PODMAN_SHA256}  /tmp/podman.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/podman.tar.gz -C /tmp
+          sudo cp -r /tmp/podman-linux-amd64/usr /tmp/podman-linux-amd64/etc /
+          # The runner already has the distro's older crun/conmon/netavark, which
+          # podman's default search finds first -- and the old crun rejects the
+          # OCI config this podman writes ("crun: unknown version specified").
+          # Point podman at the bundle's own binaries instead.
+          sudo mkdir -p /etc/containers/containers.conf.d
+          sudo tee /etc/containers/containers.conf.d/99-podman-static.conf >/dev/null <<'CONF'
+          [engine]
+          helper_binaries_dir = ["/usr/local/lib/podman"]
+          runtime = "crun"
+          [engine.runtimes]
+          crun = ["/usr/local/bin/crun"]
+          CONF
+          # Ubuntu 24.04 restricts unprivileged user namespaces to binaries with
+          # an AppArmor profile that grants them. The system /usr/bin/podman has
+          # one; the new /usr/local/bin/podman does not, so rootless podman would
+          # fail to re-exec into its user namespace. Lift the restriction on this
+          # throwaway runner rather than author a profile for the new path.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          hash -r
+          podman version
+
       - name: Enable a systemd user session for rootless podman
         # Building the bundle image runs RUN steps, and podman kube play starts
         # pods; without a lingering user session crun cannot set up their cgroups
@@ -79,5 +110,11 @@ jobs:
 
       - name: Build the AOT image
         run: mise run image
+      - name: Build the CLI
+        # The smoke test verifies the rendered PDF with the CLI's veraPDF check
+        # when cli/target/pdf-ua-generator.jar is present. skipTests, so this does
+        # not run ApiIT (which under this job's PDFUAGEN_IT_DB_HOST would expect a
+        # container, not the host process).
+        run: mise exec -- mvn -B -ntp -pl cli -am package -DskipTests
       - name: Run the smoke test
         run: mise run smoke-test
