@@ -352,7 +352,6 @@ old-school senior developer: direct and minimal.
   completed before the next starts.
 - `main` receives no rebuild work until the epic is merged as a whole.
 - `epic/rebuild` stays buildable after every commit.
-- Work stays local for now: no push to `origin`.
 
 ## Licence
 
