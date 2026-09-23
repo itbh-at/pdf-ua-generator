@@ -116,6 +116,27 @@ class LayoutTest {
   }
 
   @Test
+  void theLayoutMustTranslateItsTextsIntoEveryLanguageOfTheTemplate() {
+    MapTemplateRepository files =
+        new MapTemplateRepository()
+            .template(
+                "t.xhtml", "{#include layout}{#title}T{/title}{#body}<p>x</p>{/body}{/include}")
+            .template(
+                "t.de.xhtml", "{#include layout}{#title}T{/title}{#body}<p>x</p>{/body}{/include}")
+            .language("t.xhtml", "de")
+            .resource(
+                "t.json", "{\"language\": \"en\", \"layout\": \"corporate@1\", \"fields\": {}}");
+    // The German texts are missing: German pages would carry the English layout texts.
+    TemplateRepository repository =
+        new ComposedTemplateRepository(files, layout().resource("messages.de.json", "{}"));
+    assertEquals(
+        List.of(
+            "the layout has no de text for greeting; the template is written in de, so add it to"
+                + " messages.de.json"),
+        problems(repository));
+  }
+
+  @Test
   void schemaIncludesTheLayoutsFields() throws Exception {
     String schema = renderer.schema(content("<p>{name}</p>", ""), "t.xhtml").toJson();
     assertTrue(schema.contains("\"company\""), schema);

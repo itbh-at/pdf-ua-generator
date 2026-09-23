@@ -215,7 +215,9 @@ public final class LayoutRules {
 
   /**
    * Checks the texts of a layout for the languages a template is rendered in: a translation file
-   * must not have keys the default file lacks; missing translations are warnings.
+   * must not have keys the default file lacks, and every text must be translated into each language
+   * of the template other than the layout's own. A missing translation would put default-language
+   * texts into the document under another {@code lang}.
    */
   public static Findings checkTexts(
       TemplateRepository repository, LayoutDescriptor layout, Set<Locale> languages) {
@@ -258,12 +260,23 @@ public final class LayoutRules {
       }
       List<String> missing = defaults.keySet().stream().filter(k -> !covered.contains(k)).toList();
       if (!missing.isEmpty()) {
-        warnings.add(
-            "the layout has no "
-                + language.toLanguageTag()
-                + " text for "
-                + String.join(", ", missing)
-                + "; the default texts are used");
+        String file = "messages." + language.getLanguage() + ".json";
+        problems.add(
+            problem(
+                "the layout has no "
+                    + language.toLanguageTag()
+                    + " text for "
+                    + String.join(", ", missing)
+                    + "; the template is written in "
+                    + language.toLanguageTag()
+                    + ", so add "
+                    + (missing.size() == 1 ? "it" : "them")
+                    + " to "
+                    + file
+                    + (language.getCountry().isEmpty()
+                        ? ""
+                        : " or messages." + language.toLanguageTag() + ".json"),
+                PREFIX + file));
       }
     }
     return new Findings(problems, warnings);

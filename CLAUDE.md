@@ -134,7 +134,9 @@ plain text).
 - A template may, but need not, exist in several languages: the default file
   (`template.xhtml`) plus optional variants named with a BCP 47 tag
   (`template.de-AT.xhtml`, `template.en.xhtml`). Layout texts come from the
-  layout's message files per language.
+  layout's message files per language; a layout a template lists must translate
+  every text into each language the template is written in (the publish check
+  refuses it otherwise).
 - Selection: the API matches `Accept-Language` by RFC 4647 lookup; a `lang`
   query parameter takes precedence; the CLI uses `--lang`. No matching variant
   means the default variant — never an error. Responses carry

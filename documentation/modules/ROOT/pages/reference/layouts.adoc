@@ -128,8 +128,11 @@ cannot take a name Qute reserves (`if`, `for`, `include`, …).
 `+{msg:page}+` is the text `page`: from `messages.<tag>.json` for the language of
 the rendered variant, shortened step by step (`de-AT`, then `de`), otherwise
 from `messages.json`. Every text the layout uses must be in `messages.json`;
-a translation file must not have other keys. Missing translations are
-warnings.
+a translation file must not have other keys. A template written in a language
+other than the layout's own (`language` in `layout.json`) needs every text
+translated into it, in `messages.<tag>.json` for that language or the shorter
+tag; a missing translation is an error, because the page would otherwise carry
+default-language texts under another `lang`.
 
 `+{doc:lang}+` is the language tag of the rendered variant, for
 `<html lang="{doc:lang}">`.
