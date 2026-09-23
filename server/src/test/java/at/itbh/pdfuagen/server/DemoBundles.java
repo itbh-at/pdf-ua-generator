@@ -30,6 +30,7 @@ final class DemoBundles {
         String.join(", ", java.util.Arrays.stream(layouts).map(l -> "\"" + l + "\"").toList());
     Map<String, byte[]> files = new TreeMap<>();
     files.put("template.xhtml", Files.readAllBytes(CONTENT.resolve("template.xhtml")));
+    files.put("template.de.xhtml", Files.readAllBytes(CONTENT.resolve("template.de.xhtml")));
     files.put(
         "template.json",
         Files.readString(CONTENT.resolve("template.json"))

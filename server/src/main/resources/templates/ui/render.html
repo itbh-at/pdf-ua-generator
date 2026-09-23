@@ -20,6 +20,13 @@
       </select>
     </label>
     {/if}
+    {#if languages.size() > 1}
+    <label>Language
+      <select name="lang">
+        {#for g in languages}<option value="{g}">{g}{#if g_isFirst} (default){/if}</option>{/for}
+      </select>
+    </label>
+    {/if}
     <label>Format
       <select name="format">
         {#for f in formats}<option value="{f}">{f}</option>{/for}

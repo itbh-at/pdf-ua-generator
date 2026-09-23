@@ -6,6 +6,7 @@
 package at.itbh.pdfuagen.server.ui;
 
 import at.itbh.pdfuagen.core.JsonData;
+import at.itbh.pdfuagen.core.LanguageVariants;
 import at.itbh.pdfuagen.core.OutputFormat;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
@@ -178,12 +179,14 @@ public class UiResource {
     List<String> formats = List.of();
     List<String> attachments = List.of();
     List<String> layouts = List.of();
+    List<String> languages = List.of();
     String example = "";
     String schema = "";
     if (published != null) {
       TemplateStore.Revision revision = store.revision(id, published).orElseThrow();
       layouts = revision.layouts().stream().map(Object::toString).toList();
       TemplateRepository repository = renderers.repository(revision, layoutOf(revision, null));
+      languages = languages(repository);
       formats =
           renderers.renderer().formats(repository, Bundle.TEMPLATE).stream()
               .map(OutputFormat::id)
@@ -206,9 +209,21 @@ public class UiResource {
         .data("published", published)
         .data("formats", formats)
         .data("layouts", layouts)
+        .data("languages", languages)
         .data("attachments", attachments)
         .data("example", example)
         .data("schema", schema);
+  }
+
+  /** The languages a template is written in: the default variant's first, then its variants. */
+  private List<String> languages(TemplateRepository repository) {
+    List<String> languages = new java.util.ArrayList<>();
+    String tag = renderers.renderer().language(repository, Bundle.TEMPLATE).toLanguageTag();
+    if (!tag.equals("und")) {
+      languages.add(tag);
+    }
+    repository.languages(Bundle.TEMPLATE).stream().sorted().forEach(languages::add);
+    return languages;
   }
 
   /** The data model as a pretty-printed JSON Schema, or empty if it cannot be derived. */
@@ -234,6 +249,7 @@ public class UiResource {
       @RestForm String data,
       @RestForm String format,
       @RestForm String layout,
+      @RestForm String lang,
       @RestForm(FileUpload.ALL) List<FileUpload> uploads,
       @Context UriInfo uri)
       throws IOException {
@@ -271,7 +287,14 @@ public class UiResource {
     try {
       Map<String, Object> json =
           JsonData.parse(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
-      String variant = renderers.renderer().selectVariant(repository, Bundle.TEMPLATE, List.of());
+      // The chosen language picks the variant as Accept-Language does in the API.
+      List<java.util.Locale.LanguageRange> ranges;
+      try {
+        ranges = lang == null || lang.isBlank() ? List.of() : LanguageVariants.ranges(lang);
+      } catch (IllegalArgumentException e) {
+        return html(problemsFragment.data("problems", problem("not a language: " + lang)));
+      }
+      String variant = renderers.renderer().selectVariant(repository, Bundle.TEMPLATE, ranges);
       Rendered rendered =
           renderers
               .renderer()

@@ -101,7 +101,20 @@ class UiTest {
         .statusCode(200)
         .body(containsString("<select name=\"layout\">"))
         .body(containsString(plain + "@1 (default)"))
-        .body(containsString(memo + "@1"));
+        .body(containsString(memo + "@1"))
+        .body(containsString("<select name=\"lang\">"))
+        .body(containsString("en (default)"))
+        .body(containsString("<option value=\"de\">"));
+
+    // The chosen language picks the German variant.
+    given()
+        .multiPart("data", DemoBundles.data("data-email.json"))
+        .multiPart("format", "xhtml")
+        .multiPart("lang", "de")
+        .post("/ui/templates/" + content + "/render")
+        .then()
+        .statusCode(200)
+        .body(containsString("Hallo Jane Doe."));
 
     given()
         .multiPart("data", DemoBundles.data("data-email.json"))
