@@ -31,8 +31,9 @@ Validation errors carry an `errors` member with one entry per violation:
 
 Every problem found is one entry of `errors`. `pointer` is a JSON Pointer to
 the offending value in the request data, written as a URI fragment; `location`
-names a place in the template instead (`template.xhtml, line 12, column 5`, or
-`template.json#/fields/total` in the descriptor). When the entries have
+names a place in the document template or layout instead
+(`template.xhtml, line 12, column 5`, or `template.json#/fields/total` in the
+descriptor). When the entries have
 different types, as for `publish-rejected`, each carries its own `type`.
 
 == Types
@@ -43,19 +44,21 @@ different types, as for `publish-rejected`, each carries its own `type`.
 
 |`urn:itbh:pdf-ua-generator:problem:invalid-data`
 |422, 400
-|The data does not match the JSON Schema of the template revision; `errors`
-lists every violation (422). 400 if the data is not a JSON object at all.
+|The data does not match the JSON Schema of the revision of the document
+template; `errors` lists every violation (422). 400 if the data is not a JSON
+object at all.
 
 |`urn:itbh:pdf-ua-generator:problem:format-not-supported`
 |406
-|The requested output format is not offered by the template (its descriptor
-lists `formats`), or none of the media types in `Accept` is an output format.
+|The requested output format is not offered by the document template (its
+descriptor lists `formats`), or none of the media types in `Accept` is an output
+format.
 
 |`urn:itbh:pdf-ua-generator:problem:template-error`
 |422
-|The template cannot be parsed or rendered: a Qute syntax error, a value the
-template uses but the data lacks, or rendered output that is not well-formed
-XHTML.
+|The document template or layout cannot be parsed or rendered: a Qute syntax
+error, a value it uses but the data lacks, or rendered output that is not
+well-formed XHTML.
 
 |`urn:itbh:pdf-ua-generator:problem:accessibility`
 |422
@@ -66,9 +69,9 @@ xref:reference/building-blocks.adoc#_accessibility_rules[Accessibility rules].
 
 |`urn:itbh:pdf-ua-generator:problem:resource-rejected`
 |422
-|A resource the template references is not allowed or not available: a
-forbidden URI scheme (`file:`, `http:`, `data:`, …), a path outside the
-template, a missing file, an external URL outside the host allowlist, or a
+|A resource the document template or layout references is not allowed or not
+available: a forbidden URI scheme (`file:`, `http:`, `data:`, …), a path outside
+the document template or layout, a missing file, an external URL outside the host allowlist, or a
 resource above the size limit.
 
 |`urn:itbh:pdf-ua-generator:problem:image-rejected`
@@ -83,12 +86,13 @@ comes from a host that is not allowed.
 |`urn:itbh:pdf-ua-generator:problem:publish-rejected`
 |422
 |A revision failed the publish checks. `errors` lists every problem with its
-own type: template errors, invalid example data, accessibility violations.
+own type: errors in the document template or layout, invalid example data,
+accessibility violations.
 
 |`urn:itbh:pdf-ua-generator:problem:not-found`
 |404
-|The template, revision or asset does not exist, or the template has no
-published revision yet.
+|The document template or layout, the revision or the asset does not exist, or
+the document template or layout has no published revision yet.
 
 |`urn:itbh:pdf-ua-generator:problem:conflict`
 |409
@@ -103,8 +107,8 @@ bundle or occurs twice, exceeds the size or file limits, or lacks
 
 |`urn:itbh:pdf-ua-generator:problem:invalid-request`
 |400
-|The request itself is malformed: an invalid template id, a malformed `lang`
-parameter, or a multipart render request without a `data` part.
+|The request itself is malformed: an invalid id of a document template or
+layout, a malformed `lang` parameter, or a multipart render request without a `data` part.
 
 |`urn:itbh:pdf-ua-generator:problem:overloaded`
 |503

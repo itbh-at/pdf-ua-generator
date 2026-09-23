@@ -3,8 +3,8 @@
   // Copyright 2026 IT Beratung Hermann GmbH
 ////
 
-= Template building blocks
-:description: The XHTML elements, data-block markers, page boxes and stylesheets a template may use, and what each becomes in every output format.
+= Building blocks
+:description: The XHTML elements, data-block markers, page boxes and stylesheets a document template or layout may use, and what each becomes in every output format.
 
 DOCX, ODT, email HTML and plain text are written from a format-neutral document
 model. The model knows a fixed set of building blocks; an element outside this
@@ -81,7 +81,8 @@ are rendered from the XHTML directly.
 |Line break
 
 |`<span data-block="footnote">…</span>`
-|Footnote. For PDF, style it with `float: footnote` (see the demo template).
+|Footnote. For PDF, style it with `float: footnote` (see the demo document
+template).
 |===
 
 == Accessibility rules
@@ -125,15 +126,16 @@ page selector (`@page :first`) apply to PDF only.
 
 == Stylesheet for email HTML
 
-Email HTML needs a stylesheet `email.css` next to the template. Its rules are
-inlined into `style` attributes; only element (`p`), class (`.lead`) and
-element-with-class (`td.box`) selectors are used. Boxes are styled as
+Email HTML needs a stylesheet `email.css` next to the default variant. Its
+rules are inlined into `style` attributes; only element (`p`), class (`.lead`)
+and element-with-class (`td.box`) selectors are used. Boxes are styled as
 `td.box`, columns as `td.col` and `table.columns`, the footnote list as
 `ol.footnotes`.
 
 Images in email HTML need a public URL:
 
-* template assets: `<public-base-url>/assets/<sha256>`; SVG as a PNG rendition
-  `<sha256>.png`, since many mail clients do not display SVG;
+* assets of document templates and layouts:
+  `<public-base-url>/assets/<sha256>`; SVG as a PNG rendition `<sha256>.png`,
+  since many mail clients do not display SVG;
 * external `https` URLs: unchanged;
 * request attachments: not possible — an error.

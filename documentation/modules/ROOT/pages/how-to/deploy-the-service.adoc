@@ -4,7 +4,7 @@
 ////
 
 = Deploy the service
-:description: Build the image, pack templates and layouts into a bundle image, and run both on one machine with podman or in Kubernetes.
+:description: Build the image, pack document templates and layouts into a bundle image, and run both on one machine with podman or in Kubernetes.
 
 == Build the image
 
@@ -32,14 +32,14 @@ podman push itbh/pdf-ua-generator:2.0.0-SNAPSHOT-aot registry.example.org/pdf-ua
 The cache is recorded by a real run, so it is only as good as what `ApiIT`
 does. If the service gains work that matters at startup, extend that test.
 
-== Pack templates and layouts into an image
+== Pack document templates and layouts into an image
 
 The import job of the chart reads bundles from an OCI image. Such an image
 carries
 
-* `+/bundles/<template id>.zip+` — one bundle per template and layout, laid out
-  like a template directory (see
-  xref:reference/template-files.adoc[Template files]) plus `example.json` and
+* `+/bundles/<id>.zip+` — one bundle per document template and layout,
+  laid out like the directory of a document template or layout (see
+  xref:reference/template-files.adoc[Document template files]) plus `example.json` and
   its attachments under `example/`, and
 * a shell with `curl`, so the job can run the import script of the chart.
 
@@ -52,8 +52,8 @@ podman build -f deploy/bundles/Containerfile -t registry.example.org/bundles:1 .
 podman push registry.example.org/bundles:1
 ----
 
-Bundle ids are file names: `demo-layout.zip` becomes the template `demo-layout`,
-which content lists as `"layouts": ["demo-layout@1", "memo-layout@1"]`.
+Bundle ids are file names: `demo-layout.zip` becomes the layout `demo-layout`,
+which a document template lists as `"layouts": ["demo-layout@1", "memo-layout@1"]`.
 
 == Run it on one machine with podman
 
@@ -99,7 +99,7 @@ chart creates the Secret.
 
 Every value is listed in xref:reference/configuration.adoc#chart[Configuration].
 
-== Import templates again
+== Import document templates and layouts again
 
 The import job runs whenever the bundle image changes — its name carries the
 image's hash. Repeating it changes nothing: a bundle whose files are already
@@ -135,7 +135,7 @@ verifies it as PDF/UA and repeats the import to prove that nothing changes.
 
 == Measure the load a deployment carries
 
-With a service reachable at `BASE_URL` and a published template `demo`:
+With a service reachable at `BASE_URL` and a published document template `demo`:
 
 [source,shell]
 ----

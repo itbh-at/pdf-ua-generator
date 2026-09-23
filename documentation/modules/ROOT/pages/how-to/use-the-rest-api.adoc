@@ -3,8 +3,8 @@
   // Copyright 2026 IT Beratung Hermann GmbH
 ////
 
-= Upload and render a template through the API
-:description: Upload the demo template (validated and released on upload), validate data and render documents with curl.
+= Upload and render a document template through the API
+:description: Upload the demo document template (validated and released on upload), validate data and render documents with curl.
 
 Prerequisites: a running `podman` — on Linux its user socket
 (`systemctl --user enable --now podman.socket`), on macOS a started machine
@@ -18,8 +18,8 @@ environment overrides it.
 mise run dev
 ----
 
-. Pack the layout as a bundle. The demo content pins `demo-layout@1`, so the
-layout is uploaded first. A layout carries only styles, so its directory is a
+. Pack the layout as a bundle. The demo document template pins `demo-layout@1`,
+so the layout is uploaded first. A layout carries only styles, so its directory is a
 complete bundle as it is (no example data):
 +
 ----
@@ -34,10 +34,10 @@ curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/layout.zip \
   http://localhost:8080/templates/demo-layout/revisions
 ----
 
-. Pack the demo content as a bundle. Every demo is a self-contained bundle
-directory, so packing is just zipping it. The content bundle
-(`demo/content/`) holds the template, its language variants, the descriptor,
-and the example data and attachment; the fonts, styles and images live in the
+. Pack the demo document template as a bundle. Every demo is a self-contained
+bundle directory, so packing is just zipping it. The bundle of the document
+template (`demo/content/`) holds the default variant, the other language
+variants, the descriptor, and the example data and attachment; the fonts, styles and images live in the
 layout. (`data-email.json` is only a render input for the format check, not
 part of the bundle.)
 +
@@ -45,8 +45,8 @@ part of the bundle.)
 (cd demo/content && zip -r /tmp/demo.zip . -x data-email.json)
 ----
 
-. Upload it as the first revision of the template `demo`; it is checked with
-its `example.json` and released:
+. Upload it as the first revision of the document template `demo`; it is
+checked with its `example.json` and released:
 +
 ----
 curl -X POST -H 'Content-Type: application/zip' --data-binary @/tmp/demo.zip \
@@ -74,8 +74,8 @@ curl -H 'Content-Type: application/json' -d @demo/content/data-email.json \
   'http://localhost:8080/templates/demo/render?format=email-html' -o demo.html
 ----
 
-. Render the German variant with `Accept-Language` (or `?lang=de`); the response
-carries `Content-Language: de`:
+. Render the German language variant with `Accept-Language` (or `?lang=de`);
+the response carries `Content-Language: de`:
 +
 ----
 curl -F data=@demo/content/example.json -F photo=@demo/content/example/photo.png -H 'Accept: application/pdf' \

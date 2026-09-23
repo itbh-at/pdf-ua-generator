@@ -1,8 +1,8 @@
 # itbh.at PDF UA Generator
 
-Renders Qute templates (XHTML + Print CSS) with JSON data into accessible
-documents: PDF/UA, XHTML, email HTML, DOCX, ODT and plain text. Available as a
-command-line tool and as a REST service.
+Renders document templates (Qute XHTML + Print CSS) with JSON data into
+accessible documents: PDF/UA, XHTML, email HTML, DOCX, ODT and plain text.
+Available as a command-line tool and as a REST service.
 
 > **Status:** being rebuilt on the branch `epic/rebuild`. The command-line
 > tool renders every format; the REST service follows in phase 3. See the
@@ -17,16 +17,16 @@ pdf-ua-generator schema -t demo/content/template.xhtml -L demo/layout
 pdf-ua-generator check -t demo/content/template.xhtml -L demo/layout -d demo/content/example.json -a photo=demo/content/example/photo.png
 ```
 
-The first command renders the content template `demo/content/template.xhtml` in
-the layout `demo/layout` with the data from `demo/content/example.json` and the
-attached photo into `demo/content/template.pdf` and checks it against PDF/UA-1;
-the second writes the same document as `demo/content/template.docx` in the memo
-layout. Formats: `pdf`,
-`xhtml`, `email-html`, `text`, `docx`, `odt`. `schema` prints the JSON Schema of
-the data the template needs, derived from the template and its field definitions
-in `demo/content/template.json`; `check` runs the checks a template must pass before it is
-published. The distribution
-`cli/target/pdf-ua-generator-<version>.zip` contains the launcher
+The first command renders the document template whose default variant is
+`demo/content/template.xhtml` in the layout `demo/layout` with the data from
+`demo/content/example.json` and the attached photo into
+`demo/content/template.pdf` and checks it against PDF/UA-1; the second writes
+the same document as `demo/content/template.docx` in the memo layout. Formats:
+`pdf`, `xhtml`, `email-html`, `text`, `docx`, `odt`. `schema` prints the JSON
+Schema of the data the document template needs, derived from its language
+variants and its field definitions in `demo/content/template.json`; `check` runs
+the checks a document template must pass before it is published. The
+distribution `cli/target/pdf-ua-generator-<version>.zip` contains the launcher
 `bin/pdf-ua-generator`.
 
 ## Build
@@ -43,11 +43,11 @@ mise run docs         # build the documentation into documentation/build/site
 
 Modules:
 
-| Module   | Content                                                        |
-|----------|----------------------------------------------------------------|
-| `core`   | Template parsing, schema, validation, rendering. Plain Java.   |
-| `cli`    | Command-line tool (Picocli). `cli/target/pdf-ua-generator-*.zip` |
-| `server` | Quarkus REST service. `server/target/quarkus-app/`             |
+| Module   | Content                                                                         |
+|----------|---------------------------------------------------------------------------------|
+| `core`   | Parsing of document templates and layouts, schema, validation, rendering. Plain Java. |
+| `cli`    | Command-line tool (Picocli). `cli/target/pdf-ua-generator-*.zip`                |
+| `server` | Quarkus REST service. `server/target/quarkus-app/`                              |
 
 ## Documentation
 

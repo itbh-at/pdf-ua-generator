@@ -38,11 +38,12 @@ when the service is reached through a proxy under another name.
 
 |`pdfuagen.render.timeout`
 |`30s`
-|Maximum time Qute may spend on one template.
+|Maximum time Qute may spend on one document.
 
 |`quarkus.cache.caffeine."template-revisions".maximum-size`
 |`64`
-|Template revisions kept in memory, counted in revisions, not bytes. Revisions
+|Revisions of document templates and layouts kept in memory, counted in
+revisions, not bytes. Revisions
 are immutable and addressed by content hash, so a cached entry is never stale;
 the least recently used are dropped and read from the database again when
 needed. A revision with embedded fonts is far larger than one without, so leave
@@ -146,7 +147,7 @@ a minimal PostgreSQL for podman.
 
 |`import.enabled`, `import.image`, `import.pullPolicy`
 |`false`, –, `IfNotPresent`
-|The image the templates and layouts come from, see
+|The image the document templates and layouts come from, see
 xref:how-to/deploy-the-service.adoc[Deploy the service]. The job is named after
 the image's hash, so a new image is a new job.
 

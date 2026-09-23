@@ -28,16 +28,16 @@ for external URLs (implemented with the host allowlist in phase 3); image
 limits; SVG in secure mode; caches; PDF 1.7; veraPDF; CLI `render` with
 `--attach`; CLI distribution with generated `NOTICE`, licence texts and licence
 check; Spotless formatting; JMH benchmark
-|The demo template renders to PDF/UA confirmed by veraPDF
+|The demo document template renders to PDF/UA confirmed by veraPDF
 |done
 
 |1a Proof of concept
-|Demo template with all building blocks, rendered to PDF, XHTML, email HTML,
-plain text, DOCX and ODT; document model with accessibility checker; DOCX and
-ODT writers without an office library; running headers and footers with page
-numbers from `@page`; decorative images as PDF artifacts; CLI formats and
-`verify`; `mise run check-formats` with veraPDF, axe-core, ODF validator and
-LibreOffice
+|Demo document template with all building blocks, rendered to PDF, XHTML,
+email HTML, plain text, DOCX and ODT; document model with accessibility
+checker; DOCX and ODT writers without an office library; running headers and
+footers with page numbers from `@page`; decorative images as PDF artifacts; CLI
+formats and `verify`; `mise run check-formats` with veraPDF, axe-core, ODF
+validator and LibreOffice
 |Every format passes its checks — otherwise the set of building blocks is
 reduced before anything builds on it
 |done
@@ -57,7 +57,7 @@ stored once per hash and served at
 `+/assets/{sha256}+`; publish checks; REST API; problem details with URNs;
 worker pool with 503; warm-up before readiness; `Accept-Language` and
 `lang` parameter, `Content-Language`, `Vary: Accept-Language`; formats per
-template (406)
+document template (406)
 |Create, publish, validate and render work through the API
 |done
 
@@ -65,16 +65,16 @@ template (406)
 |`+{#insert}+` areas; style catalog; components as user tags, described in
 `layout.json`; whitelist check; free CSS fallback; `.dotx`, `.ott` and
 `email.css` per layout; message files per language for layout texts; fonts
-shared by many templates held in memory once per hash; content pins a layout
-revision; a second demo layout for the same document
-|A layout change never alters a published template unnoticed
+shared by many document templates held in memory once per hash; a document
+template pins a layout revision; a second demo layout for the same document
+|A layout change never alters a published document template unnoticed
 |done
 
 |5 Operations
-|Import of layouts (and templates) into the cluster: bundles in their own OCI
-image, uploaded and published by an idempotent job of the chart (upload and
-publish in one API call; same content hash, no new revision); image built by the
-Quarkus container-image extension (Jib) from a pinned JRE base image, with a
+|Import of layouts (and document templates) into the cluster: bundles in their
+own OCI image, uploaded and published by an idempotent job of the chart (upload
+and publish in one API call; same content hash, no new revision); image built by
+the Quarkus container-image extension (Jib) from a pinned JRE base image, with a
 Leyden AOT cache trained by the integration test against that image and baked
 into a second image tagged `-aot`; generated `NOTICE`, licence list and licence
 texts in the image, and the licence gate closed for the server's
@@ -89,9 +89,9 @@ with k6 that reads the server's own saturation
 |6 Formats complete
 |Writers complete: headers and footers styled by the layout's `.dotx`/`.ott`
 (styles, default font, page setup and embedded fonts from them are done, taken
-ahead with phase 4); image sizes from the template; SVG with PNG fallback; `rowspan`;
-`multipart/alternative`; email HTML written through the StAX writer
-instead of string assembly
+ahead with phase 4); image sizes from the document template or layout; SVG
+with PNG fallback; `rowspan`; `multipart/alternative`; email HTML written
+through the StAX writer instead of string assembly
 |Every format passes its automated checks; DOCX also passes Word's
 accessibility checker
 |done
@@ -100,7 +100,7 @@ accessibility checker
 |Qute pages with htmx: management, field definitions, example data,
 publishing; CodeMirror 6 with Qute mode, completion and server diagnostics; PDF
 preview; ETag conflict detection; editing language variants side by side
-|An experienced editor publishes a template without a developer
+|An experienced editor publishes a document template without a developer
 |next
 
 |Prototype
@@ -112,7 +112,7 @@ preview; ETag conflict detection; editing language variants side by side
 |TipTap block editor; Qute only as placeholder, loop and condition nodes; own
 JSON format with translation to Qute XHTML in `core`; one-way switch to code
 mode
-|An editor without Qute knowledge creates an accessible template
+|An editor without Qute knowledge creates an accessible document template
 |
 
 |Later

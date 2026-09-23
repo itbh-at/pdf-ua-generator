@@ -4,9 +4,9 @@
 ////
 
 = Check the output formats
-:description: Render the demo template in every format and run the automated accessibility and conformance checks.
+:description: Render the demo document template in every format and run the automated accessibility and conformance checks.
 
-Use this after changing the renderer, a writer or the demo template.
+Use this after changing the renderer, a writer or the demo document template.
 
 . Build the tool:
 +

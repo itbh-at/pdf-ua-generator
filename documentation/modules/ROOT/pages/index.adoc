@@ -4,13 +4,13 @@
 ////
 
 = PDF UA Generator
-:description: Renders Qute templates with JSON data into accessible PDF, HTML, DOCX, ODT and plain-text documents.
+:description: Renders document templates with JSON data into accessible PDF, HTML, DOCX, ODT and plain-text documents.
 
-The PDF UA Generator turns a template and a JSON data structure into an
-accessible document. Templates are XHTML with Print CSS and
-https://quarkus.io/guides/qute[Qute] expressions; they are created, changed and
-deleted at runtime. The generator derives a JSON Schema from every template, so
-data can be checked before anything is rendered.
+The PDF UA Generator turns a document template and a JSON data structure into
+an accessible document. Document templates and layouts are XHTML with Print CSS
+and https://quarkus.io/guides/qute[Qute] expressions; they are created, changed
+and deleted at runtime. The generator derives a JSON Schema from every document
+template, so data can be checked before anything is rendered.
 
 Output formats:
 
@@ -24,8 +24,8 @@ It runs in two ways:
 
 * as a *command-line tool* that works on files and directories, without a
   database or network access, and
-* as a *REST service* with a template store, running standalone on a JVM, under
-  podman or scaled out in Kubernetes.
+* as a *REST service* with a store of document templates and layouts, running
+  standalone on a JVM, under podman or scaled out in Kubernetes.
 
 NOTE: The generator is being rebuilt. The
 xref:project/roadmap.adoc[roadmap] shows what exists today and what comes next.

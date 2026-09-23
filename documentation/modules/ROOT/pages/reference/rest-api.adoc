@@ -10,33 +10,35 @@ The API is open: there is no authentication yet. Errors are RFC 9457 problem
 details (`application/problem+json`) with the types listed under
 xref:reference/problem-types.adoc[Problem types].
 
-== Templates and revisions
+== Document templates, layouts and revisions
 
 [cols="3,5",options="header"]
 |===
 |Request |Response
 
 |`GET /templates`
-|All templates: `id`, `createdAt`, `publishedRevision`, `latestRevision`.
+|All document templates and layouts: `id`, `createdAt`, `publishedRevision`,
+`latestRevision`.
 
 |`+GET /templates/{id}+`
-|One template with the list of its revisions.
+|One document template or layout with the list of its revisions.
 
 |`+DELETE /templates/{id}+`
-|204. Deletes the template with all revisions. A layout that content still
-references gives 409.
+|204. Deletes the document template or layout with all revisions. A layout that
+a document template still references gives 409.
 
 |`+POST /templates/{id}/revisions+` +
 `Content-Type: application/zip`
 |201 with `Location` and the released revision. The archive is validated by the
 publish checks and released for use in one step; the first revision creates the
-template. A bundle that fails the checks gives 422 `publish-rejected` with every
-problem, and nothing is stored. +
+document template or layout. A bundle that fails the checks gives 422
+`publish-rejected` with every problem, and nothing is stored. +
  +
-Files that are already stored as a revision of this template give 200 with
-`Content-Location` and that revision instead of a new one, so an import can be
-repeated without changing anything. A layout carries no example data and is
-checked with empty data; a content template is checked with its `example.json`.
+Files that are already stored as a revision of this document template or layout
+give 200 with `Content-Location` and that revision instead of a new one, so an
+import can be repeated without changing anything. A layout carries no example
+data and is checked with empty data; a document template is checked with its
+`example.json`.
 
 |`+GET /templates/{id}/revisions/{n}+`
 |The revision (see below).
@@ -46,22 +48,25 @@ checked with empty data; a content template is checked with its `example.json`.
 
 |`+DELETE /templates/{id}/revisions/{n}+`
 |The archived revision. Retires (archives) a released revision, keeping it as
-history; a layout revision that released content still lists gives 409.
+history; a layout revision that a released document template still lists gives
+409.
 |===
 
-Template ids consist of lower-case letters, digits and `-`, at most 64
-characters.
+Ids of document templates and layouts consist of lower-case letters, digits and
+`-`, at most 64 characters.
 
-Templates and layouts share these endpoints. A bundle with `layout.json` is a
-layout; a template keeps the kind of its first revision (409 otherwise). A
-layout is previewed with the render endpoints like any template.
+Document templates and layouts share these endpoints; the field `kind` tells
+them apart: `content` is a document template, `layout` a layout. A bundle with
+`layout.json` is a layout; a document template or layout keeps the kind of its
+first revision (409 otherwise). A layout is previewed with the render endpoints
+like any document template.
 
-A content revision lists the layout revisions named in its `template.json`
-(`layouts`, the default first). It is released only if every listed layout
-revision is released, and the publish checks render it with each of them. A
-layout that content lists cannot be deleted, nor can a listed layout revision be
-archived (409). `+GET /templates/{id}+` of a layout lists the content revisions
-that list it in `usedBy`.
+A revision of a document template lists the layout revisions named in its
+`template.json` (`layouts`, the default first). It is released only if every
+listed layout revision is released, and the publish checks render it with each
+of them. A layout that a document template lists cannot be deleted, nor can a
+listed layout revision be archived (409). `+GET /templates/{id}+` of a layout
+lists the revisions of document templates that list it in `usedBy`.
 
 A revision:
 
@@ -89,15 +94,15 @@ An archived revision also carries `archivedAt`.
 
 === Bundle
 
-The archive is laid out like a template directory of the command line, see
-xref:reference/template-files.adoc[Template files]:
+The archive is laid out like the directory of a document template or layout on
+the command line, see xref:reference/template-files.adoc[Document template files]:
 
 [cols="2,5",options="header"]
 |===
 |Path |Content
 
 |`template.xhtml`
-|The template. Required.
+|The default variant. Required.
 
 |`template.<tag>.xhtml`
 |Language variants.
@@ -106,8 +111,8 @@ xref:reference/template-files.adoc[Template files]:
 |Descriptor with language, formats and field definitions.
 
 |`example.json`
-|Example data of a content template. Required to release it: the publish checks
-render it with every variant in every offered format.
+|Example data of a document template. Required to release it: the publish
+checks render it with every language variant in every offered format.
 
 |`example/<name>.<ext>`
 |Attachments of the example data, referred to as `attachment:<name>`.
@@ -170,8 +175,8 @@ revision does not list gives 400 `invalid-request`. The response carries the
 layout used in `Template-Layout` (e.g. `memo@1`), next to `Template-Revision`.
 
 Format:: The query parameter `format` (`pdf`, `xhtml`, `email-html`, `text`,
-`docx`, `odt`), otherwise the first media type in `Accept` that the template
-offers. `*/*` or no `Accept` gives the first offered format, PDF if offered.
+`docx`, `odt`), otherwise the first media type in `Accept` that the document
+template offers. `*/*` or no `Accept` gives the first offered format, PDF if offered.
 +
 [cols="1,3",options="header"]
 |===
@@ -186,12 +191,12 @@ offers. `*/*` or no `Accept` gives the first offered format, PDF if offered.
 |===
 
 Language:: The query parameter `lang`, otherwise `Accept-Language`, both as
-language ranges (`de-AT, en;q=0.8`). The variant is chosen by RFC 4647 lookup;
-without a match, the default variant is rendered. A malformed
+language ranges (`de-AT, en;q=0.8`). The language variant is chosen by RFC 4647
+lookup; without a match, the default variant is rendered. A malformed
 `Accept-Language` is ignored, a malformed `lang` gives 400.
 
 Response headers:: `Content-Type`; `Content-Language` with the language of the
-rendered variant; `Vary: Accept, Accept-Language`; `Content-Disposition:
+rendered language variant; `Vary: Accept, Accept-Language`; `Content-Disposition:
 inline` with a file name; `Template-Revision` with the revision number.
 
 Rendering runs in a pool of worker threads with a bounded queue. When the queue
@@ -199,13 +204,15 @@ is full, the service answers 503 `overloaded` with `Retry-After` at once.
 
 == Assets
 
-`+GET /assets/{sha256}+` returns a template image (PNG, JPEG, SVG) by the SHA-256
-of its content; `+GET /assets/{sha256}.png+` returns an SVG as PNG. Both are
-public and cached as immutable. Email HTML refers to images this way. Only
-images are served — templates, descriptors, fonts and example data are not.
+`+GET /assets/{sha256}+` returns an image of a document template or layout (PNG,
+JPEG, SVG) by the SHA-256 of its content; `+GET /assets/{sha256}.png+` returns
+an SVG as PNG. Both are public and cached as immutable. Email HTML refers to
+images this way. Only images are served — language variants, descriptors, fonts
+and example data are not.
 
 == Health
 
 `GET /q/health/live` and `GET /q/health/ready`. Readiness waits for the
 warm-up: after start, the instance renders the example data of the latest
-published revision of every template in every format before it reports ready.
+published revision of every document template in every format before it reports
+ready.

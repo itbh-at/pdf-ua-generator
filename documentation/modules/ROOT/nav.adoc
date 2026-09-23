@@ -12,11 +12,11 @@
 
 .Reference
 * xref:reference/cli.adoc[Command line]
-* xref:reference/template-files.adoc[Template files]
+* xref:reference/template-files.adoc[Document template files]
 * xref:reference/layouts.adoc[Layouts]
 * xref:reference/rest-api.adoc[REST API]
 * xref:reference/configuration.adoc[Configuration]
-* xref:reference/building-blocks.adoc[Template building blocks]
+* xref:reference/building-blocks.adoc[Building blocks]
 * xref:reference/problem-types.adoc[Problem types]
 * xref:reference/glossary.adoc[Glossary]
 

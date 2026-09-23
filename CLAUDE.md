@@ -7,10 +7,10 @@ the docs).
 
 ## Project in one sentence
 
-A Java/Quarkus service and CLI that renders Qute templates (XHTML + Print CSS),
-loaded at runtime and filled with JSON data, into accessible documents
-(PDF/UA via openhtmltopdf and Apache PDFBox, XHTML, email HTML, DOCX, ODT,
-plain text).
+A Java/Quarkus service and CLI that renders document templates written in Qute
+(XHTML + Print CSS), loaded at runtime and filled with JSON data, into
+accessible documents (PDF/UA via openhtmltopdf and Apache PDFBox, XHTML, email
+HTML, DOCX, ODT, plain text).
 
 ## Stack
 
@@ -19,17 +19,17 @@ plain text).
   `mise run build`.
 - Base package: `at.itbh.pdfuagen`.
 - Three Maven modules:
-  - `core` — plain Java library: template parsing, schema derivation,
-    validation, rendering. Uses standalone `qute-core`, no Quarkus. The Qute
-    engine is configured here only, so CLI and server render identically.
-    Template lookup goes through an interface; `core` has no database or HTTP
-    code.
+  - `core` — plain Java library: parsing of document templates and layouts,
+    schema derivation, validation, rendering. Uses standalone `qute-core`, no
+    Quarkus. The Qute engine is configured here only, so CLI and server render
+    identically. Looking them up goes through an interface; `core` has no
+    database or HTTP code.
   - `cli` — plain Java + Picocli on top of `core`. No Quarkus, no database, no
     network access. Everything is done through command-line arguments, files and
     stdin/stdout. No editor or other interactive features.
-  - `server` — Quarkus REST service on top of `core`: template store
-    (PostgreSQL, schema migrations with Flyway, plain JDBC), API, security. The
-    CLI does not depend on it.
+  - `server` — Quarkus REST service on top of `core`: store of document
+    templates and layouts (PostgreSQL, schema migrations with Flyway, plain
+    JDBC), API, security. The CLI does not depend on it.
 - Single-tenant. No tenant concept in data model, API or UI; separate tenants
   are separate deployments (cluster or namespace).
 - No rendering, schema or validation logic in `cli` or `server`; it belongs in
@@ -39,32 +39,33 @@ plain text).
   CodeMirror 6 for code); JS dependencies via mvnpm and the Quarkus Web
   Bundler. No TypeScript, no separate Node build.
 - The UI works only through the REST API. The stored format of block-edited
-  templates is our own JSON format defined in `core`, not the document format of
-  any editor library; `core` translates it into Qute XHTML and escapes all
-  literal text, so only placeholder nodes produce Qute expressions.
+  document templates is our own JSON format defined in `core`, not the document
+  format of any editor library; `core` translates it into Qute XHTML and escapes
+  all literal text, so only placeholder nodes produce Qute expressions.
 - Qute and XHTML diagnostics for the editors (line, column, message) come from
   the server; the browser does not parse Qute itself.
-- Templates are parsed at runtime. The server adds, changes and deletes them
-  at runtime through the API; the CLI reads them from files and directories
-  given as arguments. No template is part of the application build: no
-  `src/main/resources/templates`, no `@CheckedTemplate`, no type-safe template
-  validation at build time.
+- Document templates and layouts are parsed at runtime. The server adds, changes
+  and deletes them at runtime through the API; the CLI reads them from files and
+  directories given as arguments. No document template or layout is part of the
+  application build: none in `src/main/resources/templates` (it holds only the
+  UI's own pages), no `@CheckedTemplate`, no type-safe validation of document
+  templates at build time.
 - Checks that build-time Qute would provide (parse errors, unknown expressions)
-  are done at runtime when a template revision is saved.
-- Every template revision has a JSON Schema (draft 2020-12) describing the data
-  it needs. It is derived from the template and its field definitions and
-  exposed through the API and the CLI.
-- A template's descriptor `<name>.json` holds the language of the default
-  variant and the field definitions (types `text`, `number`, `date`,
+  are done at runtime when a revision is saved.
+- Every revision of a document template has a JSON Schema (draft 2020-12)
+  describing the data it needs. It is derived from its language variants and
+  field definitions and exposed through the API and the CLI.
+- A document template's descriptor `<name>.json` holds the language of the
+  default variant and the field definitions (types `text`, `number`, `date`,
   `boolean`, `image`, `list`, `object`); all language variants share it.
-  Every field a template reads must be defined.
-- Numbers are JSON numbers and dates ISO 8601 strings in the data; templates
-  format them (`.number`, `.currency('EUR')`, `.date`) for the variant's
-  language. No pre-formatted amounts or dates in the data.
+  Every field a language variant reads must be defined.
+- Numbers are JSON numbers and dates ISO 8601 strings in the data; language
+  variants format them (`.number`, `.currency('EUR')`, `.date`) for the
+  variant's language. No pre-formatted amounts or dates in the data.
 - `{#with}` is not available: its names cannot be resolved without the data.
 - Input data is validated against that schema before rendering, and can be
-  validated without rendering. Additional properties not used by the template
-  are allowed; missing required values and wrong types are errors.
+  validated without rendering. Additional properties not used by the document
+  template are allowed; missing required values and wrong types are errors.
 - All API errors are RFC 9457 problem details (`application/problem+json`),
   produced by the Quarkiverse extension
   `io.quarkiverse.httpproblem:quarkus-http-problem`. No hand-written exception
@@ -76,20 +77,21 @@ plain text).
   `urn:itbh:pdf-ua-generator:problem:<name>` (e.g. `…:problem:invalid-data`).
   Every URN is explained on the problem-types reference page of the docs; a new
   URN is not used before it is documented there.
-- Template data is JSON. No `Map<String, String>` or other flattening of the data.
-- A server template revision is a bundle laid out like a CLI template
-  directory (`template.xhtml`, `template.json`, variants, assets). A content
-  bundle also carries `example.json` and `example/` for the publish checks; a
-  layout carries no example data of its own and is checked with empty data.
+- The data is JSON. No `Map<String, String>` or other flattening of the data.
+- A revision on the server is a bundle laid out like a directory of the CLI
+  (`template.xhtml`, `template.json`, language variants, assets). The bundle of
+  a document template also carries `example.json` and `example/` for the
+  publish checks; a layout carries no example data of its own and is checked
+  with empty data.
   Revisions are immutable; caches are keyed by content hash, and status is
   always read from the database.
 - A bundle is validated by the publish checks and released for use on upload;
   there is no separate publish step and no resting draft. A released revision is
-  not deleted but archived (retired, kept as history); a whole template is
-  deleted only while nothing references it. A layout revision cannot be archived,
-  nor its template deleted, while released content lists it. Status values are
-  `published` (released) and `archived`; `draft` is only transient during an
-  upload.
+  not deleted but archived (retired, kept as history); a whole document
+  template or layout is deleted only while nothing references it. A layout
+  revision cannot be archived, nor the layout deleted, while a released
+  document template lists it. Status values are `published` (released) and
+  `archived`; `draft` is only transient during an upload.
 - Caching is done with `quarkus-cache`, never hand-rolled. The files of a
   revision are plain data (`Map<String, byte[]>`), so the backend is a
   deployment decision: Caffeine by default, a remote one where an operator
@@ -101,49 +103,51 @@ plain text).
   When the way they are derived changes, a Flyway migration recomputes them
   from the stored files.
 
-## Template styling
+## Styling
 
-- A layout is a template with `layout.json` (style catalog, internal classes,
+- A layout consists of `layout.json` (style catalog, internal classes,
   areas, components with their parameters, fonts, free-styling permission,
   fields), `template.xhtml` with `{#insert}` areas, `components/<name>.xhtml`,
   `messages.json` plus `messages.<tag>.json`, `email.css`, and optionally
   `layout.dotx` and `layout.ott`.
-- A content template's descriptor lists the layout revisions it may be rendered
-  with (`"layouts": ["corporate@3", "memo@1"]`, at most one revision per layout);
-  the first is the default, a render request may choose another listed one
-  (`layout` parameter), and anything else is refused. The publish check renders
-  the content with every listed layout. The content is one `{#include layout}`
-  filling declared areas. The layout's files appear under `layout/`.
-- Default: content templates are styled only through the style catalog (named
+- A document template's descriptor lists the layout revisions it may be rendered
+  with (`"layouts": ["corporate@3", "memo@1"]`, at most one revision per
+  layout); the first is the default, a render request may choose another listed
+  one (`layout` parameter), and anything else is refused. The publish check
+  renders the document template with every listed layout. Each language variant
+  is one `{#include layout}` filling declared areas. The layout's files appear
+  under `layout/`.
+- Default: document templates are styled only through the style catalog (named
   CSS classes) and the components (Qute user tags) of their layout. No `style`
   attribute, no `<style>` block, no `<link>`, no font declarations; class
-  values are literal. These rules are checked on the template source.
+  values are literal. These rules are checked on the source of the
+  language variants.
 - Fallback: free CSS (`<style>` blocks and `style` attributes) is an explicit
   per-revision opt-in (`styling: free`), allowed only if the layout permits it.
   The flag is visible in the API and the UI.
 - Free CSS still has hard limits: no `@import`, no `!important`, `url()` only to
-  template assets or request attachments, `font-family` only fonts declared by
-  the layout.
+  assets of the document template or request attachments, `font-family` only
+  fonts declared by the layout.
 - Free CSS never bypasses the publish checks: element whitelist, alt texts,
   heading structure and veraPDF apply unchanged.
-- A template with `styling: free` is rendered to PDF and XHTML only. DOCX and
-  ODT are not offered for it (see Output formats).
+- A document template with `styling: free` is rendered to PDF and XHTML only.
+  DOCX and ODT are not offered for it (see Output formats).
 
 ## Language variants
 
-- A template may, but need not, exist in several languages: the default file
-  (`template.xhtml`) plus optional variants named with a BCP 47 tag
-  (`template.de-AT.xhtml`, `template.en.xhtml`). Layout texts come from the
-  layout's message files per language; a layout a template lists must translate
-  every text into each language the template is written in (the publish check
-  refuses it otherwise).
+- A document template may, but need not, exist in several languages: the default
+  variant (`template.xhtml`) plus optional language variants named with a BCP 47
+  tag (`template.de-AT.xhtml`, `template.en.xhtml`). Layout texts come from the
+  layout's message files per language; a layout a document template lists must
+  translate every text into each language the document template is written in
+  (the publish check refuses it otherwise).
 - Selection: the API matches `Accept-Language` by RFC 4647 lookup; a `lang`
   query parameter takes precedence; the CLI uses `--lang`. No matching variant
   means the default variant — never an error. Responses carry
   `Content-Language` and `Vary: Accept-Language`.
-- All variants of a template use the same data fields (one JSON Schema); the
-  publish check verifies this. Date, number and currency formatting follow the
-  selected language.
+- All language variants of a document template use the same data fields (one
+  JSON Schema); the publish check verifies this. Date, number and currency
+  formatting follow the selected language.
 
 ## Output formats
 
@@ -158,7 +162,7 @@ plain text).
   email HTML) is written through the StAX writer `Xml`, never assembled from
   strings; plain text is the only output built as a string.
 - Running headers and footers come from the `@page` margin boxes of the
-  template CSS (strings, `counter(page)`, `counter(pages)`) and are written to
+  layout CSS (strings, `counter(page)`, `counter(pages)`) and are written to
   PDF, DOCX and ODT; anything else in their `content` is an error.
 - Decorative images (`alt=""` or `role="presentation"`) become CSS backgrounds
   before PDF rendering, so openhtmltopdf marks them as artifacts.
@@ -168,24 +172,25 @@ plain text).
   styles, and the blocks `columns`, `col`, `box`, `footnote`. Components mark
   these blocks with `data-block="…"`. Anything outside this set is an error,
   never silently approximated.
-- Page layout, default font and styles for DOCX and ODT come from a template
-  file per layout: `layout.dotx` for DOCX, `layout.ott` for ODT. The writers
-  add only styles the template lacks and find catalog styles by name. Every
-  catalog style has the same name in the layout CSS, the `.dotx` and the
-  `.ott`; the publish check verifies this.
+- Page layout, default font and styles for DOCX and ODT come from an Office
+  template file per layout: `layout.dotx` for DOCX, `layout.ott` for ODT. The
+  writers add only styles the Office template lacks and find catalog styles by
+  name. Every catalog style has the same name in the layout CSS, the `.dotx` and
+  the `.ott`; the publish check verifies this.
 - DOCX and ODT embed the layout's fonts (from its `@font-face` rules) that their
-  template names — DOCX obfuscated as ECMA-376 requires, ODT under `Fonts/` —
-  so no office application substitutes a system font. List markers use only
-  characters every text font has.
+  Office template names — DOCX obfuscated as ECMA-376 requires, ODT under
+  `Fonts/` — so no office application substitutes a system font. List markers
+  use only characters every text font has.
 - Email: `email-html` is a separate rendition — layout-provided `email.css`,
   styles inlined into `style` attributes, absolute image URLs, layout tables
   with `role="presentation"`. Not offered for `styling: free`.
 - Plain text is written from the document model (headings underlined, links as
   `text <url>`, images as alt text, footnotes collected, UTF-8, wrapped at 72).
-  A template may ship its own `template.txt`, which then replaces it.
+  A document template may ship its own `template.txt`, which then replaces it.
 - `Accept: multipart/alternative` returns plain text and email HTML from one
   render (text first, HTML last, RFC 2046). The service never sends mail.
-- Images: PNG, JPEG and SVG only. Template assets are served publicly at
+- Images: PNG, JPEG and SVG only. Assets of document templates and layouts are
+  served publicly at
   `/assets/{sha256}` (immutable). External image URLs are allowed only from a
   configured host allowlist: passed through unchanged in email HTML, fetched
   (HTTPS only, no cross-host redirects, no private address ranges, time and
@@ -194,13 +199,13 @@ plain text).
 - Request attachments (`attachment:<name>`) must be PNG, JPEG or SVG images;
   fonts, stylesheets and anything else are rejected.
 - Fonts are assets of the layout (stored and versioned with the revision,
-  loaded via `@font-face` from the layout CSS; CLI: template directory or
+  loaded via `@font-face` from the layout CSS; CLI: the layout directory or
   include paths). No fonts in the container image, no shared volume, no system
   fonts: a font that is not an asset would fall back to a non-embedded standard
   font and fail PDF/UA. Uploading a font checks its embedding permission (OS/2
   `fsType`); fonts that forbid embedding are rejected.
-- Every template declares the formats it offers. A request for a format the
-  template does not offer is answered with 406 and the problem type
+- Every document template declares the formats it offers. A request for a format
+  the document template does not offer is answered with 406 and the problem type
   `urn:itbh:pdf-ua-generator:problem:format-not-supported`.
 
 ## Runtime and deployment
@@ -222,7 +227,7 @@ plain text).
   `values-podman.yaml` for podman. podman consumes the rendered chart:
   `helm template … -f values-podman.yaml | podman kube play -`.
 - The chart renders only plain manifests: no hooks, no subcharts, no lookups,
-  no `hostPort`. PostgreSQL for podman is a minimal template in the chart,
+  no `hostPort`. PostgreSQL for podman is a minimal manifest in the chart,
   enabled only by `values-podman.yaml`; on Kubernetes the database is external
   and configured through values.
 - Every chart change is verified with `mise run check-chart`: rendered with both
@@ -237,11 +242,11 @@ plain text).
 - The image ships the generated `NOTICE`, `THIRD-PARTY.txt` and the licence
   texts; the build fills `server/src/main/jib`, which Jib copies into the image
   root.
-- Templates and layouts are never part of an image of the service. They reach a
-  cluster in a bundle image of their own (`+/bundles/<template id>.zip+`, a
-  shell with `curl`), imported by an idempotent job of the chart that uploads
-  and publishes each bundle in one API call. `deploy/bundles/Containerfile`
-  builds that image for the demo and is the pattern for others.
+- Document templates and layouts are never part of an image of the service. They
+  reach a cluster in a bundle image of their own (`+/bundles/<id>.zip+`, a shell
+  with `curl`), imported by an idempotent job of the chart that uploads and
+  publishes each bundle in one API call. `deploy/bundles/Containerfile` builds
+  that image for the demo and is the pattern for others.
 - `mise run smoke-test` runs the rendered chart under podman, imports the demo
   bundles and renders; it must pass after every change to the image, the chart
   or the import. `mise run load-test` (k6) measures a running deployment.
@@ -251,12 +256,14 @@ plain text).
 - Every generated output must be accessible. PDF output must pass veraPDF
   PDF/UA validation; a change that breaks this is a failing change.
 - veraPDF is a library dependency of `core` (used by the CLI `check` command and
-  by the server when a template revision is published), not an external tool.
-- `mise run check-formats` renders the demo template in every format and checks
+  by the server when a revision is released), not an external tool.
+- `mise run check-formats` renders the demo document template in every
+  format and checks
   each (veraPDF, axe-core, ODF validator, LibreOffice export as PDF/UA). It
   must pass after every change to rendering or a writer.
-- Demo and test templates use semantic XHTML: `lang` attribute, document title,
-  heading hierarchy, `alt` on images, `th`/`scope` on tables, embedded fonts.
+- The demo and test document templates use semantic XHTML: `lang` attribute,
+  document title, heading hierarchy, `alt` on images, `th`/`scope` on tables,
+  embedded fonts.
 
 ## Language
 
@@ -271,16 +278,16 @@ Answers are crisp, specific, and to the point — no filler, no slang, no
 marketing tone, no self-praise. Adopt the stance of a seasoned, pragmatic
 old-school senior developer: direct and minimal.
 
-- **No small talk, no preamble, no narration.** Start straight with the answer or
-  the code. Do not announce what you are about to do, do not retell the steps at
-  the end.
+- **No small talk, no preamble, no narration.** Start straight with the answer
+  or the code. Do not announce what you are about to do, do not retell the steps
+  at the end.
 - **No jargon, no buzzwords, no marketing language.** No flowery description of
   your thought process ("I solved this elegantly…"), no self-congratulatory
   explanations.
 - **Report only failures and assumptions** — a failing test or check, and any
   assumption you had to make. Nothing else: no summary of what was done.
-- **Explain only on request.** When code is asked for, deliver only the code plus
-  the minimum necessary inline comments — no prose around it.
+- **Explain only on request.** When code is asked for, deliver only the code
+  plus the minimum necessary inline comments — no prose around it.
 - **Recommend, do not enumerate.** Give one recommendation instead of listing
   every option.
 
@@ -327,6 +334,11 @@ old-school senior developer: direct and minimal.
   `documentation/modules/ROOT/pages/`. Put a page in the quadrant that matches
   what it *does*, and do not mix modes on one page — a how-to explains nothing,
   an explanation instructs nobody.
+- Terms follow the
+  [Glossary](documentation/modules/ROOT/pages/reference/glossary.adoc):
+  document template, layout, language variant, default variant, document,
+  revision, bundle. "Template" alone is used for none of them — not in the docs,
+  the UI, nor this file.
 - Plans, rationale and design live only in the docs, never in this file. Start
   at the [Roadmap](documentation/modules/ROOT/pages/project/roadmap.adoc)
   (phases and their status) and the

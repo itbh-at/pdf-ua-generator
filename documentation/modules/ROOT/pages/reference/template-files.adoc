@@ -3,8 +3,8 @@
   // Copyright 2026 IT Beratung Hermann GmbH
 ////
 
-= Template files
-:description: The files that make up a template, the field definitions, how the JSON Schema is derived from them, the language variants and the formatting functions.
+= Document template files
+:description: The files that make up a document template, the field definitions, how the JSON Schema is derived from them, the language variants and the formatting functions.
 
 == Files
 
@@ -13,7 +13,7 @@
 |File |Content
 
 |`<name>.xhtml`
-|The template, default language variant.
+|The default variant.
 
 |`<name>.<tag>.xhtml`
 |Optional language variant; `<tag>` is a BCP 47 language tag with a two- or
@@ -71,21 +71,22 @@ text.
 formatted for this language.
 
 |`layouts`
-|The layout revisions the template may be rendered with, e.g.
+|The layout revisions the document template may be rendered with, e.g.
 `["corporate@3", "memo@1"]`; the first is the default, and at most one
 revision per layout. Optional; see xref:reference/layouts.adoc[Layouts].
-Without it the template brings its own styling (written by developers). A
-single layout may also be written `"layout": "corporate@3"`; not both keys.
+Without it the document template brings its own styling (written by
+developers). A single layout may also be written `"layout": "corporate@3"`; not
+both keys.
 
 |`styling`
-|`"catalog"` (default) or `"free"` for a template with a layout; see
+|`"catalog"` (default) or `"free"` for a document template with a layout; see
 xref:reference/layouts.adoc#free-styling[Free styling].
 
 |`formats`
-|The output formats the template offers: `pdf`, `xhtml`, `email-html`, `text`,
-`docx`, `odt`. Optional; default: all. Rendering another format is refused
-with `format-not-supported`, and the publish checks render every offered
-format.
+|The output formats the document template offers: `pdf`, `xhtml`,
+`email-html`, `text`, `docx`, `odt`. Optional; default: all. Rendering another
+format is refused with `format-not-supported`, and the publish checks render
+every offered format.
 
 |`fields`
 |The top-level fields. Required.
@@ -157,11 +158,12 @@ marks the image as decorative
 
 == Derived schema
 
-The schema combines the field definitions with what the template reads.
+The schema combines the field definitions with what the language variants
+read.
 
-* A field is *required* in its parent object if the template reads it without
-  a default wherever the parent exists. `+{customer.name}+` makes `customer`
-  required and `name` required within `customer`.
+* A field is *required* in its parent object if the document template reads
+  it without a default wherever the parent exists. `+{customer.name}+` makes
+  `customer` required and `name` required within `customer`.
 * A field is *optional* if it has a default — `+{nickname ?: name}+`,
   `+{greeting.or('Hello')}+`, `+{#if photo??}+`, `+{#for x in notes.orEmpty}+`
   — or is read only under a condition that tests something other than its
@@ -174,12 +176,12 @@ The schema combines the field definitions with what the template reads.
 * Optional fields also accept `null`.
 * Properties the schema does not name are allowed, so callers can send their
   existing data objects unchanged.
-* Defined fields the template never reads stay in the schema as optional
-  fields and are reported as warnings.
+* Defined fields the document template never reads stay in the schema as
+  optional fields and are reported as warnings.
 
 These are errors:
 
-* The template reads a field the definitions lack.
+* The document template reads a field the definitions lack.
 * A read does not fit the type: a property of a `text` field, iterating an
   `object`, `.date` on a `number`.
 * The language variants need different data: a field required in one variant
@@ -221,9 +223,9 @@ Values are formatted for the language of the rendered variant.
 
 == Language variants
 
-A template may exist in several languages. Each variant is a complete template
-with its own texts; all variants read the same data. Which variant is rendered
-is decided per request:
+A document template may exist in several languages. Each language variant is
+a complete XHTML file with its own texts; all variants read the same data.
+Which variant is rendered is decided per request:
 
 * CLI: `--lang` with language ranges, e.g. `--lang "de-AT, en;q=0.8"`.
 * REST API: the `lang` query parameter, otherwise `Accept-Language`.

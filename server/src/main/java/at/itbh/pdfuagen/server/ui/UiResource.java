@@ -131,7 +131,9 @@ public class UiResource {
       @Context UriInfo uri)
       throws IOException {
     if (id == null || !TemplateStore.ID.matcher(id).matches()) {
-      return html(problemsFragment.data("problems", problem("invalid template id")));
+      return html(
+          problemsFragment.data(
+              "problems", problem("invalid id: use lower-case letters, digits and dashes")));
     }
     if (bundle == null) {
       return html(problemsFragment.data("problems", problem("no bundle uploaded")));
@@ -286,8 +288,7 @@ public class UiResource {
     TemplateStore.Template template = templateOf(id);
     Integer published = template.latestPublished();
     if (published == null) {
-      return html(
-          problemsFragment.data("problems", problem("the template has no published revision")));
+      return html(problemsFragment.data("problems", problem("no revision is released yet")));
     }
     TemplateStore.Revision revision = store.revision(id, published).orElseThrow();
     TemplateStore.LayoutPin pin =
@@ -300,7 +301,8 @@ public class UiResource {
     if (pin == null && !revision.layouts().isEmpty()) {
       return html(
           problemsFragment.data(
-              "problems", problem("the template does not list the layout '" + layout + "'")));
+              "problems",
+              problem("the document template does not list the layout '" + layout + "'")));
     }
     TemplateRepository repository = renderers.repository(revision, layoutOf(revision, pin));
     OutputFormat out = OutputFormat.of(format).orElse(OutputFormat.PDF);

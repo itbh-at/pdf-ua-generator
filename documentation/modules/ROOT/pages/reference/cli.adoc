@@ -41,7 +41,7 @@ of each library.
 
 == `render`
 
-Renders a template with JSON data into a document.
+Renders a document template with JSON data into a document.
 
 ----
 pdf-ua-generator render -t <file|dir> [-d <file|->] [-a <name>=<file>]...
@@ -49,34 +49,35 @@ pdf-ua-generator render -t <file|dir> [-d <file|->] [-a <name>=<file>]...
                         [--public-base-url <url>] [--verify] [-w]
 ----
 
-If the template has field definitions (`<name>.json`), the data is validated
-against its schema first; see xref:reference/template-files.adoc[Template
-files].
+If the document template has field definitions (`<name>.json`), the data is
+validated against its schema first; see
+xref:reference/template-files.adoc[Document template files].
 
 [cols="2,5",options="header"]
 |===
 |Option |Meaning
 
 |`-t`, `--template <file\|dir>`
-|The template: a file, or a directory containing `template.xhtml`. Relative
-resource references (fonts, images, stylesheets) are resolved against its
-directory. Required.
+|The document template or layout: the file of its default variant, or a
+directory containing `template.xhtml`. Relative resource references (fonts,
+images, stylesheets) are resolved against its directory. Required.
 
 |`-I`, `--include-path <dir>`
-|Additional directory searched for included templates and resources, after the
-template directory. Repeatable.
+|Additional directory searched for included Qute templates and resources,
+after the directory of the document template. Repeatable.
 
 |`-L`, `--layout <dir>`
-|The layout directory, for a template whose descriptor names a layout. Its
-files appear under `layout/`. A directory with `layout.json` given as `-t` is a
-layout on its own and is checked or previewed without `--layout`.
+|The layout directory, for a document template whose descriptor names a
+layout. Its files appear under `layout/`. A directory with `layout.json` given
+as `-t` is a layout on its own and is checked or previewed without `--layout`.
 
 |`-d`, `--data <file\|->`
-|JSON object with the template data; `-` reads stdin. Default: `{}`.
+|JSON object with the data for the document template; `-` reads stdin.
+Default: `{}`.
 
 |`-a`, `--attach <name>=<file>`
-|Image the template references as `attachment:<name>`. PNG, JPEG or SVG only.
-Repeatable.
+|Image the document template references as `attachment:<name>`. PNG, JPEG or
+SVG only. Repeatable.
 
 |`-f`, `--format <format>`
 a|One of:
@@ -84,15 +85,15 @@ a|One of:
 * `pdf` (default) — PDF/UA-1
 * `xhtml` — self-contained: images, fonts and stylesheets embedded as data URIs
 * `email-html` — styles from `email.css` inlined, absolute image URLs
-* `text` — plain text; a template `<name>.txt` next to the template replaces
-  the generated text
+* `text` — plain text; a hand-written `<name>.txt` next to the default variant
+  replaces the generated text
 * `docx`, `odt`
 
 DOCX, ODT, email HTML and text accept only the
 xref:reference/building-blocks.adoc[building blocks].
 
 |`-o`, `--output <file\|->`
-|Output file; `-` writes to stdout. Default: next to the template, as
+|Output file; `-` writes to stdout. Default: next to the default variant, as
 `<name>.pdf`, `.rendered.xhtml`, `.email.html`, `.rendered.txt`, `.docx` or
 `.odt`.
 
@@ -103,7 +104,8 @@ the default variant if none matches. The default output name follows the
 variant (`<name>.de-AT.pdf`).
 
 |`--public-base-url <url>`
-|Base of the public URLs of template assets in email HTML:
+|Base of the public URLs of the assets of document templates and layouts in
+email HTML:
 `<url>/assets/<sha256>`.
 
 |`--verify`
@@ -111,9 +113,9 @@ variant (`<name>.de-AT.pdf`).
 conform. Only with `--format pdf`.
 
 |`-w`, `--watch`
-|Render once, then again whenever a file in the template directory, an include
-path, or the directory of the data file or an attachment changes. Stops with
-Ctrl+C.
+|Render once, then again whenever a file in the directory of the document
+template, an include path, or the directory of the data file or an attachment
+changes. Stops with Ctrl+C.
 |===
 
 Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
@@ -129,7 +131,7 @@ Warnings of the renderer (e.g. unsupported CSS) are printed to stderr as
 |Document written.
 
 |`1`
-|Template, data or resources invalid, or `--verify` failed.
+|Document template or layout, data, or resources invalid, or `--verify` failed.
 
 |`2`
 |Invalid command line.
@@ -144,21 +146,21 @@ pdf-ua-generator render -t demo/content/template.xhtml -L demo/layout-memo -d de
 
 == `schema`
 
-Prints the JSON Schema (draft 2020-12) of the data a template needs, derived
-from the template and its field definitions.
+Prints the JSON Schema (draft 2020-12) of the data a document template needs,
+derived from its language variants and its field definitions.
 
 ----
 pdf-ua-generator schema -t <file|dir> [-I <dir>]... [-L <dir>] [-o <file>]
 ----
 
 Fields that are defined but never used are reported as `warning: …`. Exit code
-`0` if the schema was written, `1` if the template, a language variant or the
-field definitions have errors — each printed with its location (template, line
-and column, or a JSON Pointer into the descriptor).
+`0` if the schema was written, `1` if the default variant, another language
+variant or the field definitions have errors — each printed with its location
+(language variant, line and column, or a JSON Pointer into the descriptor).
 
 == `validate`
 
-Validates data against the schema of a template, without rendering.
+Validates data against the schema of a document template, without rendering.
 
 ----
 pdf-ua-generator validate -t <file|dir> [-I <dir>]... [-L <dir>] -d <file|->
@@ -174,23 +176,25 @@ error: is required (#/order/positions/0/quantity)
 
 == `check`
 
-Runs the checks a template must pass before it is published.
+Runs the checks a document template or layout must pass before it is
+published.
 
 ----
 pdf-ua-generator check -t <file|dir> [-I <dir>]... [-L <dir>] -d <file|-> [-a <name>=<file>]...
 ----
 
 . Every language variant parses, the field definitions are valid, every field
-  the template reads is defined with a fitting type, and all variants need the
-  same data.
-. With a layout: the layout matches its `layout.json`, and the content follows
-  the xref:reference/layouts.adoc#content-rules[rules for content].
+  the document template reads is defined with a fitting type, and all variants
+  need the same data.
+. With a layout: the layout matches its `layout.json`, and the document template
+  follows the xref:reference/layouts.adoc#content-rules[rules for document
+  templates].
 . The example data given with `-d` is valid.
 . Every variant renders to well-formed XHTML whose `lang` matches the language
   of the variant.
-. Every variant renders in every format the template offers; veraPDF confirms
-  the PDF as PDF/UA-1. Email HTML is skipped, with a warning, when the example
-  uses attachments, which email HTML cannot show.
+. Every variant renders in every format the document template offers; veraPDF
+  confirms the PDF as PDF/UA-1. Email HTML is skipped, with a warning, when the
+  example uses attachments, which email HTML cannot show.
 
 Prints `passed` and exits with `0`, or prints every problem and exits with `1`.
 
@@ -205,10 +209,10 @@ pdf-ua-generator verify <pdf>...
 Exit code `0` if every file conforms, `1` otherwise; the failed rules are
 printed to stderr.
 
-== Resources a template may use
+== Resources a document template or layout may use
 
-* Files relative to the template directory or an include path. Paths must not
-  leave these directories.
+* Files relative to its directory or an include path. Paths must not leave
+  these directories.
 * Attachments given with `--attach`, referenced as `attachment:<name>`.
 * Nothing else: `file:`, `http:`, `https:`, `data:` and other URIs are
   rejected. External `https` images are available only in the REST service,
@@ -218,17 +222,17 @@ Images must be PNG, JPEG or SVG. SVG is rendered without scripts and without
 external resources. Resources larger than 20 MB and raster images larger than
 20,000 pixels per side or 50 megapixels are rejected.
 
-== Template language
+== Qute template syntax
 
-Templates are XHTML with https://quarkus.io/guides/qute[Qute] expressions. Data
-values are HTML-escaped. Not available: calling Java methods, `raw` output,
-`+{#eval}+`, `+{#cache}+` and `+{#with}+` (use `+{#let}+`). Layouts add
-components, `+{msg:…}+` texts and `+{doc:lang}+`; see
-xref:reference/layouts.adoc[Layouts]. A value the template
+Language variants are XHTML with https://quarkus.io/guides/qute[Qute]
+expressions. Data values are HTML-escaped. Not available: calling Java methods,
+`raw` output, `+{#eval}+`, `+{#cache}+` and `+{#with}+` (use `+{#let}+`).
+Layouts add components, `+{msg:…}+` texts and `+{doc:lang}+`; see
+xref:reference/layouts.adoc[Layouts]. A value the document template
 uses but the data lacks is an error, not an empty string. Formatting functions
 for numbers, amounts and dates are listed under
-xref:reference/template-files.adoc#formatting[Template files].
+xref:reference/template-files.adoc#formatting[Document template files].
 
-The template is parsed as XML without loading a DTD, so named entities such as
-`&nbsp;` are not available; use the character itself or a numeric reference
-(`&#160;`).
+Each language variant is parsed as XML without loading a DTD, so named
+entities such as `&nbsp;` are not available; use the character itself or a
+numeric reference (`&#160;`).

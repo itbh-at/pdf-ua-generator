@@ -4,10 +4,10 @@
 ////
 
 = Layouts
-:description: The files of a layout, layout.json, components, texts per language, and the rules for content templates that fill a layout.
+:description: The files of a layout, layout.json, components, texts per language, and the rules for document templates that fill a layout.
 
-A layout gives content templates their page format, stylesheets, fonts, running
-headers and footers, style catalog and components. `demo/layout/` and
+A layout gives document templates their page format, stylesheets, fonts,
+running headers and footers, style catalog and components. `demo/layout/` and
 `demo/layout-memo/` are two layouts for the same demo document.
 
 == Files
@@ -17,7 +17,8 @@ headers and footers, style catalog and components. `demo/layout/` and
 |File |Content
 
 |`layout.json`
-|The layout descriptor, see below. Its presence makes a template a layout.
+|The layout descriptor, see below. Its presence makes a directory or bundle a
+layout.
 
 |`template.xhtml`
 |The page skeleton with an `+{#insert}+` for every area. May contain `<style>`,
@@ -40,9 +41,10 @@ them the writers use their own plain styles.
 |Stylesheets, fonts, images of the layout.
 |===
 
-To content — and to the layout itself — the layout's files appear under
-`layout/`: the skeleton links `layout/layout.css`, shows `layout/logo.svg`.
-Paths inside a stylesheet are relative to it (`url('fonts/Roboto.ttf')`).
+To the document template — and to the layout itself — the layout's files
+appear under `layout/`: the skeleton links `layout/layout.css`, shows
+`layout/logo.svg`. Paths inside a stylesheet are relative to it
+(`url('fonts/Roboto.ttf')`).
 
 == layout.json
 
@@ -76,17 +78,18 @@ Paths inside a stylesheet are relative to it (`url('fonts/Roboto.ttf')`).
 |Language of `messages.json`. Required.
 
 |`styles`
-|The style catalog: CSS classes content may use. `kind` is `paragraph`
-(default: `p`, headings, list items, table cells, images) or `character`
-(`span`, `strong`, `em`, `a`, …). Each must be defined in the layout's
-stylesheets.
+|The style catalog: CSS classes document templates may use. `kind` is
+`paragraph` (default: `p`, headings, list items, table cells, images) or
+`character` (`span`, `strong`, `em`, `a`, …). Each must be defined in the
+layout's stylesheets.
 
 |`classes`
-|Further classes of the skeleton and the components; not for content.
+|Further classes of the skeleton and the components; not for document
+templates.
 
 |`areas`
-|The areas content fills, by `+{#insert}+` name. `required` areas must be
-filled. At least one.
+|The areas a document template fills, by `+{#insert}+` name. `required` areas
+must be filled. At least one.
 
 |`components`
 |Components with their `parameters`; `required` parameters must be passed.
@@ -95,12 +98,12 @@ filled. At least one.
 |Font families free CSS may name.
 
 |`freeStyling`
-|Whether content may opt into free styling. Default `false`.
+|Whether document templates may opt into free styling. Default `false`.
 
 |`fields`
-|Data the layout reads, e.g. a recipient in the letterhead, as in the template
-descriptor. They join the content's fields in one schema; a name may be defined
-only once.
+|Data the layout reads, e.g. a recipient in the letterhead, as in the
+descriptor of a document template. They join the document template's fields in
+one schema; a name may be defined only once.
 |===
 
 == Components
@@ -112,23 +115,24 @@ only once.
 <div data-block="box" class="box">{#if title??}<p><strong>{title}</strong></p>{/if}{nested-content}</div>
 ----
 
-Used in content:
+Used in a document template:
 
 ----
 {#box title="Note"}<p>Kept together on one page.</p>{/box}
 ----
 
 A component reads only its parameters, `it` and `+{nested-content}+`, never
-template data. Blocks of the document model are marked with `data-block`, see
-xref:reference/building-blocks.adoc[Template building blocks]. A component
-cannot take a name Qute reserves (`if`, `for`, `include`, …).
+the data passed to the document template. Blocks of the document model are
+marked with `data-block`, see xref:reference/building-blocks.adoc[Building
+blocks]. A component cannot take a name Qute reserves (`if`, `for`, `include`,
+…).
 
 == Texts and language
 
 `+{msg:page}+` is the text `page`: from `messages.<tag>.json` for the language of
 the rendered variant, shortened step by step (`de-AT`, then `de`), otherwise
 from `messages.json`. Every text the layout uses must be in `messages.json`;
-a translation file must not have other keys. A template written in a language
+a translation file must not have other keys. A language variant in a language
 other than the layout's own (`language` in `layout.json`) needs every text
 translated into it, in `messages.<tag>.json` for that language or the shorter
 tag; a missing translation is an error, because the page would otherwise carry
@@ -153,13 +157,13 @@ CSS does not map to Word and ODF styles, so a layout brings them as office
 templates, made in Word or LibreOffice:
 
 * Styles, the default font and the page setup (size, margins) of
-  `layout.dotx` and `layout.ott` are taken as they are. Styles a template lacks
-  are added by the writers.
+  `layout.dotx` and `layout.ott` are taken as they are. Styles they lack are
+  added by the writers.
 * Catalog styles are found by their name (Word: the style name, ODF: the
-  display name or name); every catalog style must exist in both templates.
+  display name or name); every catalog style must exist in both files.
 * Headings keep their outline level and the standard names (`Heading1`… in
   Word, `Heading_20_1`… in ODF), so the document structure stays accessible.
-* The fonts the templates name are embedded from the layout's `@font-face`
+* The fonts these files name are embedded from the layout's `@font-face`
   files, so Word and LibreOffice show the layout's fonts, not a substitute.
 * The document language is always that of the rendered variant.
 
@@ -176,9 +180,9 @@ handle static instances reliably.
 ====
 
 [[content-rules]]
-== Rules for content
+== Rules for document templates
 
-A content template with a layout:
+A document template with a layout:
 
 * consists of one `+{#include layout}+` whose blocks fill declared areas:
 +
@@ -193,14 +197,15 @@ A content template with a layout:
   writes them literally, not computed from data;
 * passes only declared parameters to components, and every required one.
 
-These rules are checked on the template source, with line and column.
+These rules are checked on the source of each language variant, with line and
+column.
 
 [[free-styling]]
 == Free styling
 
-With `"styling": "free"` in its descriptor, a content template may use `<style>`
-and `style` attributes and any class — if the layout allows it
+With `"styling": "free"` in its descriptor, a document template may use
+`<style>` and `style` attributes and any class — if the layout allows it
 (`"freeStyling": true`). It is rendered to PDF and XHTML only. Hard limits
 stay: no `@import`, no `!important`, no `@font-face`, no `font` shorthand,
-`font-family` only from the layout's `fonts`, `url()` only to template assets
-and attachments. All other publish checks apply unchanged.
+`font-family` only from the layout's `fonts`, `url()` only to the document
+template's assets and attachments. All other publish checks apply unchanged.

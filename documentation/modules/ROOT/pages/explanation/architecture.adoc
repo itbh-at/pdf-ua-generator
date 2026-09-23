@@ -4,20 +4,21 @@
 ////
 
 = Architecture
-:description: How templates, data, rendering, the CLI and the REST service fit together, and why they are built this way.
+:description: How document templates, layouts, data, rendering, the CLI and the REST service fit together, and why they are built this way.
 
 This page explains the design of the generator and the reasons behind it. What
 is built when is on the xref:project/roadmap.adoc[roadmap].
 
 == The idea in one paragraph
 
-A template is XHTML with Print CSS and Qute expressions. Data is JSON. Qute
-renders the template with the data *once*; every output format is produced
-from that one rendered XHTML. Templates are not compiled into the application:
-they are added, changed and deleted at runtime. Because the build-time checks
-Qute normally provides are therefore not available, the generator performs them
-itself whenever a template revision is saved, and derives a JSON Schema from
-the template so data can be checked before rendering.
+A document template is XHTML with Print CSS and Qute expressions. Data is JSON.
+Qute renders the document template with the data *once*; every output format is
+produced from that one rendered XHTML. Document templates and layouts are not
+compiled into the application: they are added, changed and deleted at runtime.
+Because the build-time checks Qute normally provides are therefore not
+available, the generator performs them itself whenever a revision of a document
+template or layout is saved, and derives a JSON Schema from the document
+template so data can be checked before rendering.
 
 == Three modules
 
@@ -26,11 +27,11 @@ the template so data can be checked before rendering.
 |Module |Responsibility
 
 |`core`
-|Plain Java library, no Quarkus. Template parsing, schema derivation,
-validation, rendering, the document model and all format writers. The Qute
-engine is configured here and only here, so the CLI and the server render
-identically. Templates are looked up through an interface; `core` contains no
-database or HTTP code.
+|Plain Java library, no Quarkus. Parsing of document templates and layouts,
+schema derivation, validation, rendering, the document model and all format
+writers. The Qute engine is configured here and only here, so the CLI and the
+server render identically. Document templates and layouts are looked up through
+an interface; `core` contains no database or HTTP code.
 
 |`cli`
 |Plain Java and Picocli on top of `core`. Works only with command-line
@@ -38,23 +39,24 @@ arguments, files and stdin/stdout. No Quarkus, no database, no network access,
 no interactive features.
 
 |`server`
-|Quarkus REST service on top of `core`: template store in PostgreSQL, REST API,
-security and the editor UI. Until OIDC is added (see the roadmap), every
-endpoint is open; run it only where that is acceptable.
+|Quarkus REST service on top of `core`: store of document templates and layouts
+in PostgreSQL, REST API, security and the editor UI. Until OIDC is added (see
+the roadmap), every endpoint is open; run it only where that is acceptable.
 |===
 
 Keeping `core` free of Quarkus keeps the CLI small and fast to start, and makes
 the rendering behaviour independent of how it is invoked.
 
-== Templates at runtime
+== Document templates and layouts at runtime
 
 Qute can check templates at build time, but only for templates that are part
-of the build. Here, editors create templates while the service runs, so that
-is not possible. Instead, saving a template revision runs the *publish checks*:
+of the build. Here, editors create document templates while the service runs,
+so that is not possible. Instead, saving a revision of a document template or
+layout runs the *publish checks*:
 
-. Qute parses the template; the result must be well-formed XHTML.
+. Qute parses the document template; the result must be well-formed XHTML.
 . The JSON Schema is derived and compared with the field definitions.
-. The template is rendered with its example data.
+. The document template is rendered with its example data.
 . veraPDF confirms that the PDF conforms to PDF/UA.
 
 A revision that fails a check cannot be published. These checks are the
@@ -65,8 +67,8 @@ replacement for the build-time checks, not an optional extra.
 Every save creates an immutable revision, either a draft or published. Rendering
 uses the latest published revision unless a request names a specific one
 (`+/templates/{id}/revisions/{n}/render+`), which makes a document reproducible
-later and lets editors preview drafts. A revision is a bundle laid out like a
-template directory of the CLI, so the same files work in both.
+later and lets editors preview drafts. A revision is a bundle laid out like the
+CLI directory of a document template or layout, so the same files work in both.
 
 Files are stored once per SHA-256 of their content. A revision's hash covers
 its paths and file hashes, and everything cached hangs off it: a cached entry
@@ -84,7 +86,7 @@ itself, keyed by the repository's content key rather than by the repository
 object, so a repository rebuilt around cached files finds the parsed form
 again.
 
-=== Layouts, components and content templates
+=== Layouts, components and document templates
 
 [cols="1,1,3",options="header"]
 |===
@@ -102,12 +104,12 @@ again.
 They belong to a layout, which lists them with their parameters in its
 `layout.json`.
 
-|Content template
+|Document template
 |Editors
 |Fills the areas of a layout, using the style catalog and the components.
 |===
 
-Content templates are styled only through the *style catalog* — named styles
+Document templates are styled only through the *style catalog* — named styles
 that exist with the same name in the layout CSS, the `.dotx` and the `.ott` —
 and through components. Free choice of font size is the most common cause of
 inaccessible documents (a large bold paragraph instead of a heading) and cannot
@@ -115,44 +117,45 @@ be mapped to DOCX or ODT. Named styles can.
 
 For emergencies a revision can opt into *free CSS* (`styling: free`) if its
 layout allows it. Free CSS works only for PDF and XHTML, keeps hard limits (no
-`@import`, no `!important`, only layout fonts, only template assets or
+`@import`, no `!important`, only layout fonts, only assets of the revision or
 attachments in `url()`), and never bypasses the publish checks.
 
-A content template is one `+{#include layout}+` whose blocks fill the layout's
-areas. The layout's files appear to it under `layout/`, so the content cannot
-replace them; a layout is checked and previewed the same way, with its own
-files under `layout/`. One content template can be rendered in any layout that
-offers the areas, styles and components it uses — the demo shows the same
+A document template is one `+{#include layout}+` whose blocks fill the layout's
+areas. The layout's files appear to it under `layout/`, so the document template
+cannot replace them; a layout is checked and previewed the same way, with its
+own files under `layout/`. One document template can be rendered in any layout
+that offers the areas, styles and components it uses — the demo shows the same
 document in two layouts.
 
-The styling rules of content are checked on its source, not on the rendered
-document. Data is always escaped and there is no `raw`, so markup can only come
-from the literal text of a template: a `<style>`, a `style` attribute or a
-class that is not in the source cannot appear in the output. Class values must
-be literal for the same reason. Layouts are written by developers and are free
-in their markup; their `<style>` may use Qute, so page headers and footers can
-take texts from the layout's message files (`+{msg:page}+`) and the document
-language from `+{doc:lang}+`.
+The styling rules of document templates are checked on their source, not on the
+rendered document. Data is always escaped and there is no `raw`, so markup can
+only come from the literal text of a language variant: a `<style>`, a `style`
+attribute or a class that is not in the source cannot appear in the output.
+Class values must be literal for the same reason. Layouts are written by
+developers and are free in their markup; their `<style>` may use Qute, so page
+headers and footers can take texts from the layout's message files
+(`+{msg:page}+`) and the document language from `+{doc:lang}+`.
 
-A content revision lists the layout revisions it may be rendered with
-(`["corporate@3", "memo@1"]`); the first is the default, and a render request
-may choose another listed one. The list is the compatibility matrix: the
-publish checks render the content with every listed layout, so no combination
-is used before it has passed them. A new layout revision changes nothing for
-the content that lists an older one; moving to it is a new content revision,
-which re-runs the checks. A layout revision that released content lists cannot
-be archived, and content is released only with released layout revisions. So a
-layout change never alters a released document unnoticed, and a new layout
-never widens what existing content may be rendered with.
+A revision of a document template lists the layout revisions it may be rendered
+with (`["corporate@3", "memo@1"]`); the first is the default, and a render
+request may choose another listed one. The list is the compatibility matrix:
+the publish checks render the document template with every listed layout, so no
+combination is used before it has passed them. A new layout revision changes
+nothing for the document template that lists an older one; moving to it is a
+new revision of the document template, which re-runs the checks. A layout
+revision that a released document template lists cannot be archived, and a
+document template is released only with released layout revisions. So a layout
+change never alters a released document unnoticed, and a new layout never
+widens what existing document templates may be rendered with.
 
 == Language variants
 
-A template may exist in several languages, but need not. The default file
-(`template.xhtml`) serves every request; optional variants carry a BCP 47 tag
-in their name (`template.de-AT.xhtml`). Each variant is a complete template, so
-editors can edit every language version on its own; texts that belong to the
-layout, such as footer labels, come from the layout's message files per
-language.
+A document template may exist in several languages, but need not. The default
+variant (`template.xhtml`) serves every request; optional variants carry a BCP
+47 tag in their name (`template.de-AT.xhtml`). Each language variant is a
+complete Qute template, so editors can edit every language version on its own;
+texts that belong to the layout, such as footer labels, come from the layout's
+message files per language.
 
 The API picks the variant from `Accept-Language` with the RFC 4647 lookup; a
 `lang` query parameter takes precedence, for example in links sent by email.
@@ -166,26 +169,27 @@ language.
 == Data and schema
 
 Data is JSON, read into maps and lists that Qute resolves directly. The
-syntax tree of a template shows which data it reads and where: a `+{#for}+`
-over a value needs a list, `+{a.b}+` needs an object `a`, a value with a default
-or read only under a condition is optional. The syntax tree says nothing about
-types, so every template also carries *field definitions* with types (text,
-number, date, boolean, image, list, object) in its descriptor. Combining the
-two gives a real JSON Schema (draft 2020-12) and catches fields the template
-reads but does not define, and reads that do not fit the type. The exact rules
-are on xref:reference/template-files.adoc[Template files].
+syntax tree of a document template shows which data it reads and where: a
+`+{#for}+` over a value needs a list, `+{a.b}+` needs an object `a`, a value
+with a default or read only under a condition is optional. The syntax tree says
+nothing about types, so every document template also carries *field
+definitions* with types (text, number, date, boolean, image, list, object) in
+its descriptor. Combining the two gives a real JSON Schema (draft 2020-12) and
+catches fields the document template reads but does not define, and reads that
+do not fit the type. The exact rules are on
+xref:reference/template-files.adoc[Document template files].
 
 Names are resolved statically through `+{#let}+`, loops and includes. `+{#with}+`
 is not available: inside it, a name can mean a property of the object or a
 top-level value, which only the data decides.
 
 Numbers are JSON numbers, dates ISO 8601 strings. They are formatted in the
-template (`+{total.currency('EUR')}+`, `+{due.date('long')}+`) for the language
-of the rendered variant, so the data stays language-neutral.
+document template (`+{total.currency('EUR')}+`, `+{due.date('long')}+`) for the
+language of the rendered variant, so the data stays language-neutral.
 
 Validation reports every violation with a JSON Pointer to the offending value.
-Properties the template does not use are allowed, so callers can send their
-existing data objects unchanged.
+Properties the document template does not use are allowed, so callers can send
+their existing data objects unchanged.
 
 == Output formats
 
@@ -261,7 +265,7 @@ Plain text is the one output that is assembled as a string, because it has no
 markup to get wrong.
 
 Running headers and footers with page numbers come from the `@page` margin
-boxes of the template CSS (`content: counter(page) " / " counter(pages)`), so
+boxes of the layout CSS (`content: counter(page) " / " counter(pages)`), so
 one declaration serves PDF, DOCX and ODT.
 
 PDF/UA requires decorative images to be artifacts, but openhtmltopdf tags every
@@ -277,7 +281,7 @@ LibreOffice exports DOCX and ODT as PDF/UA for veraPDF.
 
 Images are PNG, JPEG or SVG. They come from three places:
 
-* *Template assets* (logo, icons) belong to a revision, are stored once per
+* *Assets* (logo, icons) belong to a revision, are stored once per
   content hash and are served publicly at `+/assets/{sha256}+`, so email HTML can
   reference them. SVG assets are also served as a PNG rendition
   (`+/assets/{sha256}.png+`), since many mail clients do not display SVG.
@@ -300,14 +304,14 @@ xref:reference/problem-types.adoc[Problem types].
 
 == Performance
 
-The service keeps everything reusable in memory: parsed templates, compiled
-schemas, fonts, font metrics and assets. On start it loads all published
-revisions and renders their example data in every format before readiness
-reports ready, so a new pod receives traffic only when it is warm. Rendering
-runs in a worker pool sized to the CPU cores; when the queue is full the
-service answers 503 with `Retry-After`, which lets the autoscaler react instead
-of requests timing out. Everything that reads the database or renders happens
-in that pool, so an overloaded instance refuses before it does any work.
+The service keeps everything reusable in memory: parsed document templates and
+layouts, compiled schemas, fonts, font metrics and assets. On start it loads all
+published revisions and renders their example data in every format before
+readiness reports ready, so a new pod receives traffic only when it is warm.
+Rendering runs in a worker pool sized to the CPU cores; when the queue is full
+the service answers 503 with `Retry-After`, which lets the autoscaler react
+instead of requests timing out. Everything that reads the database or renders
+happens in that pool, so an overloaded instance refuses before it does any work.
 
 The pool, the cache and the API report to Prometheus at `/q/metrics`
 (`executor.*`, `pdfuagen_render_rejected_total`, `cache.*`,
@@ -330,25 +334,26 @@ application and sets the entry point.
 Startup time is what makes scaling on load useful — a pod that is ready sooner
 absorbs a spike sooner — so the image carries a Leyden AOT cache. Recording it
 needs a representative run, and that run is the integration test `ApiIT`: it
-imports the demo layout and template and renders every format, against the
-image just built, so the cache matches the JVM that will run it. A second image
-is then written with the cache baked in, tagged with the suffix `-aot`; that is
-the image to deploy. Anything the test leaves out stays uncached.
+imports the demo layout and document template and renders every format, against
+the image just built, so the cache matches the JVM that will run it. A second
+image is then written with the cache baked in, tagged with the suffix `-aot`;
+that is the image to deploy. Anything the test leaves out stays uncached.
 
-=== How templates reach a cluster
+=== How document templates and layouts reach a cluster
 
-Templates and layouts are data of the running service, not part of its image,
-and the target clusters have no access to a Git repository. They travel in an
-OCI image of their own: a bundle per template, `+/bundles/<id>.zip+`. An
-idempotent job of the chart uploads and publishes them through the API. Its name
-carries the hash of the bundle image, so a new image is a new job, and running it
-again changes nothing: a bundle whose files are already stored yields the stored
-revision, because a revision is identified by the content hash of its files.
+Document templates and layouts are data of the running service, not part of its
+image, and the target clusters have no access to a Git repository. They travel
+in an OCI image of their own: a bundle per document template or layout,
+`+/bundles/<id>.zip+`. An idempotent job of the chart uploads and publishes them
+through the API. Its name carries the hash of the bundle image, so a new image
+is a new job, and running it again changes nothing: a bundle whose files are
+already stored yields the stored revision, because a revision is identified by
+the content hash of its files.
 
 The job therefore needs one API call per bundle — upload and publish in one step
 — and no client logic of ours: it is a shell script of the chart, which keeps the
 script and the API in one version. Two passes are enough for the only ordering
-constraint, content that pins a layout published in the same run.
+constraint, a document template that pins a layout published in the same run.
 
 == Editor
 
@@ -356,9 +361,9 @@ The editor UI consists of server-rendered Qute pages with htmx. JavaScript is
 used only for the two embedded editors: a block editor (TipTap/ProseMirror) for
 editors without Qute knowledge, and a code editor (CodeMirror 6) with Qute
 support. Diagnostics — Qute and XHTML errors with line and column — come from
-the server. Block-edited templates are stored in our own JSON format, not in
-the document format of an editor library; `core` translates it into Qute XHTML
-and escapes all literal text, so only placeholder nodes produce Qute
+the server. Block-edited document templates are stored in our own JSON format,
+not in the document format of an editor library; `core` translates it into Qute
+XHTML and escapes all literal text, so only placeholder nodes produce Qute
 expressions.
 
 The UI is one client of the JSON API, not a privileged part of it. The API is
