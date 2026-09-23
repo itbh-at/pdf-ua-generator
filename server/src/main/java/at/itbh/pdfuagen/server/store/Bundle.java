@@ -62,16 +62,13 @@ public final class Bundle {
     long total = 0;
     try (ZipInputStream in = new ZipInputStream(zip)) {
       for (ZipEntry entry; (entry = in.getNextEntry()) != null; ) {
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() || isArchiverJunk(entry.getName())) {
           continue;
         }
         String name = entry.getName();
         String path =
             ResourcePaths.normalize(name)
                 .orElseThrow(() -> new InvalidBundleException("invalid path in archive: " + name));
-        if (files.containsKey(path)) {
-          throw new InvalidBundleException("duplicate path in archive: " + path);
-        }
         if (files.size() >= maxFiles) {
           throw new InvalidBundleException("more than " + maxFiles + " files");
         }
@@ -84,7 +81,9 @@ public final class Bundle {
           }
           out.write(buffer, 0, n);
         }
-        files.put(path, out.toByteArray());
+        if (files.put(path, out.toByteArray()) != null) {
+          throw new InvalidBundleException("duplicate path in archive: " + path);
+        }
       }
     } catch (ZipException e) {
       throw new InvalidBundleException("not a valid ZIP archive: " + e.getMessage());
@@ -92,10 +91,51 @@ public final class Bundle {
     if (files.isEmpty()) {
       throw new InvalidBundleException("not a ZIP archive, or an empty one");
     }
+    // Zipping a folder (e.g. macOS Finder) wraps every file in one directory; unwrap it.
+    files = stripCommonWrapper(files);
     if (!files.containsKey(TEMPLATE)) {
       throw new InvalidBundleException("the archive has no " + TEMPLATE);
     }
     return files;
+  }
+
+  /** Metadata some archivers add (macOS: {@code __MACOSX/}, {@code .DS_Store}, AppleDouble). */
+  private static boolean isArchiverJunk(String name) {
+    if (name.startsWith("__MACOSX/") || name.contains("/__MACOSX/")) {
+      return true;
+    }
+    String base = name.substring(name.lastIndexOf('/') + 1);
+    return base.equals(".DS_Store") || base.startsWith("._");
+  }
+
+  /** Strips a leading directory shared by every entry, repeatedly (handles double-wrapping). */
+  private static Map<String, byte[]> stripCommonWrapper(Map<String, byte[]> files) {
+    for (String prefix; (prefix = commonFirstSegment(files.keySet())) != null; ) {
+      Map<String, byte[]> stripped = new TreeMap<>();
+      for (Map.Entry<String, byte[]> file : files.entrySet()) {
+        stripped.put(file.getKey().substring(prefix.length() + 1), file.getValue());
+      }
+      files = stripped;
+    }
+    return files;
+  }
+
+  /** The first path segment shared by all entries, or {@code null} if any sits at the root. */
+  private static String commonFirstSegment(java.util.Set<String> paths) {
+    String prefix = null;
+    for (String path : paths) {
+      int slash = path.indexOf('/');
+      if (slash < 0) {
+        return null;
+      }
+      String segment = path.substring(0, slash);
+      if (prefix == null) {
+        prefix = segment;
+      } else if (!prefix.equals(segment)) {
+        return null;
+      }
+    }
+    return prefix;
   }
 
   /** Writes files as a deterministic archive: sorted, fixed timestamps. */
