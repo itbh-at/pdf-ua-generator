@@ -4,22 +4,7 @@
 <h1>{template.id} <small>{template.kind}</small></h1>
 
 <h2>Revisions</h2>
-<table>
-  <thead>
-    <tr><th>#</th><th>Status</th><th>Layout</th><th>Created</th><th>Published</th></tr>
-  </thead>
-  <tbody>
-    {#for r in revisions}
-    <tr>
-      <td>{r.number}</td>
-      <td><span class="status {r.status}">{r.status}</span></td>
-      <td>{#if r.layoutId}{r.layoutId}@{r.layoutRevision}{#else}<span class="muted">—</span>{/if}</td>
-      <td class="muted">{r.createdAt}</td>
-      <td class="muted">{#if r.publishedAt}{r.publishedAt}{#else}—{/if}</td>
-    </tr>
-    {/for}
-  </tbody>
-</table>
+{#include ui/revisions /}
 
 {#if dependents}
 <h2>Used by</h2>

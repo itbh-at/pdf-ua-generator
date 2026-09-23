@@ -1,0 +1,25 @@
+{#include ui/base}
+{#title}{template.id} · revision {revision.number}{/title}
+<p><a href="/ui/templates/{template.id}">← {template.id}</a></p>
+<h1>Revision {revision.number} <small>{template.id}</small></h1>
+
+<table class="fields">
+  <tbody>
+    <tr><th>Status</th><td><span class="status {revision.status}">{revision.status}</span></td></tr>
+    <tr><th>Layout</th><td>{#if revision.layoutId}{revision.layoutId}@{revision.layoutRevision}{#else}<span class="muted">—</span>{/if}</td></tr>
+    <tr><th>Created</th><td class="muted">{revision.createdAt}</td></tr>
+    <tr><th>Published</th><td class="muted">{#if revision.publishedAt}{revision.publishedAt}{#else}—{/if}</td></tr>
+    <tr><th>Content hash</th><td class="muted mono">{revision.sha256}</td></tr>
+  </tbody>
+</table>
+
+<h2>Files</h2>
+<table>
+  <thead><tr><th>Path</th><th>Hash</th></tr></thead>
+  <tbody>
+    {#for file in revision.files.entrySet()}
+    <tr><td>{file.key}</td><td class="muted mono">{file.value}</td></tr>
+    {/for}
+  </tbody>
+</table>
+{/include}

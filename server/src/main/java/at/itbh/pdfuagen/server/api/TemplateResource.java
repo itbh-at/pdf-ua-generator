@@ -9,10 +9,10 @@ import at.itbh.pdfuagen.core.JsonData;
 import at.itbh.pdfuagen.core.LanguageVariants;
 import at.itbh.pdfuagen.core.Problem;
 import at.itbh.pdfuagen.core.RenderException;
-import at.itbh.pdfuagen.core.TemplateCheck;
 import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import at.itbh.pdfuagen.core.schema.TemplateDescriptor;
 import at.itbh.pdfuagen.server.ServerConfig;
+import at.itbh.pdfuagen.server.TemplateActions;
 import at.itbh.pdfuagen.server.render.RenderService;
 import at.itbh.pdfuagen.server.store.Bundle;
 import at.itbh.pdfuagen.server.store.TemplateStore;
@@ -51,6 +51,7 @@ public class TemplateResource {
   @Inject RenderService service;
   @Inject ServerConfig config;
   @Inject Targets targets;
+  @Inject TemplateActions actions;
 
   @GET
   public List<Views.TemplateView> list() {
@@ -170,19 +171,12 @@ public class TemplateResource {
   @DELETE
   @Path("/{id}/revisions/{n}")
   public Response deleteRevision(@PathParam("id") String id, @PathParam("n") int n) {
-    Views.Target loaded = targets.revision(id, n);
-    List<String> users =
-        store.dependents(id).stream()
-            .filter(d -> d.layoutRevision() == n)
-            .map(d -> d.templateId() + "@" + d.number())
-            .toList();
-    if (!users.isEmpty()) {
-      throw Problems.conflict("revision " + n + " is used by " + String.join(", ", users));
-    }
-    if (loaded.revision().published() || !store.deleteDraft(id, n)) {
-      throw Problems.conflict("revision " + n + " is published; published revisions are kept");
-    }
-    return Response.noContent().build();
+    Targets.checkId(id);
+    return switch (actions.deleteDraft(id, n)) {
+      case TemplateActions.Deleted d -> Response.noContent().build();
+      case TemplateActions.CannotDelete c -> throw Problems.conflict(c.detail());
+      case TemplateActions.Missing m -> throw Problems.notFound(m.detail());
+    };
   }
 
   /**
@@ -198,63 +192,17 @@ public class TemplateResource {
   }
 
   private CompletionStage<Views.RevisionView> publishRevision(String id, int n, UriInfo uri) {
+    Targets.checkId(id);
     java.net.URI publicBase = config.publicBaseUrl().orElse(uri.getBaseUri());
-    Views.Target loaded = targets.revision(id, n);
-    if (loaded.revision().published()) {
-      throw Problems.conflict("revision " + n + " is already published");
-    }
-    if (loaded.revision().layoutId() != null) {
-      String pinned = Views.layout(loaded.revision());
-      String problem =
-          loaded.layout() == null
-              ? "the layout " + pinned + " does not exist"
-              : loaded.layout().published() ? null : "the layout " + pinned + " is not published";
-      if (problem != null) {
-        throw Problems.publishRejected(
-            List.of(
-                new Problem(
-                    Problem.TEMPLATE_ERROR,
-                    problem + "; publish it first, or pin a published one",
-                    LanguageVariants.descriptorPath(Bundle.TEMPLATE) + "#/layout")));
-      }
-    }
     return Problems.submit(
         service,
-        () -> {
-          var repository = loaded.repository();
-          byte[] example =
-              repository
-                  .resource(Bundle.EXAMPLE)
-                  .orElseThrow(
-                      () ->
-                          Problems.publishRejected(
-                              List.of(
-                                  new Problem(
-                                      Problem.TEMPLATE_ERROR,
-                                      "the revision has no example data; add "
-                                          + Bundle.EXAMPLE
-                                          + " to the bundle",
-                                      Bundle.EXAMPLE))));
-          Map<String, Object> data;
-          try {
-            data = JsonData.parse(new ByteArrayInputStream(example));
-          } catch (RenderException e) {
-            throw Problems.publishRejected(e.problems());
-          }
-          Map<String, byte[]> attachments =
-              Bundle.exampleAttachments(
-                  loaded.revision().files().keySet(), p -> repository.resource(p).orElseThrow());
-          TemplateCheck.Report report =
-              TemplateCheck.check(
-                  service.renderer(), repository, Bundle.TEMPLATE, data, attachments, publicBase);
-          if (!report.passed()) {
-            throw Problems.publishRejected(report.problems());
-          }
-          if (!store.publish(id, n)) {
-            throw Problems.conflict("revision " + n + " is already published");
-          }
-          return Views.revision(targets.revision(id, n), service);
-        });
+        () ->
+            switch (actions.publish(id, n, publicBase)) {
+              case TemplateActions.Published p -> Views.revision(targets.revision(id, n), service);
+              case TemplateActions.Rejected r -> throw Problems.publishRejected(r.problems());
+              case TemplateActions.Conflict c -> throw Problems.conflict(c.detail());
+              case TemplateActions.NotFound nf -> throw Problems.notFound(nf.detail());
+            });
   }
 
   @GET

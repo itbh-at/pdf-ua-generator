@@ -89,3 +89,59 @@ th {
 .muted {
   color: var(--muted);
 }
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+table.fields th {
+  width: 140px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg);
+}
+
+td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+button {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f6f6f6;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #eee;
+}
+
+button.danger {
+  color: #b3261e;
+  border-color: #f0c8c5;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.notice.ok {
+  background: #e6f4ea;
+  color: #1e7e34;
+}
+
+.notice.error {
+  background: #fce8e6;
+  color: #b3261e;
+}
+
+ul.problems {
+  margin: 0 0 12px;
+}

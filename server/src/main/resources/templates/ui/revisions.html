@@ -1,0 +1,37 @@
+<div id="revisions">
+  {#if messageText}
+  <p class="notice {messageKind}">{messageText}</p>
+  {#if !problems.isEmpty()}
+  <ul class="problems">
+    {#for p in problems}
+    <li>{p.detail}{#if p.location} <span class="muted">({p.location})</span>{/if}</li>
+    {/for}
+  </ul>
+  {/if}
+  {/if}
+  <table>
+    <thead>
+      <tr><th>#</th><th>Status</th><th>Layout</th><th>Created</th><th>Published</th><th></th></tr>
+    </thead>
+    <tbody>
+      {#for r in revisions}
+      <tr>
+        <td><a href="/ui/templates/{template.id}/revisions/{r.number}">{r.number}</a></td>
+        <td><span class="status {r.status}">{r.status}</span></td>
+        <td>{#if r.layoutId}{r.layoutId}@{r.layoutRevision}{#else}<span class="muted">—</span>{/if}</td>
+        <td class="muted">{r.createdAt}</td>
+        <td class="muted">{#if r.publishedAt}{r.publishedAt}{#else}—{/if}</td>
+        <td class="actions">
+          {#if !r.published}
+          <button hx-post="/ui/templates/{template.id}/revisions/{r.number}/publish"
+                  hx-target="#revisions" hx-swap="outerHTML">Publish</button>
+          <button class="danger" hx-post="/ui/templates/{template.id}/revisions/{r.number}/delete"
+                  hx-target="#revisions" hx-swap="outerHTML"
+                  hx-confirm="Delete draft {r.number}?">Delete</button>
+          {/if}
+        </td>
+      </tr>
+      {/for}
+    </tbody>
+  </table>
+</div>
