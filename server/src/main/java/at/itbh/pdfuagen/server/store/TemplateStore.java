@@ -494,6 +494,16 @@ public class TemplateStore {
     }
   }
 
+  /**
+   * The hash the files would have as a revision, so a draft and the revision it becomes share
+   * everything the renderer derives from them.
+   */
+  public static String manifest(Map<String, byte[]> files) {
+    Map<String, String> hashes = new TreeMap<>();
+    files.forEach((path, content) -> hashes.put(path, sha256(content)));
+    return manifestHash(hashes);
+  }
+
   /** Hash of a revision: over its sorted paths and file hashes. */
   static String manifestHash(Map<String, String> files) {
     StringBuilder manifest = new StringBuilder();

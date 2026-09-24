@@ -1,0 +1,47 @@
+{#include ui/base}
+{#title}{template.id} · edit{/title}
+<p><a href="/ui/templates/{template.id}">← {template.id}</a></p>
+<h1>Edit <small>{template.id}, based on revision {revision.number}</small></h1>
+
+<div id="editor" data-id="{template.id}" data-base="{revision.number}">
+  <section class="source" aria-label="Files">
+    <nav class="files" role="tablist" aria-label="Files">
+      {#for f in files}<button type="button" role="tab" data-file="{f}">{f}</button>{/for}
+    </nav>
+    <div class="code"></div>
+    <div class="bar">
+      <span class="state muted">No changes.</span>
+      <button type="button" class="save" disabled>Save as new revision</button>
+    </div>
+    <div class="messages" aria-live="polite"></div>
+  </section>
+
+  <section class="output" aria-label="Preview">
+    <div class="bar">
+      {#if !layouts.isEmpty()}
+      <label>Layout
+        <select name="layout">
+          {#for l in layouts}<option value="{l}">{l}{#if l_isFirst} (default){/if}</option>{/for}
+        </select>
+      </label>
+      {/if}
+      {#if languages.size() > 1}
+      <label>Language
+        <select name="lang">
+          {#for g in languages}<option value="{g}">{g}{#if g_isFirst} (default){/if}</option>{/for}
+        </select>
+      </label>
+      {/if}
+      <label>Format
+        <select name="format">
+          {#for f in formats}<option value="{f}">{f}</option>{/for}
+        </select>
+      </label>
+      <button type="button" class="preview">Preview edited files</button>
+      <label class="muted"><input type="checkbox" name="live" checked> live</label>
+    </div>
+    <p class="preview-state muted" aria-live="polite"></p>
+    <iframe name="preview" title="Preview"></iframe>
+  </section>
+</div>
+{/include}

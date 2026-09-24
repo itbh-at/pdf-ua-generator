@@ -90,6 +90,10 @@ public class UiResource {
   @Location("ui/problems.html")
   Template problemsFragment;
 
+  @Inject
+  @Location("ui/edit.html")
+  Template editPage;
+
   /** Document templates and layouts live on pages of their own; the start page is the first. */
   @GET
   public Response start() {
@@ -199,6 +203,56 @@ public class UiResource {
       case TemplateActions.CannotDelete c ->
           html(problemsFragment.data("problems", problem(c.detail())));
       case TemplateActions.Missing m -> throw new NotFoundException(m.detail());
+    };
+  }
+
+  /** Files the editor edits as text; everything else (images, fonts, office files) stays. */
+  private static final Set<String> TEXT = Set.of("xhtml", "json", "css", "txt");
+
+  /**
+   * The editor for the latest revision: its text files in a code editor, checked while typing,
+   * previewed and saved as a new revision — all through the JSON API.
+   */
+  @GET
+  @Path("/templates/{id}/edit")
+  @Blocking
+  public TemplateInstance edit(@PathParam("id") String id) {
+    TemplateStore.Template template = templateOf(id);
+    TemplateStore.Revision revision =
+        store
+            .revision(id, template.latest())
+            .orElseThrow(() -> new NotFoundException("'" + id + "' has no revision"));
+    List<String> files =
+        revision.files().keySet().stream()
+            .filter(p -> TEXT.contains(p.substring(p.lastIndexOf('.') + 1)))
+            .sorted(java.util.Comparator.comparing(UiResource::editorOrder).thenComparing(p -> p))
+            .toList();
+    TemplateRepository repository = renderers.repository(revision, layoutOf(revision, null));
+    return editPage
+        .data("template", template)
+        .data("revision", revision)
+        .data("files", files)
+        .data("layouts", revision.layouts().stream().map(Object::toString).toList())
+        .data("languages", languages(repository))
+        .data(
+            "formats",
+            renderers.renderer().formats(repository, Bundle.TEMPLATE).stream()
+                .map(OutputFormat::id)
+                .toList());
+  }
+
+  /** Language variants first, then the descriptor and data, then the rest. */
+  private static int editorOrder(String path) {
+    if (path.equals(Bundle.TEMPLATE)) {
+      return 0;
+    }
+    if (path.startsWith("template.") && path.endsWith(".xhtml")) {
+      return 1;
+    }
+    return switch (path) {
+      case "template.json", "layout.json" -> 2;
+      case "example.json" -> 3;
+      default -> 4;
     };
   }
 

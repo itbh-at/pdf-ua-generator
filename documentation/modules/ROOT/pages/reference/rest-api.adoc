@@ -43,6 +43,23 @@ data and is checked with empty data; a document template is checked with its
 |`+GET /templates/{id}/revisions/{n}+`
 |The revision (see below).
 
+|`+GET /templates/{id}/revisions/{n}/files/{path}+`
+|One file of the revision, as stored, with its media type.
+
+|`+POST /templates/{id}/revisions+` +
+`Content-Type: application/json`
+|Saves edited files as a new revision: `{"base": 3, "files": {"template.xhtml":
+"…"}, "delete": ["…"]}` is revision `base` with the text `files` written over
+it and `delete` removed. Then as the upload of a bundle: validated and released,
+201, 200 or 422.
+
+|`+POST /templates/{id}/revisions/{n}/check+` +
+`Content-Type: application/json`
+|The quick checks of edited files without saving them (`files` and `delete` as
+above): every language variant parses, the descriptor and data model are valid,
+the layout rules and texts hold, for each listed layout. 200 with `problems`
+(as in a revision) and `warnings`. The full publish checks run on saving.
+
 |`+GET /templates/{id}/revisions/{n}/bundle+`
 |The files of the revision as a ZIP archive.
 
@@ -163,6 +180,12 @@ parameter like rendering (see below); without it, the default layout.
 
 |`+POST /templates/{id}/revisions/{n}/render+`
 |The document, rendered with any revision, also an archived one (preview).
+
+|`+POST /templates/{id}/revisions/{n}/preview+` +
+`Content-Type: application/json`
+|Renders edited files without saving them: `files` and `delete` as for saving,
+`data` the data to render (otherwise the edited `example.json`); the example
+attachments are attached. Parameters as for rendering.
 |===
 
 The data is sent either as `application/json`, or as `multipart/form-data`

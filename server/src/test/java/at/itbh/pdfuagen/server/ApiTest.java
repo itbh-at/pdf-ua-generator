@@ -533,6 +533,77 @@ class ApiTest {
         .getBytes(StandardCharsets.UTF_8);
   }
 
+  @Test
+  @Order(18)
+  void editsChecksPreviewsAndSavesFilesOfARevision() throws Exception {
+    // demo@3 lists demo-layout@2 and memo-layout@1 (see rendersWithAnyListedLayout).
+    String source =
+        given()
+            .get("/templates/demo/revisions/3/files/template.xhtml")
+            .then()
+            .statusCode(200)
+            .contentType(startsWith("application/xhtml+xml"))
+            .extract()
+            .asString();
+    assertTrue(source.contains("Hello {customer.name}."), source);
+    given().get("/templates/demo/revisions/3/files/nope.xhtml").then().statusCode(404);
+
+    // The quick check: nothing changed is fine; a broken language variant has a located problem.
+    given()
+        .contentType("application/json")
+        .body(Map.of())
+        .post("/templates/demo/revisions/3/check")
+        .then()
+        .statusCode(200)
+        .body("problems.size()", equalTo(0));
+    given()
+        .contentType("application/json")
+        .body(Map.of("files", Map.of("template.xhtml", source.replace("{customer.name}", "{#if}"))))
+        .post("/templates/demo/revisions/3/check")
+        .then()
+        .statusCode(200)
+        .body("problems.size()", org.hamcrest.Matchers.greaterThan(0))
+        .body("problems[0].location", containsString("template.xhtml, line"));
+
+    // Preview the unsaved text in the memo layout; nothing is stored.
+    String edited = source.replace("Hello {customer.name}.", "Good day {customer.name}.");
+    String preview =
+        given()
+            .contentType("application/json")
+            .body(Map.of("files", Map.of("template.xhtml", edited)))
+            .post("/templates/demo/revisions/3/preview?format=xhtml&layout=memo-layout")
+            .then()
+            .statusCode(200)
+            .header("Template-Layout", "memo-layout@1")
+            .extract()
+            .asString();
+    assertTrue(preview.contains("Good day Jane Doe.") && preview.contains("MEMORANDUM"), preview);
+    given().get("/templates/demo").then().body("latestRevision", equalTo(3));
+
+    // Save: a new revision, validated and released like an upload.
+    given()
+        .contentType("application/json")
+        .body(Map.of("base", 3, "files", Map.of("template.xhtml", edited)))
+        .post("/templates/demo/revisions")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(201)
+        .body("revision", equalTo(4))
+        .body("status", equalTo("published"));
+    assertTrue(xhtml("demo").contains("Good day Jane Doe."));
+
+    // A broken edit is refused and stores nothing.
+    given()
+        .contentType("application/json")
+        .body(Map.of("base", 4, "files", Map.of("template.xhtml", "<html>")))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(422)
+        .body("type", equalTo(PROBLEM + "publish-rejected"));
+    given().get("/templates/demo").then().body("latestRevision", equalTo(4));
+  }
+
   /** Renders the template as XHTML with a listed layout; {@code ""} for the default. */
   private static Response render(String template, String layout) throws Exception {
     return given()

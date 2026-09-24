@@ -52,6 +52,31 @@
             <version>2.0.10</version>
             <scope>provided</scope>
         </dependency>
+        <!-- The code editor of the UI (CodeMirror 6) with the languages of a template bundle. -->
+        <dependency>
+            <groupId>org.mvnpm</groupId>
+            <artifactId>codemirror</artifactId>
+            <version>6.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mvnpm.at.codemirror</groupId>
+            <artifactId>lang-html</artifactId>
+            <version>6.4.12</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mvnpm.at.codemirror</groupId>
+            <artifactId>lang-json</artifactId>
+            <version>6.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mvnpm.at.codemirror</groupId>
+            <artifactId>lang-css</artifactId>
+            <version>6.3.1</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.quarkiverse.httpproblem</groupId>
             <artifactId>quarkus-http-problem</artifactId>

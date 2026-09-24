@@ -130,6 +130,45 @@ public class RenderResource {
         () -> targets.revision(id, n, layout), format, lang, headers, uri, data, parts);
   }
 
+  /**
+   * Renders unsaved files — the editor's draft based on revision {@code n} — without storing them.
+   * The data is the request's {@code data}, otherwise the draft's {@code example.json}; the draft's
+   * example attachments are attached.
+   */
+  @POST
+  @Path("/revisions/{n}/preview")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Blocking
+  public CompletionStage<Response> preview(
+      @PathParam("id") String id,
+      @PathParam("n") int n,
+      @QueryParam("format") String format,
+      @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
+      @Context HttpHeaders headers,
+      @Context UriInfo uri,
+      Views.DraftRequest draft)
+      throws IOException {
+    Targets.checkId(id);
+    var draftFiles = targets.draftFiles(id, n, draft);
+    Map<String, byte[]> files = draftFiles.files();
+    byte[] data =
+        draft != null && draft.data() != null
+            ? new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(draft.data())
+            : files.get(Bundle.EXAMPLE);
+    if (data == null) {
+      throw Problems.invalidRequest("no 'data' and no " + Bundle.EXAMPLE + " to preview with");
+    }
+    return render(
+        () -> targets.draft(draftFiles.base(), files, layout),
+        format,
+        lang,
+        headers,
+        uri,
+        data,
+        Bundle.exampleAttachments(files.keySet(), files::get));
+  }
+
   private CompletionStage<Response> renderParts(
       Supplier<Views.Target> target,
       String format,

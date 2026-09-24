@@ -305,6 +305,117 @@ public class TemplateActions {
     return store.deleteTemplate(id) ? new Deleted() : new Missing("no template '" + id + "'");
   }
 
+  /** The files of an unsaved edit, built from a stored revision. */
+  public sealed interface DraftResult {}
+
+  public record DraftFiles(TemplateStore.Revision base, Map<String, byte[]> files)
+      implements DraftResult {}
+
+  public record NoSuchRevision(String detail) implements DraftResult {}
+
+  public record InvalidDraft(String detail) implements DraftResult {}
+
+  /**
+   * The files of revision {@code base} with {@code edits} written over them (text, UTF-8) and
+   * {@code delete} removed — what the editor holds before it saves. Binary assets stay as they are.
+   */
+  public DraftResult draft(String id, int base, Map<String, String> edits, List<String> delete) {
+    Optional<TemplateStore.Revision> revision = store.revision(id, base);
+    if (revision.isEmpty()) {
+      return new NoSuchRevision("template '" + id + "' has no revision " + base);
+    }
+    Map<String, byte[]> files = new java.util.TreeMap<>(store.files(id, base));
+    for (String path : delete == null ? List.<String>of() : delete) {
+      files.remove(path);
+    }
+    if (edits != null) {
+      for (Map.Entry<String, String> edit : edits.entrySet()) {
+        Optional<String> path = at.itbh.pdfuagen.core.ResourcePaths.normalize(edit.getKey());
+        if (path.isEmpty() || !path.get().equals(edit.getKey())) {
+          return new InvalidDraft("invalid file path: " + edit.getKey());
+        }
+        files.put(
+            edit.getKey(),
+            edit.getValue() == null
+                ? new byte[0]
+                : edit.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      }
+    }
+    if (!files.containsKey(Bundle.TEMPLATE)) {
+      return new InvalidDraft("the files have no " + Bundle.TEMPLATE);
+    }
+    return new DraftFiles(revision.get(), files);
+  }
+
+  /** Problems and warnings of unsaved files. */
+  public record Findings(List<Problem> problems, List<String> warnings) {}
+
+  /**
+   * The quick checks of unsaved files, as the editor runs them while typing: every language variant
+   * parses, the descriptor and data model are valid, the layout rules and texts hold — for each
+   * layout the files list. The full publish checks (rendering every format, PDF/UA) run when the
+   * files are saved.
+   */
+  public Findings check(Map<String, byte[]> files) {
+    List<Problem> problems = new ArrayList<>();
+    List<TemplateStore.Revision> layouts = new ArrayList<>();
+    if (!files.containsKey(LayoutDescriptor.FILE)) {
+      byte[] descriptor = files.get(LanguageVariants.descriptorPath(Bundle.TEMPLATE));
+      List<TemplateDescriptor.LayoutRef> refs = List.of();
+      if (descriptor != null) {
+        try {
+          refs = TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE).layouts();
+        } catch (RenderException e) {
+          // Reported by the check of the files below.
+        }
+      }
+      for (int i = 0; i < refs.size(); i++) {
+        TemplateDescriptor.LayoutRef ref = refs.get(i);
+        Optional<TemplateStore.Revision> layout =
+            layout(new TemplateStore.LayoutPin(ref.id(), ref.revision()));
+        if (layout.isEmpty()) {
+          problems.add(
+              new Problem(
+                  Problem.TEMPLATE_ERROR,
+                  "the layout " + ref + " does not exist",
+                  "template.json#/layouts/" + i));
+        } else {
+          layouts.add(layout.get());
+        }
+      }
+    }
+    List<TemplateStore.Revision> checked =
+        layouts.isEmpty() ? java.util.Arrays.asList((TemplateStore.Revision) null) : layouts;
+    // A problem found with every layout is the files' own; one found with some is marked.
+    Map<Problem, Integer> counts = new java.util.LinkedHashMap<>();
+    Map<Problem, String> firstLayout = new java.util.HashMap<>();
+    java.util.Set<String> warnings = new java.util.LinkedHashSet<>();
+    for (TemplateStore.Revision layout : checked) {
+      TemplateRepository repository = service.draft(files, layout);
+      try {
+        service.renderer().schema(repository, Bundle.TEMPLATE);
+        warnings.addAll(service.renderer().schemaWarnings(repository, Bundle.TEMPLATE));
+      } catch (RenderException e) {
+        for (Problem p : e.problems()) {
+          counts.merge(p, 1, Integer::sum);
+          if (layout != null) {
+            firstLayout.putIfAbsent(p, layout.templateId() + "@" + layout.number());
+          }
+        }
+      }
+    }
+    counts.forEach(
+        (p, n) ->
+            problems.add(
+                n == checked.size()
+                    ? p
+                    : new Problem(
+                        p.type(),
+                        "with layout " + firstLayout.get(p) + ": " + p.detail(),
+                        p.location())));
+    return new Findings(problems, List.copyOf(warnings));
+  }
+
   private Optional<TemplateStore.Revision> layout(TemplateStore.LayoutPin pin) {
     return store
         .revision(pin.id(), pin.revision())

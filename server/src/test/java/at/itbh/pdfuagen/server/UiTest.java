@@ -129,6 +129,20 @@ class UiTest {
         .body(containsString("en (default)"))
         .body(containsString("<option value=\"de\">"));
 
+    // The editor lists the text files of the latest revision and offers the preview choices.
+    given()
+        .accept("text/html")
+        .get("/ui/templates/" + content + "/edit")
+        .then()
+        .statusCode(200)
+        .body(containsString("id=\"editor\""))
+        .body(containsString("data-base=\"1\""))
+        .body(containsString("data-file=\"template.xhtml\""))
+        .body(containsString("data-file=\"template.de.xhtml\""))
+        .body(containsString("data-file=\"template.json\""))
+        .body(not(containsString("data-file=\"example/photo.png\"")))
+        .body(containsString("<select name=\"layout\">"));
+
     // The chosen language picks the German variant.
     given()
         .multiPart("data", DemoBundles.data("data-email.json"))

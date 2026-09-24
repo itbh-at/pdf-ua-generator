@@ -162,6 +162,22 @@ public class RenderService {
   }
 
   /**
+   * Unsaved files — a draft in the editor — ready to render, composed like a stored revision. They
+   * are keyed by the hash they would have as a revision, so what the renderer derives from them is
+   * reused once they are saved.
+   *
+   * @param layout the layout revision to compose content with, or {@code null}
+   */
+  public TemplateRepository draft(Map<String, byte[]> files, TemplateStore.Revision layout) {
+    TemplateRepository content =
+        new InMemoryTemplateRepository(files, TemplateStore.manifest(files));
+    if (files.containsKey(LayoutDescriptor.FILE)) {
+      return new ComposedTemplateRepository(content, content);
+    }
+    return layout == null ? content : new ComposedTemplateRepository(content, files(layout));
+  }
+
+  /**
    * The files of a revision, cached under its content hash. Composing a repository around them is
    * cheap: the renderer keys what it derives on {@link TemplateRepository#contentKey()}, not on the
    * repository object.

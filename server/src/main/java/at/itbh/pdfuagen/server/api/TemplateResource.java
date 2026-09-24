@@ -93,7 +93,28 @@ public class TemplateResource {
   public CompletionStage<Response> create(
       @PathParam("id") String id, InputStream zip, @Context UriInfo uri) throws IOException {
     Targets.checkId(id);
-    byte[] bytes = zip.readAllBytes();
+    return upload(id, zip.readAllBytes(), uri);
+  }
+
+  /**
+   * Saves edited files as a new revision: revision {@code base} with {@code files} written over it
+   * and {@code delete} removed, then validated and released like an uploaded bundle.
+   */
+  @POST
+  @Path("/{id}/revisions")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Blocking
+  public CompletionStage<Response> save(
+      @PathParam("id") String id, Views.DraftRequest draft, @Context UriInfo uri)
+      throws IOException {
+    Targets.checkId(id);
+    if (draft == null || draft.base() == null) {
+      throw Problems.invalidRequest("'base' is required: the revision the files are based on");
+    }
+    return upload(id, Bundle.write(targets.draftFiles(id, draft.base(), draft).files()), uri);
+  }
+
+  private CompletionStage<Response> upload(String id, byte[] bytes, UriInfo uri) {
     java.net.URI base = uri.getBaseUri();
     java.net.URI publicBase = config.publicBaseUrl().orElse(base);
     return Problems.submit(
@@ -125,6 +146,45 @@ public class TemplateResource {
   @Path("/{id}/revisions/{n}")
   public Views.RevisionView revision(@PathParam("id") String id, @PathParam("n") int n) {
     return Views.revision(targets.revision(id, n), service);
+  }
+
+  /** One file of a revision, as stored. */
+  @GET
+  @Path("/{id}/revisions/{n}/files/{path: .+}")
+  @Produces(MediaType.WILDCARD)
+  public Response file(
+      @PathParam("id") String id, @PathParam("n") int n, @PathParam("path") String path) {
+    Targets.checkId(id);
+    if (store.revision(id, n).isEmpty()) {
+      throw Problems.notFound("template '" + id + "' has no revision " + n);
+    }
+    byte[] content = store.files(id, n).get(path);
+    if (content == null) {
+      throw Problems.notFound("revision " + n + " of '" + id + "' has no file " + path);
+    }
+    return Response.ok(content).type(Bundle.mediaType(path)).build();
+  }
+
+  /**
+   * The quick checks of edited files, without saving them: every language variant parses, the
+   * descriptor and data model are valid, the layout rules and texts hold. The full publish checks
+   * run when the files are saved.
+   */
+  @POST
+  @Path("/{id}/revisions/{n}/check")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public CompletionStage<Views.CheckView> check(
+      @PathParam("id") String id, @PathParam("n") int n, Views.DraftRequest draft) {
+    Targets.checkId(id);
+    return Problems.submit(
+        service,
+        () -> {
+          TemplateActions.Findings findings =
+              actions.check(targets.draftFiles(id, n, draft).files());
+          return new Views.CheckView(
+              findings.problems().stream().map(Views.ProblemView::of).toList(),
+              findings.warnings());
+        });
   }
 
   @GET

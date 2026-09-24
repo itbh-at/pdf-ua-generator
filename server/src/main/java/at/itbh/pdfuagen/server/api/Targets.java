@@ -7,6 +7,7 @@ package at.itbh.pdfuagen.server.api;
 
 import at.itbh.pdfuagen.core.schema.LayoutDescriptor;
 import at.itbh.pdfuagen.server.render.RenderService;
+import at.itbh.pdfuagen.server.store.Bundle;
 import at.itbh.pdfuagen.server.store.TemplateStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -17,6 +18,7 @@ class Targets {
 
   @Inject TemplateStore store;
   @Inject RenderService service;
+  @Inject at.itbh.pdfuagen.server.TemplateActions actions;
 
   TemplateStore.Template template(String id) {
     return store
@@ -41,36 +43,64 @@ class Targets {
         store
             .revision(checkId(id), n)
             .orElseThrow(() -> Problems.notFound("template '" + id + "' has no revision " + n));
-    TemplateStore.LayoutPin pin = pin(revision, layout);
-    TemplateStore.Revision composed =
-        pin == null
-            ? null
-            : store
-                .revision(pin.id(), pin.revision())
-                .filter(l -> l.files().containsKey(LayoutDescriptor.FILE))
-                .orElse(null);
+    TemplateStore.Revision composed = layout(pin(id, revision.layouts(), layout));
     return new Views.Target(revision, composed, service.repository(revision, composed));
   }
 
-  /** The requested layout among those a revision lists, or its default. */
-  private static TemplateStore.LayoutPin pin(TemplateStore.Revision revision, String requested) {
-    if (requested == null || requested.isBlank()) {
-      return revision.defaultLayout();
+  /**
+   * Unsaved files based on a revision, ready to render with one of the layouts their descriptor
+   * lists — the requested one, or the default.
+   */
+  Views.Target draft(
+      TemplateStore.Revision base, java.util.Map<String, byte[]> files, String layout) {
+    java.util.List<TemplateStore.LayoutPin> pins = java.util.List.of();
+    byte[] descriptor =
+        files.get(at.itbh.pdfuagen.core.LanguageVariants.descriptorPath(Bundle.TEMPLATE));
+    if (!files.containsKey(LayoutDescriptor.FILE) && descriptor != null) {
+      try {
+        pins =
+            at.itbh.pdfuagen.core.schema.TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE)
+                .layouts()
+                .stream()
+                .map(l -> new TemplateStore.LayoutPin(l.id(), l.revision()))
+                .toList();
+      } catch (at.itbh.pdfuagen.core.RenderException e) {
+        throw Problems.from(e.problems());
+      }
     }
-    for (TemplateStore.LayoutPin pin : revision.layouts()) {
+    TemplateStore.Revision composed = layout(pin(base.templateId(), pins, layout));
+    return new Views.Target(base, composed, service.draft(files, composed));
+  }
+
+  private TemplateStore.Revision layout(TemplateStore.LayoutPin pin) {
+    return pin == null
+        ? null
+        : store
+            .revision(pin.id(), pin.revision())
+            .filter(l -> l.files().containsKey(LayoutDescriptor.FILE))
+            .orElse(null);
+  }
+
+  /** The requested layout among those listed, or the default (the first). */
+  private static TemplateStore.LayoutPin pin(
+      String id, java.util.List<TemplateStore.LayoutPin> listed, String requested) {
+    if (requested == null || requested.isBlank()) {
+      return listed.isEmpty() ? null : listed.getFirst();
+    }
+    for (TemplateStore.LayoutPin pin : listed) {
       if (pin.id().equals(requested) || pin.toString().equals(requested)) {
         return pin;
       }
     }
     throw Problems.invalidRequest(
-        revision.layouts().isEmpty()
-            ? "template '" + revision.templateId() + "' is not rendered with a layout"
+        listed.isEmpty()
+            ? "template '" + id + "' is not rendered with a layout"
             : "template '"
-                + revision.templateId()
+                + id
                 + "' does not list the layout '"
                 + requested
                 + "'; it lists "
-                + String.join(", ", revision.layouts().stream().map(Object::toString).toList()));
+                + String.join(", ", listed.stream().map(Object::toString).toList()));
   }
 
   /** The latest published revision with its default layout. */
@@ -85,6 +115,19 @@ class Targets {
       throw Problems.notFound("template '" + id + "' has no published revision");
     }
     return revision(id, n, layout);
+  }
+
+  /** The files of a draft; an unknown base revision is 404, a bad path 400. */
+  at.itbh.pdfuagen.server.TemplateActions.DraftFiles draftFiles(
+      String id, int base, Views.DraftRequest draft) {
+    return switch (actions.draft(
+        id, base, draft == null ? null : draft.files(), draft == null ? null : draft.delete())) {
+      case at.itbh.pdfuagen.server.TemplateActions.DraftFiles f -> f;
+      case at.itbh.pdfuagen.server.TemplateActions.NoSuchRevision m ->
+          throw Problems.notFound(m.detail());
+      case at.itbh.pdfuagen.server.TemplateActions.InvalidDraft b ->
+          throw Problems.invalidRequest(b.detail());
+    };
   }
 
   static String checkId(String id) {

@@ -59,6 +59,20 @@ final class Views {
 
   record UsedBy(String template, int revision, String status, int layoutRevision) {}
 
+  /**
+   * Unsaved files of the editor: revision {@code base} with {@code files} (text, by path) written
+   * over it and {@code delete} removed; {@code data} is the data to preview with, or {@code null}
+   * for the example data.
+   */
+  record DraftRequest(
+      Integer base,
+      Map<String, String> files,
+      List<String> delete,
+      com.fasterxml.jackson.databind.JsonNode data) {}
+
+  /** The quick checks of unsaved files. */
+  record CheckView(List<ProblemView> problems, List<String> warnings) {}
+
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record ProblemView(String type, String detail, String pointer, String location) {
     static ProblemView of(Problem p) {

@@ -207,3 +207,80 @@ details.schema pre {
   padding: 10px 12px;
   border-radius: 6px;
 }
+
+#editor .files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 12px 0 0;
+}
+
+#editor .files button[aria-selected="true"] {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#editor .files button.dirty::after {
+  content: " •";
+  color: #b3261e;
+}
+
+#editor .code {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+#editor .code .cm-editor {
+  height: 70vh;
+  font-size: 0.85rem;
+}
+
+/* The editor page uses the whole width: files on the left, the preview beside them. */
+main:has(#editor) {
+  max-width: none;
+}
+
+#editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+#editor .output {
+  position: sticky;
+  top: 12px;
+}
+
+#editor .output .bar {
+  margin-top: 12px;
+}
+
+#editor .output iframe[name="preview"] {
+  height: calc(70vh + 40px);
+}
+
+#editor .preview-state {
+  margin: 0 0 6px;
+  min-height: 1.5em;
+}
+
+@media (max-width: 1100px) {
+  #editor {
+    grid-template-columns: 1fr;
+  }
+
+  #editor .output {
+    position: static;
+  }
+}
+
+#editor .bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}

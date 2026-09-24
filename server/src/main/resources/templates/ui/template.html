@@ -3,11 +3,11 @@
 {#if template.kind == 'layout'}
 <p><a href="/ui/layouts">← Layouts</a></p>
 <h1>{template.id} <small>layout</small></h1>
-{#if template.latestPublished}<p><a href="/ui/templates/{template.id}/render">Preview the layout →</a></p>{/if}
+<p><a href="/ui/templates/{template.id}/edit">Edit →</a>{#if template.latestPublished} · <a href="/ui/templates/{template.id}/render">Preview the layout →</a>{/if}</p>
 {#else}
 <p><a href="/ui/documents">← Document templates</a></p>
 <h1>{template.id} <small>document template</small></h1>
-{#if template.latestPublished}<p><a href="/ui/templates/{template.id}/render">Generate a document →</a></p>{/if}
+<p><a href="/ui/templates/{template.id}/edit">Edit →</a>{#if template.latestPublished} · <a href="/ui/templates/{template.id}/render">Generate a document →</a>{/if}</p>
 {/if}
 
 <h2>Revisions</h2>
