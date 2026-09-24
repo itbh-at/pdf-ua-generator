@@ -604,6 +604,34 @@ class ApiTest {
     given().get("/templates/demo").then().body("latestRevision", equalTo(4));
   }
 
+  @Test
+  @Order(19)
+  void addsAndRemovesLanguageVariantsInAnEdit() throws Exception {
+    String source =
+        given().get("/templates/demo/revisions/4/files/template.xhtml").then().extract().asString();
+
+    // A French variant: the layouts have no French texts, so the quick check says so.
+    given()
+        .contentType("application/json")
+        .body(Map.of("files", Map.of("template.fr.xhtml", source)))
+        .post("/templates/demo/revisions/4/check")
+        .then()
+        .statusCode(200)
+        .body("problems.detail", hasItem(containsString("has no fr text")));
+
+    // Removing the German variant is a new revision without it.
+    given()
+        .contentType("application/json")
+        .body(Map.of("base", 4, "delete", java.util.List.of("template.de.xhtml")))
+        .post("/templates/demo/revisions")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(201)
+        .body("revision", equalTo(5))
+        .body("languages", org.hamcrest.Matchers.not(hasItem("de")));
+  }
+
   /** Renders the template as XHTML with a listed layout; {@code ""} for the default. */
   private static Response render(String template, String layout) throws Exception {
     return given()

@@ -131,8 +131,8 @@ class LayoutTest {
         new ComposedTemplateRepository(files, layout().resource("messages.de.json", "{}"));
     assertEquals(
         List.of(
-            "the layout has no de text for greeting; the template is written in de, so add it to"
-                + " messages.de.json"),
+            "the layout has no de text for greeting; the document template is written in de, so"
+                + " add it to messages.de.json"),
         problems(repository));
   }
 

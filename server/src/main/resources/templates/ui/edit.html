@@ -3,7 +3,8 @@
 <p><a href="/ui/templates/{template.id}">← {template.id}</a></p>
 <h1>Edit <small>{template.id}, based on revision {revision.number}</small></h1>
 
-<div id="editor" data-id="{template.id}" data-base="{revision.number}">
+<div id="editor" data-id="{template.id}" data-base="{revision.number}"
+     data-default-lang="{#if languages.isEmpty()}{#else}{languages.get(0)}{/if}">
   <section class="source" aria-label="Files">
     <nav class="files" role="tablist" aria-label="Files">
       {#for f in files}<button type="button" role="tab" data-file="{f}">{f}</button>{/for}
@@ -13,35 +14,53 @@
       <span class="state muted">No changes.</span>
       <button type="button" class="save" disabled>Save as new revision</button>
     </div>
+    <div class="bar languages">
+      <label>Add a language
+        <input name="new-lang" list="offered-langs" size="8" placeholder="e.g. {#if offered.isEmpty()}fr{#else}{offered.get(0)}{/if}">
+      </label>
+      <datalist id="offered-langs">{#for g in offered}<option value="{g}">{/for}</datalist>
+      <button type="button" class="add-lang">Add</button>
+      <button type="button" class="danger remove-lang" hidden>Remove this language</button>
+      {#if !offered.isEmpty()}<span class="muted">The layouts have texts in: {#each offered}{it}{#if it_hasNext}, {/if}{/each}.</span>{/if}
+    </div>
     <div class="messages" aria-live="polite"></div>
   </section>
 
   <section class="output" aria-label="Preview">
-    <div class="bar">
-      {#if !layouts.isEmpty()}
-      <label>Layout
-        <select name="layout">
-          {#for l in layouts}<option value="{l}">{l}{#if l_isFirst} (default){/if}</option>{/for}
-        </select>
+    <div class="bar mode">
+      <label><input type="radio" name="mode" value="preview" checked> Preview</label>
+      <label><input type="radio" name="mode" value="compare"> Compare with
+        <select name="compare"></select>
       </label>
-      {/if}
-      {#if languages.size() > 1}
-      <label>Language
-        <select name="lang">
-          {#for g in languages}<option value="{g}">{g}{#if g_isFirst} (default){/if}</option>{/for}
-        </select>
-      </label>
-      {/if}
-      <label>Format
-        <select name="format">
-          {#for f in formats}<option value="{f}">{f}</option>{/for}
-        </select>
-      </label>
-      <button type="button" class="preview">Preview edited files</button>
-      <label class="muted"><input type="checkbox" name="live" checked> live</label>
     </div>
-    <p class="preview-state muted" aria-live="polite"></p>
-    <iframe name="preview" title="Preview"></iframe>
+    <div class="preview-pane">
+      <div class="bar">
+        {#if !layouts.isEmpty()}
+        <label>Layout
+          <select name="layout">
+            {#for l in layouts}<option value="{l}">{l}{#if l_isFirst} (default){/if}</option>{/for}
+          </select>
+        </label>
+        {/if}
+        <label>Language
+          <select name="lang">
+            {#for g in languages}<option value="{g}">{g}{#if g_isFirst} (default){/if}</option>{/for}
+          </select>
+        </label>
+        <label>Format
+          <select name="format">
+            {#for f in formats}<option value="{f}">{f}</option>{/for}
+          </select>
+        </label>
+        <button type="button" class="preview">Preview edited files</button>
+        <label class="muted"><input type="checkbox" name="live" checked> live</label>
+      </div>
+      <p class="preview-state muted" aria-live="polite"></p>
+      <iframe name="preview" title="Preview"></iframe>
+    </div>
+    <div class="compare-pane" hidden>
+      <div class="code"></div>
+    </div>
   </section>
 </div>
 {/include}

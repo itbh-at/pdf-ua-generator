@@ -234,11 +234,51 @@ public class UiResource {
         .data("files", files)
         .data("layouts", revision.layouts().stream().map(Object::toString).toList())
         .data("languages", languages(repository))
+        .data("offered", offeredLanguages(revision, languages(repository)))
         .data(
             "formats",
             renderers.renderer().formats(repository, Bundle.TEMPLATE).stream()
                 .map(OutputFormat::id)
                 .toList());
+  }
+
+  /**
+   * The languages a new variant may be written in: those every listed layout has texts for (its own
+   * language or a {@code messages.<tag>.json}), less those the template already has. Empty for a
+   * template without layouts, which may take any language.
+   */
+  private List<String> offeredLanguages(TemplateStore.Revision revision, List<String> existing) {
+    java.util.Set<String> offered = null;
+    for (TemplateStore.LayoutPin pin : revision.layouts()) {
+      java.util.Set<String> tags = new java.util.TreeSet<>();
+      Map<String, byte[]> files = store.files(pin.id(), pin.revision());
+      try {
+        byte[] descriptor = files.get(LayoutDescriptor.FILE);
+        if (descriptor != null) {
+          tags.add(
+              LayoutDescriptor.parse(descriptor, LayoutDescriptor.FILE).language().toLanguageTag());
+        }
+      } catch (RenderException e) {
+        // A layout that does not parse offers only its translation files.
+      }
+      for (String path : files.keySet()) {
+        java.util.regex.Matcher m =
+            java.util.regex.Pattern.compile("messages\\.([A-Za-z0-9-]+)\\.json").matcher(path);
+        if (m.matches()) {
+          tags.add(m.group(1));
+        }
+      }
+      if (offered == null) {
+        offered = tags;
+      } else {
+        offered.retainAll(tags);
+      }
+    }
+    if (offered == null) {
+      return List.of();
+    }
+    offered.removeAll(existing);
+    return List.copyOf(offered);
   }
 
   /** Language variants first, then the descriptor and data, then the rest. */

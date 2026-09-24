@@ -267,7 +267,7 @@ public final class LayoutRules {
                     + language.toLanguageTag()
                     + " text for "
                     + String.join(", ", missing)
-                    + "; the template is written in "
+                    + "; the document template is written in "
                     + language.toLanguageTag()
                     + ", so add "
                     + (missing.size() == 1 ? "it" : "them")
