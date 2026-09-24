@@ -48,12 +48,24 @@ class LayoutTest {
 
   private final DocumentRenderer renderer = new DocumentRenderer();
 
+  private static final String FONT_FACE =
+      "@font-face { font-family: 'Roboto'; src: url('fonts/Roboto.ttf'); }";
+
+  private static byte[] roboto() {
+    try {
+      return java.nio.file.Files.readAllBytes(Demo.DIR.resolve("layout/fonts/Roboto.ttf"));
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException(e);
+    }
+  }
+
   private static MapTemplateRepository layout() {
     return new MapTemplateRepository()
         .resource("layout.json", LAYOUT_JSON)
         .template("template.xhtml", SKELETON)
         .template("components/box.xhtml", "<div class=\"box\"><p>{title}</p>{nested-content}</div>")
-        .resource("layout.css", ".lead { font-size: 12pt } .mark { color: red }")
+        .resource("layout.css", FONT_FACE + " .lead { font-size: 12pt } .mark { color: red }")
+        .resource("fonts/Roboto.ttf", roboto())
         .resource("messages.json", "{\"greeting\": \"Hello\"}")
         .resource("messages.de.json", "{\"greeting\": \"Hallo\"}");
   }
@@ -134,6 +146,58 @@ class LayoutTest {
             "the layout has no de text for greeting; the document template is written in de, so"
                 + " add it to messages.de.json"),
         problems(repository));
+  }
+
+  @Test
+  void theFontsOfTheLayoutFitTogether() {
+    // A source that is no file, a listed family without @font-face, a font that forbids embedding.
+    MapTemplateRepository missing =
+        layout()
+            .resource(
+                "layout.css",
+                "@font-face { font-family: 'Roboto'; src: url('fonts/Gone.ttf'); } .lead { } .mark"
+                    + " { }");
+    assertTrue(
+        problems(content(missing))
+            .contains(
+                "@font-face of 'Roboto' refers to fonts/Gone.ttf, which is not a file of the"
+                    + " layout"));
+    MapTemplateRepository unlisted = layout().resource("layout.css", ".lead { } .mark { }");
+    assertTrue(
+        problems(content(unlisted))
+            .contains(
+                "font 'Roboto' is listed in fonts but has no @font-face rule in the layout's"
+                    + " stylesheets"));
+    MapTemplateRepository restricted = layout().resource("fonts/Roboto.ttf", fsType(roboto(), 2));
+    assertTrue(
+        problems(content(restricted)).stream()
+            .anyMatch(p -> p.startsWith("the font forbids embedding")));
+  }
+
+  private TemplateRepository content(MapTemplateRepository layout) {
+    MapTemplateRepository content =
+        new MapTemplateRepository()
+            .template(
+                "t.xhtml", "{#include layout}{#title}T{/title}{#body}<p>x</p>{/body}{/include}")
+            .resource(
+                "t.json", "{\"language\": \"en\", \"layout\": \"corporate@1\", \"fields\": {}}");
+    return new ComposedTemplateRepository(content, layout);
+  }
+
+  /** A copy of a TrueType font with another OS/2 fsType. */
+  private static byte[] fsType(byte[] font, int fsType) {
+    byte[] copy = font.clone();
+    java.nio.ByteBuffer buffer = java.nio.ByteBuffer.wrap(copy);
+    int tables = buffer.getShort(4) & 0xFFFF;
+    for (int i = 0; i < tables; i++) {
+      int record = 12 + 16 * i;
+      String tag = new String(copy, record, 4, StandardCharsets.US_ASCII);
+      if (tag.equals("OS/2")) {
+        buffer.putShort(buffer.getInt(record + 8) + 8, (short) fsType);
+        return copy;
+      }
+    }
+    throw new IllegalArgumentException("no OS/2 table");
   }
 
   @Test

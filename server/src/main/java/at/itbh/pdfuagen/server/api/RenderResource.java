@@ -132,8 +132,8 @@ public class RenderResource {
 
   /**
    * Renders unsaved files — the editor's draft based on revision {@code n} — without storing them.
-   * The data is the request's {@code data}, otherwise the draft's {@code example.json}; the draft's
-   * example attachments are attached.
+   * The data is the request's {@code data}, otherwise the draft's {@code example.json} (a layout:
+   * no data); the draft's example attachments are attached.
    */
   @POST
   @Path("/revisions/{n}/preview")
@@ -150,12 +150,29 @@ public class RenderResource {
       Views.DraftRequest draft)
       throws IOException {
     Targets.checkId(id);
-    var draftFiles = targets.draftFiles(id, n, draft);
+    return preview(id, n, format, lang, layout, headers, uri, draft, Map.of());
+  }
+
+  private CompletionStage<Response> preview(
+      String id,
+      int n,
+      String format,
+      String lang,
+      String layout,
+      HttpHeaders headers,
+      UriInfo uri,
+      Views.DraftRequest draft,
+      Map<String, byte[]> uploads)
+      throws IOException {
+    var draftFiles = targets.draftFiles(id, n, draft, uploads);
     Map<String, byte[]> files = draftFiles.files();
     byte[] data =
         draft != null && draft.data() != null
             ? new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(draft.data())
-            : files.get(Bundle.EXAMPLE);
+            : files.containsKey(at.itbh.pdfuagen.core.schema.LayoutDescriptor.FILE)
+                // A layout has no example data; it renders on its own with none.
+                ? "{}".getBytes(StandardCharsets.UTF_8)
+                : files.get(Bundle.EXAMPLE);
     if (data == null) {
       throw Problems.invalidRequest("no 'data' and no " + Bundle.EXAMPLE + " to preview with");
     }
@@ -167,6 +184,30 @@ public class RenderResource {
         uri,
         data,
         Bundle.exampleAttachments(files.keySet(), files::get));
+  }
+
+  /**
+   * Renders edited files with uploaded ones, as {@code multipart/form-data}: the draft's JSON in
+   * the part {@code draft}, every file in a part named after its path.
+   */
+  @POST
+  @Path("/revisions/{n}/preview")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Blocking
+  public CompletionStage<Response> previewMultipart(
+      @PathParam("id") String id,
+      @PathParam("n") int n,
+      @QueryParam("format") String format,
+      @QueryParam("lang") String lang,
+      @QueryParam("layout") String layout,
+      @Context HttpHeaders headers,
+      @Context UriInfo uri,
+      @RestForm("draft") String draftJson,
+      @RestForm(FileUpload.ALL) List<FileUpload> parts)
+      throws IOException {
+    Targets.checkId(id);
+    Targets.Draft draft = Targets.multipart(draftJson, parts);
+    return preview(id, n, format, lang, layout, headers, uri, draft.request(), draft.uploads());
   }
 
   private CompletionStage<Response> renderParts(

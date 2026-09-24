@@ -120,8 +120,18 @@ class Targets {
   /** The files of a draft; an unknown base revision is 404, a bad path 400. */
   at.itbh.pdfuagen.server.TemplateActions.DraftFiles draftFiles(
       String id, int base, Views.DraftRequest draft) {
+    return draftFiles(id, base, draft, java.util.Map.of());
+  }
+
+  /** The files of a draft with uploaded binary files, by path. */
+  at.itbh.pdfuagen.server.TemplateActions.DraftFiles draftFiles(
+      String id, int base, Views.DraftRequest draft, java.util.Map<String, byte[]> uploads) {
     return switch (actions.draft(
-        id, base, draft == null ? null : draft.files(), draft == null ? null : draft.delete())) {
+        id,
+        base,
+        draft == null ? null : draft.files(),
+        draft == null ? null : draft.delete(),
+        uploads)) {
       case at.itbh.pdfuagen.server.TemplateActions.DraftFiles f -> f;
       case at.itbh.pdfuagen.server.TemplateActions.NoSuchRevision m ->
           throw Problems.notFound(m.detail());
@@ -129,6 +139,51 @@ class Targets {
           throw Problems.invalidRequest(b.detail());
     };
   }
+
+  /**
+   * A multipart draft: the part {@code draft} is the JSON of a {@link Views.DraftRequest}, every
+   * other part a file written over the base under the part's name, its path.
+   */
+  static Draft multipart(
+      String draft, java.util.List<org.jboss.resteasy.reactive.multipart.FileUpload> parts) {
+    Views.DraftRequest request = null;
+    if (draft == null) {
+      // Sent as a file part (e.g. a JSON blob) rather than a text field.
+      for (org.jboss.resteasy.reactive.multipart.FileUpload part : parts) {
+        if (part.name().equals("draft")) {
+          try {
+            draft = java.nio.file.Files.readString(part.uploadedFile());
+          } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+          }
+        }
+      }
+    }
+    if (draft != null && !draft.isBlank()) {
+      try {
+        request =
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                .readValue(draft, Views.DraftRequest.class);
+      } catch (java.io.IOException e) {
+        throw Problems.invalidRequest("the part 'draft' is not a draft: " + e.getMessage());
+      }
+    }
+    java.util.Map<String, byte[]> uploads = new java.util.TreeMap<>();
+    for (org.jboss.resteasy.reactive.multipart.FileUpload part : parts) {
+      if (part.name().equals("draft")) {
+        continue;
+      }
+      try {
+        uploads.put(part.name(), java.nio.file.Files.readAllBytes(part.uploadedFile()));
+      } catch (java.io.IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+    }
+    return new Draft(request, uploads);
+  }
+
+  /** A draft with its uploaded files. */
+  record Draft(Views.DraftRequest request, java.util.Map<String, byte[]> uploads) {}
 
   static String checkId(String id) {
     if (!TemplateStore.ID.matcher(id).matches()) {

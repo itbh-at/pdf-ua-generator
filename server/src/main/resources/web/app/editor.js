@@ -15,6 +15,8 @@ import { css } from '@codemirror/lang-css';
 import { lintGutter, setDiagnostics } from '@codemirror/lint';
 
 const DEFAULT_VARIANT = 'template.xhtml';
+const TEXT = /\.(xhtml|json|css|txt)$/i;
+const FONT = /\.(ttf|otf|woff2?)$/i;
 const VARIANT = /^template\.([A-Za-z0-9-]+)\.xhtml$/;
 
 const root = document.getElementById('editor');
@@ -30,6 +32,8 @@ function start(root) {
   const original = {}; // path -> text of the base revision ('' for a file the base lacks)
   const edited = {}; // path -> text, only files that differ from the base
   const deleted = new Set(); // paths of the base removed in the edit
+  const uploads = {}; // path -> File: assets added or replaced in the edit
+  let assets = []; // the base revision's files other than text: {path, size, mediaType}
   let problems = [];
   let timer = null;
   let previewing = null; // the running preview request, aborted when a newer one starts
@@ -60,6 +64,12 @@ function start(root) {
   $('.add-lang').addEventListener('click', addLanguage);
   removeLang.addEventListener('click', removeLanguage);
   root.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener('change', mode));
+  $('.add-asset').addEventListener('click', addAsset);
+  $('input[name="asset-file"]').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) $('input[name="asset-path"]').value = FONT.test(file.name) ? `fonts/${file.name}` : file.name;
+  });
+  loadAssets();
   compareSelect.addEventListener('change', () => open(other, compareSelect.value));
   window.addEventListener('beforeunload', (e) => {
     if (changes()) e.preventDefault();
@@ -176,7 +186,7 @@ function start(root) {
   }
 
   function changes() {
-    return Object.keys(edited).length + deleted.size;
+    return Object.keys(edited).length + deleted.size + Object.keys(uploads).length;
   }
 
   function refresh() {
@@ -275,8 +285,114 @@ function start(root) {
     }
   }
 
+  // The draft: JSON, or multipart with the draft in the part "draft" and every uploaded asset in
+  // a part named after its path.
   function body(extra) {
-    return { files: edited, delete: [...deleted], ...extra };
+    const draft = { files: edited, delete: [...deleted], ...extra };
+    if (!Object.keys(uploads).length) return draft;
+    const form = new FormData();
+    form.append('draft', JSON.stringify(draft));
+    for (const [path, file] of Object.entries(uploads)) form.append(path, file, file.name);
+    return form;
+  }
+
+  async function loadAssets() {
+    const response = await fetch(`${api}/files`);
+    if (!response.ok) return;
+    assets = (await response.json()).filter((f) => !TEXT.test(f.path));
+    renderAssets();
+  }
+
+  function size(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function renderAssets() {
+    const rows = [];
+    const paths = new Set([...assets.map((a) => a.path), ...Object.keys(uploads)]);
+    for (const path of [...paths].sort()) {
+      const base = assets.find((a) => a.path === path);
+      const upload = uploads[path];
+      const tr = document.createElement('tr');
+      const name = document.createElement('td');
+      name.className = 'mono';
+      if (base && !upload && !deleted.has(path)) {
+        const link = document.createElement('a');
+        link.href = `${api}/files/${path.split('/').map(encodeURIComponent).join('/')}`;
+        link.target = '_blank';
+        link.textContent = path;
+        name.append(link);
+      } else {
+        name.textContent = path;
+      }
+      const bytes = document.createElement('td');
+      bytes.className = 'muted';
+      bytes.textContent = size(upload ? upload.size : base.size);
+      const status = document.createElement('td');
+      status.className = 'muted';
+      status.textContent = deleted.has(path) ? 'deleted' : upload ? (base ? 'replaced' : 'new') : '';
+      const actions = document.createElement('td');
+      actions.className = 'actions';
+      if (deleted.has(path)) {
+        actions.append(button('Undo', () => { deleted.delete(path); assetChanged(); }));
+      } else {
+        const replace = document.createElement('input');
+        replace.type = 'file';
+        replace.hidden = true;
+        replace.addEventListener('change', () => {
+          if (replace.files[0]) { uploads[path] = replace.files[0]; assetChanged(); }
+        });
+        actions.append(replace, button('Replace', () => replace.click()));
+        if (upload && base) {
+          actions.append(button('Undo', () => { delete uploads[path]; assetChanged(); }));
+        }
+        actions.append(
+          button('Delete', () => {
+            delete uploads[path];
+            if (base) deleted.add(path);
+            assetChanged();
+          }, 'danger'),
+        );
+      }
+      tr.append(name, bytes, status, actions);
+      rows.push(tr);
+    }
+    $('.assets tbody').replaceChildren(...rows);
+  }
+
+  function button(label, action, className) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (className) b.className = className;
+    b.addEventListener('click', action);
+    return b;
+  }
+
+  function addAsset() {
+    const input = $('input[name="asset-file"]');
+    const file = input.files[0];
+    const path = $('input[name="asset-path"]').value.trim().replace(/^\/+/, '');
+    if (!file || !path) {
+      show([{ detail: 'Choose a file and the path it goes to, e.g. fonts/MyFont.ttf.' }], []);
+      return;
+    }
+    if (TEXT.test(path)) {
+      show([{ detail: `${path} is a text file; edit it in its tab instead.` }], []);
+      return;
+    }
+    deleted.delete(path);
+    uploads[path] = file;
+    input.value = '';
+    $('input[name="asset-path"]').value = '';
+    assetChanged();
+  }
+
+  function assetChanged() {
+    renderAssets();
+    refresh();
   }
 
   async function check() {
@@ -345,6 +461,7 @@ function start(root) {
     );
     if (response.ok) {
       Object.keys(edited).forEach((f) => delete edited[f]);
+      Object.keys(uploads).forEach((f) => delete uploads[f]);
       deleted.clear();
       window.location.href = `/ui/templates/${encodeURIComponent(id)}`;
       return;
@@ -397,6 +514,9 @@ function start(root) {
   }
 
   function post(url, payload, signal) {
+    if (payload instanceof FormData) {
+      return fetch(url, { method: 'POST', body: payload, signal });
+    }
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -408,7 +528,14 @@ function start(root) {
   // "template.xhtml, line 12, column 5" or "template.json#/fields/total" or just a file.
   function place(location) {
     const match = /^([^,#( ]+)(?:, line (\d+), column (\d+))?/.exec(location || '');
-    return match ? { file: match[1], line: Number(match[2] || 0), column: Number(match[3] || 0) } : null;
+    if (!match) return null;
+    // A layout sees its own files under layout/; while editing it, they are its tabs.
+    let file = match[1];
+    if (file.startsWith('layout/') && !tabs().some((t) => t.dataset.file === file)) {
+      const own = file.slice('layout/'.length);
+      if (tabs().some((t) => t.dataset.file === own)) file = own;
+    }
+    return { file, line: Number(match[2] || 0), column: Number(match[3] || 0) };
   }
 
   function showDiagnostics(ed) {

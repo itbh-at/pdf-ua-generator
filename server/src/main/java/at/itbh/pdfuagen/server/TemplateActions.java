@@ -262,6 +262,7 @@ public class TemplateActions {
                     p.location()));
       }
     }
+    fontProblems(store.files(revision.templateId(), revision.number()), problems);
     if (!problems.isEmpty()) {
       return new Rejected2(problems.stream().distinct().toList());
     }
@@ -343,6 +344,21 @@ public class TemplateActions {
    * {@code delete} removed — what the editor holds before it saves. Binary assets stay as they are.
    */
   public DraftResult draft(String id, int base, Map<String, String> edits, List<String> delete) {
+    return draft(id, base, edits, delete, Map.of());
+  }
+
+  /**
+   * As {@link #draft(String, int, Map, List)}, with binary files — fonts, images, office templates
+   * — written over the base as well.
+   *
+   * @param uploads file contents by path
+   */
+  public DraftResult draft(
+      String id,
+      int base,
+      Map<String, String> edits,
+      List<String> delete,
+      Map<String, byte[]> uploads) {
     Optional<TemplateStore.Revision> revision = store.revision(id, base);
     if (revision.isEmpty()) {
       return new NoSuchRevision("template '" + id + "' has no revision " + base);
@@ -364,8 +380,23 @@ public class TemplateActions {
                 : edit.getValue().getBytes(java.nio.charset.StandardCharsets.UTF_8));
       }
     }
+    for (Map.Entry<String, byte[]> upload :
+        (uploads == null ? Map.<String, byte[]>of() : uploads).entrySet()) {
+      Optional<String> path = at.itbh.pdfuagen.core.ResourcePaths.normalize(upload.getKey());
+      if (path.isEmpty() || !path.get().equals(upload.getKey())) {
+        return new InvalidDraft("invalid file path: " + upload.getKey());
+      }
+      files.put(upload.getKey(), upload.getValue());
+    }
     if (!files.containsKey(Bundle.TEMPLATE)) {
       return new InvalidDraft("the files have no " + Bundle.TEMPLATE);
+    }
+    if (files.size() > config.bundle().maxFiles()) {
+      return new InvalidDraft("more than " + config.bundle().maxFiles() + " files");
+    }
+    long size = files.values().stream().mapToLong(b -> b.length).sum();
+    if (size > config.bundle().maxSize()) {
+      return new InvalidDraft("files larger than " + config.bundle().maxSize() + " bytes in total");
     }
     return new DraftFiles(revision.get(), files);
   }
@@ -436,7 +467,27 @@ public class TemplateActions {
                         p.type(),
                         "with layout " + firstLayout.get(p) + ": " + p.detail(),
                         p.location())));
+    fontProblems(files, problems);
     return new Findings(problems, List.copyOf(warnings));
+  }
+
+  /**
+   * Every font file must allow embedding — also one no stylesheet names yet, so an uploaded font is
+   * checked at once. A font the layout rules already reported (under {@code layout/}) is not
+   * reported twice.
+   */
+  private static void fontProblems(Map<String, byte[]> files, List<Problem> problems) {
+    files.forEach(
+        (path, bytes) ->
+            at.itbh.pdfuagen.core.FontFiles.embeddingProblem(path, bytes)
+                .filter(
+                    p ->
+                        problems.stream()
+                            .noneMatch(
+                                q ->
+                                    q.detail().equals(p.detail())
+                                        && ("layout/" + path).equals(q.location())))
+                .ifPresent(problems::add));
   }
 
   private Optional<TemplateStore.Revision> layout(TemplateStore.LayoutPin pin) {

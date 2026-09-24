@@ -129,6 +129,11 @@
                 <version>${pdfbox.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.apache.pdfbox</groupId>
+                <artifactId>fontbox</artifactId>
+                <version>${pdfbox.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>de.rototor.pdfbox</groupId>
                 <artifactId>graphics2d</artifactId>
                 <version>${pdfbox-graphics2d.version}</version>

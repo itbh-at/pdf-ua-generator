@@ -284,3 +284,16 @@ main:has(#editor) {
   gap: 12px;
   margin: 12px 0;
 }
+
+#editor details.assets {
+  margin: 16px 0;
+}
+
+#editor details.assets summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#editor details.assets td.actions button {
+  margin-left: 4px;
+}

@@ -24,6 +24,19 @@
       {#if !offered.isEmpty()}<span class="muted">The layouts have texts in: {#each offered}{it}{#if it_hasNext}, {/if}{/each}.</span>{/if}
     </div>
     <div class="messages" aria-live="polite"></div>
+
+    <details class="assets" open>
+      <summary>Assets <span class="muted">— fonts, images, office templates and other files</span></summary>
+      <table>
+        <thead><tr><th>File</th><th>Size</th><th></th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p class="bar">
+        <input type="file" name="asset-file">
+        <label>as <input name="asset-path" size="30" placeholder="fonts/MyFont.ttf"></label>
+        <button type="button" class="add-asset">Add</button>
+      </p>
+    </details>
   </section>
 
   <section class="output" aria-label="Preview">

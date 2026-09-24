@@ -186,6 +186,9 @@ public final class LayoutRules {
     }
     officeStyles(repository, PREFIX + DOTX, layout, problems);
     officeStyles(repository, PREFIX + OTT, layout, problems);
+    skeleton
+        .flatMap(t -> repository.template(layoutId))
+        .ifPresent(source -> fonts(repository, layout, source, problems));
 
     if (!keys.isEmpty()) {
       try {
@@ -571,6 +574,84 @@ public final class LayoutRules {
           }
         });
     return css.toString();
+  }
+
+  private static final Pattern FONT_FACE = Pattern.compile("@font-face\\s*\\{([^}]*)\\}");
+  private static final Pattern FACE_FAMILY =
+      Pattern.compile("font-family\\s*:\\s*['\"]?([^;'\"}]+)['\"]?");
+
+  /**
+   * The fonts of a layout fit together: every {@code @font-face} source is a file of the layout and
+   * allows embedding, and every family in {@code fonts} has an {@code @font-face} rule.
+   */
+  private static void fonts(
+      TemplateRepository repository,
+      LayoutDescriptor layout,
+      String skeleton,
+      List<Problem> problems) {
+    Map<String, String> sheets =
+        new LinkedHashMap<>(); // path -> CSS; <style> counts as the skeleton
+    Matcher style = STYLE_ELEMENT.matcher(skeleton);
+    StringBuilder inline = new StringBuilder();
+    while (style.find()) {
+      inline.append(style.group(1)).append('\n');
+    }
+    sheets.put(PREFIX + TEMPLATE, inline.toString());
+    Matcher href = STYLESHEET_HREF.matcher(skeleton);
+    while (href.find()) {
+      String path = href.group(1);
+      repository
+          .resource(path)
+          .ifPresent(b -> sheets.put(path, new String(b, java.nio.charset.StandardCharsets.UTF_8)));
+    }
+    Set<String> families = new LinkedHashSet<>();
+    Set<String> checked = new LinkedHashSet<>();
+    sheets.forEach(
+        (sheet, css) -> {
+          String dir = sheet.contains("/") ? sheet.substring(0, sheet.lastIndexOf('/') + 1) : "";
+          Matcher face = FONT_FACE.matcher(css);
+          while (face.find()) {
+            Matcher family = FACE_FAMILY.matcher(face.group(1));
+            String name = family.find() ? family.group(1).strip() : "?";
+            families.add(name);
+            Matcher url = URL.matcher(face.group(1));
+            while (url.find()) {
+              String ref = url.group(1).strip();
+              if (ref.isEmpty()
+                  || ref.contains(":")
+                  || ref.startsWith("/")
+                  || ref.startsWith("#")) {
+                continue;
+              }
+              Optional<String> path = at.itbh.pdfuagen.core.ResourcePaths.normalize(dir + ref);
+              Optional<byte[]> file = path.flatMap(repository::resource);
+              if (file.isEmpty()) {
+                problems.add(
+                    problem(
+                        "@font-face of '"
+                            + name
+                            + "' refers to "
+                            + ref
+                            + ", which is not a file of the layout",
+                        sheet));
+              } else if (checked.add(path.get())) {
+                at.itbh.pdfuagen.core.FontFiles.embeddingProblem(path.get(), file.get())
+                    .ifPresent(problems::add);
+              }
+            }
+          }
+        });
+    for (String font : layout.fonts()) {
+      if (!families.contains(font)) {
+        problems.add(
+            problem(
+                "font '"
+                    + font
+                    + "' is listed in fonts but has no @font-face rule in the layout's"
+                    + " stylesheets",
+                PREFIX + LayoutDescriptor.FILE));
+      }
+    }
   }
 
   /** Catalog styles must exist, by name, in the layout's Word and ODF templates if it has them. */

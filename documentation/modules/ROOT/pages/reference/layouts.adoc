@@ -95,7 +95,10 @@ must be filled. At least one.
 |Components with their `parameters`; `required` parameters must be passed.
 
 |`fonts`
-|Font families free CSS may name.
+|Font families free CSS may name. Each needs an `@font-face` rule in the
+layout's stylesheets whose source is a font file of the layout (TrueType or
+OpenType) that allows embedding (OS/2 `fsType` neither "restricted license" nor
+"bitmap only"); every uploaded font file is checked for that as well.
 
 |`freeStyling`
 |Whether document templates may opt into free styling. Default `false`.

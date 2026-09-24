@@ -72,6 +72,9 @@ final class Views {
       com.fasterxml.jackson.databind.JsonNode data,
       Boolean force) {}
 
+  /** A file of a revision. */
+  record FileView(String path, long size, String mediaType, String sha256) {}
+
   /** The quick checks of unsaved files. */
   record CheckView(List<ProblemView> problems, List<String> warnings) {}
 

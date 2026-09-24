@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
 
 /**
  * Templates and their revisions: upload (validate and release), inspect, archive, delete; schema
@@ -160,6 +162,39 @@ public class TemplateResource {
         id, Bundle.write(targets.draftFiles(id, draft.base(), draft).files()), uri, expected);
   }
 
+  /**
+   * Saves edited files with uploaded ones — fonts, images, office templates: as the JSON save, as
+   * {@code multipart/form-data} with the draft's JSON in the part {@code draft} and every file in a
+   * part named after its path.
+   */
+  @POST
+  @Path("/{id}/revisions")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Blocking
+  public CompletionStage<Response> saveMultipart(
+      @PathParam("id") String id,
+      @RestForm("draft") String draftJson,
+      @RestForm(FileUpload.ALL) List<FileUpload> parts,
+      @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+      @Context UriInfo uri)
+      throws IOException {
+    Targets.checkId(id);
+    Targets.Draft draft = Targets.multipart(draftJson, parts);
+    Views.DraftRequest request = draft.request();
+    if (request == null || request.base() == null) {
+      throw Problems.invalidRequest("'base' is required: the revision the files are based on");
+    }
+    Integer expected = ifMatch(ifMatch);
+    if (expected == null && !Boolean.TRUE.equals(request.force())) {
+      expected = request.base();
+    }
+    return upload(
+        id,
+        Bundle.write(targets.draftFiles(id, request.base(), request, draft.uploads()).files()),
+        uri,
+        expected);
+  }
+
   private CompletionStage<Response> upload(
       String id, byte[] bytes, UriInfo uri, Integer expectedLatest) {
     java.net.URI base = uri.getBaseUri();
@@ -201,6 +236,22 @@ public class TemplateResource {
     return Views.revision(targets.revision(id, n), service);
   }
 
+  /** The files of a revision with their sizes and media types. */
+  @GET
+  @Path("/{id}/revisions/{n}/files")
+  public List<Views.FileView> files(@PathParam("id") String id, @PathParam("n") int n) {
+    TemplateStore.Revision revision = targets.revision(id, n).revision();
+    return store.files(id, n).entrySet().stream()
+        .map(
+            f ->
+                new Views.FileView(
+                    f.getKey(),
+                    f.getValue().length,
+                    Bundle.mediaType(f.getKey()),
+                    revision.files().get(f.getKey())))
+        .toList();
+  }
+
   /** One file of a revision, as stored. */
   @GET
   @Path("/{id}/revisions/{n}/files/{path: .+}")
@@ -234,6 +285,29 @@ public class TemplateResource {
         () -> {
           TemplateActions.Findings findings =
               actions.check(targets.draftFiles(id, n, draft).files());
+          return new Views.CheckView(
+              findings.problems().stream().map(Views.ProblemView::of).toList(),
+              findings.warnings());
+        });
+  }
+
+  /** The quick checks of edited files with uploaded ones, as {@code multipart/form-data}. */
+  @POST
+  @Path("/{id}/revisions/{n}/check")
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Blocking
+  public CompletionStage<Views.CheckView> checkMultipart(
+      @PathParam("id") String id,
+      @PathParam("n") int n,
+      @RestForm("draft") String draftJson,
+      @RestForm(FileUpload.ALL) List<FileUpload> parts) {
+    Targets.checkId(id);
+    Targets.Draft draft = Targets.multipart(draftJson, parts);
+    return Problems.submit(
+        service,
+        () -> {
+          TemplateActions.Findings findings =
+              actions.check(targets.draftFiles(id, n, draft.request(), draft.uploads()).files());
           return new Views.CheckView(
               findings.problems().stream().map(Views.ProblemView::of).toList(),
               findings.warnings());

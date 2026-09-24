@@ -23,6 +23,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -677,6 +678,81 @@ class ApiTest {
         .then()
         .statusCode(201)
         .body("revision", equalTo(7));
+  }
+
+  @Test
+  @Order(21)
+  void editsTheAssetsOfALayout() throws Exception {
+    // The files of a revision, with sizes: fonts, images, office templates.
+    given()
+        .get("/templates/demo-layout/revisions/2/files")
+        .then()
+        .statusCode(200)
+        .body("find { it.path == 'fonts/Roboto.ttf' }.mediaType", equalTo("font/ttf"))
+        .body(
+            "find { it.path == 'fonts/Roboto.ttf' }.size", org.hamcrest.Matchers.greaterThan(1000))
+        .body("path", hasItem("layout.dotx"));
+
+    byte[] roboto = Files.readAllBytes(DEMO.resolve("layout/fonts/Roboto.ttf"));
+    // An uploaded font that forbids embedding is refused at once, even before a stylesheet names
+    // it.
+    given()
+        .multiPart("draft", "{}")
+        .multiPart("fonts/Restricted.ttf", "Restricted.ttf", fsType(roboto, 2), "font/ttf")
+        .post("/templates/demo-layout/revisions/2/check")
+        .then()
+        .statusCode(200)
+        .body(
+            "problems.find { it.location == 'fonts/Restricted.ttf' }.detail",
+            startsWith("the font forbids embedding"));
+    // Deleting a font a stylesheet names breaks the layout's fonts.
+    given()
+        .multiPart("draft", "{\"delete\": [\"fonts/Roboto.ttf\"]}")
+        .post("/templates/demo-layout/revisions/2/check")
+        .then()
+        .statusCode(200)
+        .body(
+            "problems.detail",
+            hasItem(
+                "@font-face of 'Roboto' refers to fonts/Roboto.ttf, which is not a file of the"
+                    + " layout"));
+
+    // An uploaded image is part of the saved revision.
+    byte[] photo = Files.readAllBytes(DEMO.resolve("content/example/photo.png"));
+    given()
+        .multiPart("draft", "{\"base\": 2}")
+        .multiPart("extra.png", "extra.png", photo, "image/png")
+        .post("/templates/demo-layout/revisions")
+        .then()
+        .log()
+        .ifValidationFails()
+        .statusCode(201)
+        .body("revision", equalTo(3))
+        .body("files", org.hamcrest.Matchers.hasKey("extra.png"));
+
+    // The preview renders with uploaded files as well.
+    given()
+        .multiPart("draft", "{}")
+        .multiPart("example/photo.png", "photo.png", photo, "image/png")
+        .post("/templates/demo/revisions/7/preview?format=pdf")
+        .then()
+        .statusCode(200)
+        .contentType("application/pdf");
+  }
+
+  /** A copy of a TrueType font with another OS/2 fsType. */
+  private static byte[] fsType(byte[] font, int fsType) {
+    byte[] copy = font.clone();
+    java.nio.ByteBuffer buffer = java.nio.ByteBuffer.wrap(copy);
+    int tables = buffer.getShort(4) & 0xFFFF;
+    for (int i = 0; i < tables; i++) {
+      int record = 12 + 16 * i;
+      if (new String(copy, record, 4, StandardCharsets.US_ASCII).equals("OS/2")) {
+        buffer.putShort(buffer.getInt(record + 8) + 8, (short) fsType);
+        return copy;
+      }
+    }
+    throw new IllegalArgumentException("no OS/2 table");
   }
 
   /** Renders the template as XHTML with a listed layout; {@code ""} for the default. */

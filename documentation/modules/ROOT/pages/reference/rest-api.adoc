@@ -47,6 +47,9 @@ data and is checked with empty data; a document template is checked with its
 |`+GET /templates/{id}/revisions/{n}+`
 |The revision (see below).
 
+|`+GET /templates/{id}/revisions/{n}/files+`
+|The files of the revision: `path`, `size`, `mediaType`, `sha256`.
+
 |`+GET /templates/{id}/revisions/{n}/files/{path}+`
 |One file of the revision, as stored, with its media type.
 
@@ -57,14 +60,20 @@ data and is checked with empty data; a document template is checked with its
 it and `delete` removed. Then as the upload of a bundle: validated and released,
 201, 200 or 422. `base` must still be the latest revision (or the one
 `If-Match` names), otherwise 412 `revision-conflict` and nothing is stored;
-`"force": true` saves anyway.
+`"force": true` saves anyway. +
+ +
+With binary files — fonts, images, office templates — the same request is
+`multipart/form-data`: the JSON in the part `draft`, every file in a part named
+after its path (e.g. `fonts/Roboto.ttf`). This also holds for `check` and
+`preview` below.
 
 |`+POST /templates/{id}/revisions/{n}/check+` +
 `Content-Type: application/json`
 |The quick checks of edited files without saving them (`files` and `delete` as
 above): every language variant parses, the descriptor and data model are valid,
-the layout rules and texts hold, for each listed layout. 200 with `problems`
-(as in a revision) and `warnings`. The full publish checks run on saving.
+the layout rules and texts hold, for each listed layout, and every font file
+allows embedding. 200 with `problems` (as in a revision) and `warnings`. The
+full publish checks run on saving.
 
 |`+GET /templates/{id}/revisions/{n}/bundle+`
 |The files of the revision as a ZIP archive.
