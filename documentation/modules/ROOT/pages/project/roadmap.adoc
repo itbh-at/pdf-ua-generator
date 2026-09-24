@@ -103,17 +103,15 @@ preview; ETag conflict detection; editing language variants side by side
 |An experienced editor publishes a document template without a developer
 |done
 
-|Prototype
-|Clickable block editor, tested with real editors
-|The interaction design is settled
-|next
-
 |8 Editor, stage 2
 |TipTap block editor; Qute only as placeholder, loop and condition nodes; own
 JSON format with translation to Qute XHTML in `core`; one-way switch to code
-mode
+mode. Built in slices, each tested with real editors: running text with
+catalog styles, fields and preview; then loops, conditions and components;
+then the JSON format is fixed and the switch to code mode added. Until then the
+format is provisional and gets no migrations
 |An editor without Qute knowledge creates an accessible document template
-|
+|next
 
 |Later
 |Confirm on a Kubernetes cluster that several pods scale under load (phase 5 was
