@@ -96,8 +96,17 @@ the document template or layout has no published revision yet.
 
 |`urn:itbh:pdf-ua-generator:problem:conflict`
 |409
-|The request contradicts the state of a revision: publishing a revision that
-is already published, or deleting a published revision.
+|The request contradicts the stored state: a bundle of the other kind than the
+earlier revisions (a layout for a document template or the other way round),
+deleting a layout that document templates list, or archiving a layout revision
+that a released document template lists.
+
+|`urn:itbh:pdf-ua-generator:problem:revision-conflict`
+|412
+|Someone saved meanwhile: the change was based on a revision that is no longer
+the latest (`base` when saving edited files, or the `If-Match` of an upload).
+The member `latestRevision` names the latest one. Nothing was stored; save
+again based on it, or with `"force": true` to save anyway.
 
 |`urn:itbh:pdf-ua-generator:problem:invalid-bundle`
 |400

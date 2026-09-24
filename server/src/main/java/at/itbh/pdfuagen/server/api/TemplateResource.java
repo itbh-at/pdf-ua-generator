@@ -18,12 +18,14 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
@@ -55,14 +57,44 @@ public class TemplateResource {
     return store.list().stream().map(t -> Views.template(t, null, null)).toList();
   }
 
+  /**
+   * The template with its revisions. The {@code ETag} is its latest revision; sent back in {@code
+   * If-Match} when uploading or saving, it makes sure nobody saved meanwhile.
+   */
   @GET
   @Path("/{id}")
-  public Views.TemplateView get(@PathParam("id") String id) {
+  public Response get(@PathParam("id") String id) {
     TemplateStore.Template template = targets.template(id);
-    return Views.template(
-        template,
-        store.revisions(id),
-        TemplateStore.LAYOUT.equals(template.kind()) ? store.dependents(id) : null);
+    return Response.ok(
+            Views.template(
+                template,
+                store.revisions(id),
+                TemplateStore.LAYOUT.equals(template.kind()) ? store.dependents(id) : null))
+        .tag(etag(template.latest()))
+        .build();
+  }
+
+  static jakarta.ws.rs.core.EntityTag etag(int latest) {
+    return new jakarta.ws.rs.core.EntityTag(String.valueOf(latest));
+  }
+
+  /**
+   * The latest revision an {@code If-Match} header expects; {@code null} without one or for {@code
+   * *}. A tag that is no revision number never matches.
+   */
+  static Integer ifMatch(String header) {
+    if (header == null || header.isBlank() || header.trim().equals("*")) {
+      return null;
+    }
+    String tag = header.split(",")[0].trim();
+    if (tag.startsWith("W/")) {
+      tag = tag.substring(2);
+    }
+    try {
+      return Integer.valueOf(tag.replace("\"", "").trim());
+    } catch (NumberFormatException e) {
+      return -1;
+    }
   }
 
   @DELETE
@@ -91,42 +123,60 @@ public class TemplateResource {
   @Consumes(ZIP)
   @Blocking
   public CompletionStage<Response> create(
-      @PathParam("id") String id, InputStream zip, @Context UriInfo uri) throws IOException {
+      @PathParam("id") String id,
+      InputStream zip,
+      @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+      @Context UriInfo uri)
+      throws IOException {
     Targets.checkId(id);
-    return upload(id, zip.readAllBytes(), uri);
+    return upload(id, zip.readAllBytes(), uri, ifMatch(ifMatch));
   }
 
   /**
    * Saves edited files as a new revision: revision {@code base} with {@code files} written over it
-   * and {@code delete} removed, then validated and released like an uploaded bundle.
+   * and {@code delete} removed, then validated and released like an uploaded bundle. {@code base}
+   * must still be the latest revision (or the one {@code If-Match} names), otherwise 412 {@code
+   * revision-conflict}; {@code "force": true} saves anyway.
    */
   @POST
   @Path("/{id}/revisions")
   @Consumes(MediaType.APPLICATION_JSON)
   @Blocking
   public CompletionStage<Response> save(
-      @PathParam("id") String id, Views.DraftRequest draft, @Context UriInfo uri)
+      @PathParam("id") String id,
+      Views.DraftRequest draft,
+      @HeaderParam(HttpHeaders.IF_MATCH) String ifMatch,
+      @Context UriInfo uri)
       throws IOException {
     Targets.checkId(id);
     if (draft == null || draft.base() == null) {
       throw Problems.invalidRequest("'base' is required: the revision the files are based on");
     }
-    return upload(id, Bundle.write(targets.draftFiles(id, draft.base(), draft).files()), uri);
+    Integer expected = ifMatch(ifMatch);
+    if (expected == null && !Boolean.TRUE.equals(draft.force())) {
+      expected = draft.base();
+    }
+    return upload(
+        id, Bundle.write(targets.draftFiles(id, draft.base(), draft).files()), uri, expected);
   }
 
-  private CompletionStage<Response> upload(String id, byte[] bytes, UriInfo uri) {
+  private CompletionStage<Response> upload(
+      String id, byte[] bytes, UriInfo uri, Integer expectedLatest) {
     java.net.URI base = uri.getBaseUri();
     java.net.URI publicBase = config.publicBaseUrl().orElse(base);
     return Problems.submit(
         service,
         () -> {
           TemplateStore.Stored stored =
-              switch (actions.create(id, new ByteArrayInputStream(bytes), publicBase)) {
+              switch (actions.create(
+                  id, new ByteArrayInputStream(bytes), publicBase, null, expectedLatest)) {
                 case TemplateActions.Created c -> c.stored();
                 case TemplateActions.InvalidBundle b ->
                     throw Problems.of(Problems.INVALID_BUNDLE, 400, "Invalid bundle", b.detail());
                 case TemplateActions.KindMismatch k -> throw Problems.conflict(k.detail());
                 case TemplateActions.Rejected r -> throw Problems.publishRejected(r.problems());
+                case TemplateActions.Stale st ->
+                    throw Problems.revisionConflict(st.latest(), expectedLatest);
               };
           int number = stored.revision().number();
           java.net.URI location =
@@ -138,7 +188,10 @@ public class TemplateResource {
               stored.created()
                   ? Response.created(location)
                   : Response.ok().header("Content-Location", location);
-          return response.entity(Views.revision(loaded, service)).build();
+          return response
+              .entity(Views.revision(loaded, service))
+              .tag(etag(targets.template(id).latest()))
+              .build();
         });
   }
 

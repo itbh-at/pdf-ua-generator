@@ -62,13 +62,15 @@ final class Views {
   /**
    * Unsaved files of the editor: revision {@code base} with {@code files} (text, by path) written
    * over it and {@code delete} removed; {@code data} is the data to preview with, or {@code null}
-   * for the example data.
+   * for the example data. Saving requires {@code base} to be the latest revision unless {@code
+   * force} is set.
    */
   record DraftRequest(
       Integer base,
       Map<String, String> files,
       List<String> delete,
-      com.fasterxml.jackson.databind.JsonNode data) {}
+      com.fasterxml.jackson.databind.JsonNode data,
+      Boolean force) {}
 
   /** The quick checks of unsaved files. */
   record CheckView(List<ProblemView> problems, List<String> warnings) {}

@@ -56,6 +56,14 @@ public class TemplateActions {
   public record Rejected(List<Problem> problems) implements CreateResult {}
 
   /**
+   * The change was based on another revision than the latest (someone saved meanwhile); nothing was
+   * stored.
+   *
+   * @param latest the latest revision now, 0 if there is none
+   */
+  public record Stale(int latest) implements CreateResult {}
+
+  /**
    * Stores a bundle, validates it and releases it for use in one step. A rejected bundle leaves
    * nothing behind. Uploading the same files again yields the existing revision (and re-releases it
    * if it was archived).
@@ -75,6 +83,19 @@ public class TemplateActions {
    *     null} for either
    */
   public CreateResult create(String id, InputStream zip, URI publicBase, String expectedKind)
+      throws java.io.IOException {
+    return create(id, zip, publicBase, expectedKind, null);
+  }
+
+  /**
+   * As {@link #create(String, InputStream, URI, String)}, only if {@code expectedLatest} is still
+   * the latest revision.
+   *
+   * @param expectedLatest the revision the change is based on (0: none yet), or {@code null} for
+   *     any
+   */
+  public CreateResult create(
+      String id, InputStream zip, URI publicBase, String expectedKind, Integer expectedLatest)
       throws java.io.IOException {
     Map<String, byte[]> files;
     try {
@@ -108,9 +129,11 @@ public class TemplateActions {
     }
     TemplateStore.Stored stored;
     try {
-      stored = store.createRevision(id, files, kind, layouts);
+      stored = store.createRevision(id, files, kind, layouts, expectedLatest);
     } catch (TemplateStore.KindMismatchException e) {
       return new KindMismatch(e.getMessage());
+    } catch (TemplateStore.StaleException e) {
+      return new Stale(e.latest());
     }
     // The same files were already stored and released: nothing to validate.
     if (stored.revision().published()) {

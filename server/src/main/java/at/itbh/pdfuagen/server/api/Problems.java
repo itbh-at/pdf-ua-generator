@@ -29,6 +29,7 @@ final class Problems {
   static final String INVALID_REQUEST = "invalid-request";
   static final String PUBLISH_REJECTED = "publish-rejected";
   static final String CONFLICT = "conflict";
+  static final String REVISION_CONFLICT = "revision-conflict";
   static final String OVERLOADED = "overloaded";
 
   private Problems() {}
@@ -56,6 +57,24 @@ final class Problems {
 
   static HttpProblem conflict(String detail) {
     return of(CONFLICT, 409, "Conflict", detail);
+  }
+
+  /**
+   * A change based on a revision that is no longer the latest: someone saved meanwhile. The member
+   * {@code latestRevision} names the latest one.
+   */
+  static HttpProblem revisionConflict(int latest, Integer base) {
+    return HttpProblem.builder()
+        .withType(type(REVISION_CONFLICT))
+        .withStatus(412)
+        .withTitle("Revision conflict")
+        .withDetail(
+            "revision "
+                + latest
+                + " was saved meanwhile; the change is based on "
+                + (base == null || base < 0 ? "another revision" : "revision " + base))
+        .with("latestRevision", latest)
+        .build();
   }
 
   static HttpProblem overloaded() {

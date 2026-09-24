@@ -154,6 +154,10 @@ public class UiResource {
             html(problemsFragment.data("problems", problem(b.detail())));
         case TemplateActions.KindMismatch k ->
             html(problemsFragment.data("problems", problem(k.detail())));
+        case TemplateActions.Stale st ->
+            html(
+                problemsFragment.data(
+                    "problems", problem("revision " + st.latest() + " was saved meanwhile")));
       };
     }
   }

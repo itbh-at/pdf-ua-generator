@@ -336,10 +336,13 @@ function start(root) {
       : 'Showing the saved revision.';
   }
 
-  async function saveRevision() {
+  async function saveRevision(force) {
     save.disabled = true;
     state.textContent = 'Checking and saving…';
-    const response = await post(`/templates/${encodeURIComponent(id)}/revisions`, body({ base }));
+    const response = await post(
+      `/templates/${encodeURIComponent(id)}/revisions`,
+      body(force === true ? { base, force: true } : { base }),
+    );
     if (response.ok) {
       Object.keys(edited).forEach((f) => delete edited[f]);
       deleted.clear();
@@ -347,12 +350,50 @@ function start(root) {
       return;
     }
     const result = await response.json();
+    if (response.status === 412 && String(result.type).endsWith(':revision-conflict')) {
+      conflict(result.latestRevision);
+      return;
+    }
     state.textContent = 'Not saved: the checks found problems.';
     save.disabled = false;
     problems = result.errors || [];
     show(result.errors || [{ detail: result.detail }], []);
     showDiagnostics(main);
     showDiagnostics(other);
+  }
+
+  // Someone saved while these edits were open. Nothing was stored: the edits can be saved anyway
+  // (a new revision from this editor's base; the other revision stays in the history), or
+  // dropped for the latest revision.
+  function conflict(latest) {
+    state.textContent = 'Not saved: someone saved meanwhile.';
+    save.disabled = false;
+    messages.replaceChildren();
+    const notice = document.createElement('p');
+    notice.className = 'notice error';
+    notice.textContent =
+      `Revision ${latest} was saved while you were editing; your edits are based on revision ` +
+      `${base}. Saving them anyway makes a new revision from revision ${base}, so the changes of ` +
+      `revision ${latest} would not be in it (it stays in the history).`;
+    const force = document.createElement('button');
+    force.type = 'button';
+    force.className = 'danger';
+    force.textContent = 'Save anyway';
+    force.addEventListener('click', () => saveRevision(true));
+    const reload = document.createElement('button');
+    reload.type = 'button';
+    reload.textContent = `Open revision ${latest}`;
+    reload.addEventListener('click', () => {
+      if (confirm('Discard your edits and open the latest revision?')) {
+        Object.keys(edited).forEach((f) => delete edited[f]);
+        deleted.clear();
+        window.location.reload();
+      }
+    });
+    const actions = document.createElement('p');
+    actions.className = 'bar';
+    actions.append(force, reload);
+    messages.append(notice, actions);
   }
 
   function post(url, payload, signal) {

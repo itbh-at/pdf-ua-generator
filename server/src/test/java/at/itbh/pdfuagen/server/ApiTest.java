@@ -632,6 +632,53 @@ class ApiTest {
         .body("languages", org.hamcrest.Matchers.not(hasItem("de")));
   }
 
+  @Test
+  @Order(20)
+  void refusesChangesBasedOnARevisionThatIsNoLongerTheLatest() throws Exception {
+    given().get("/templates/demo").then().statusCode(200).header("ETag", "\"5\"");
+    String source =
+        given().get("/templates/demo/revisions/5/files/template.xhtml").then().extract().asString();
+
+    // Someone saved revision 5 while these edits were based on 4: refused, nothing stored.
+    given()
+        .contentType("application/json")
+        .body(Map.of("base", 4, "files", Map.of("template.xhtml", source + " ")))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(412)
+        .body("type", equalTo(PROBLEM + "revision-conflict"))
+        .body("latestRevision", equalTo(5));
+    given().get("/templates/demo").then().body("latestRevision", equalTo(5));
+
+    // Saving anyway is a new revision from the old base.
+    given()
+        .contentType("application/json")
+        .body(Map.of("base", 4, "force", true, "files", Map.of("template.xhtml", source + " ")))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(201)
+        .header("ETag", "\"6\"")
+        .body("revision", equalTo(6));
+
+    // An upload with a stale If-Match is refused; with the current one it is stored.
+    given()
+        .contentType(ZIP)
+        .header("If-Match", "\"5\"")
+        .body(demoBundle("memo-layout@1", "demo-layout@2"))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(412)
+        .body("latestRevision", equalTo(6));
+    given()
+        .contentType(ZIP)
+        .header("If-Match", "\"6\"")
+        .body(demoBundle("memo-layout@1", "demo-layout@2"))
+        .post("/templates/demo/revisions")
+        .then()
+        .statusCode(201)
+        .body("revision", equalTo(7));
+  }
+
   /** Renders the template as XHTML with a listed layout; {@code ""} for the default. */
   private static Response render(String template, String layout) throws Exception {
     return given()

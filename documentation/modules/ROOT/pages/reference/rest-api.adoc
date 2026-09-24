@@ -21,7 +21,8 @@ xref:reference/problem-types.adoc[Problem types].
 `latestRevision`.
 
 |`+GET /templates/{id}+`
-|One document template or layout with the list of its revisions.
+|One document template or layout with the list of its revisions. The `ETag`
+is its latest revision (e.g. `"3"`).
 
 |`+DELETE /templates/{id}+`
 |204. Deletes the document template or layout with all revisions. A layout that
@@ -32,7 +33,10 @@ a document template still references gives 409.
 |201 with `Location` and the released revision. The archive is validated by the
 publish checks and released for use in one step; the first revision creates the
 document template or layout. A bundle that fails the checks gives 422
-`publish-rejected` with every problem, and nothing is stored. +
+`publish-rejected` with every problem, and nothing is stored. With `If-Match`
+(the `ETag` of the document template or layout), the upload is stored only if
+nobody saved meanwhile, otherwise 412 `revision-conflict`; the response carries
+the new `ETag`. +
  +
 Files that are already stored as a revision of this document template or layout
 give 200 with `Content-Location` and that revision instead of a new one, so an
@@ -51,7 +55,9 @@ data and is checked with empty data; a document template is checked with its
 |Saves edited files as a new revision: `{"base": 3, "files": {"template.xhtml":
 "…"}, "delete": ["…"]}` is revision `base` with the text `files` written over
 it and `delete` removed. Then as the upload of a bundle: validated and released,
-201, 200 or 422.
+201, 200 or 422. `base` must still be the latest revision (or the one
+`If-Match` names), otherwise 412 `revision-conflict` and nothing is stored;
+`"force": true` saves anyway.
 
 |`+POST /templates/{id}/revisions/{n}/check+` +
 `Content-Type: application/json`

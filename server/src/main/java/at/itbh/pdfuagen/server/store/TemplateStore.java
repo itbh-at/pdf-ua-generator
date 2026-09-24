@@ -53,6 +53,23 @@ public class TemplateStore {
     }
   }
 
+  /** The template has another latest revision than the one the change was based on. */
+  public static final class StaleException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    private final int latest;
+
+    StaleException(int latest) {
+      super("the latest revision is " + latest);
+      this.latest = latest;
+    }
+
+    /** The latest revision now; 0 if the template has none. */
+    public int latest() {
+      return latest;
+    }
+  }
+
   /** A layout revision a content revision may be rendered with, written {@code corporate@3}. */
   public record LayoutPin(String id, int revision) {
     @Override
@@ -152,6 +169,24 @@ public class TemplateStore {
    */
   public Stored createRevision(
       String templateId, Map<String, byte[]> files, String kind, List<LayoutPin> layouts) {
+    return createRevision(templateId, files, kind, layouts, null);
+  }
+
+  /**
+   * As {@link #createRevision(String, Map, String, List)}, only if the latest revision is still
+   * {@code expectedLatest}; checked under the same lock that numbers the revision, so two changes
+   * based on the same revision cannot both pass.
+   *
+   * @param expectedLatest the latest revision the change is based on (0: no revision yet), or
+   *     {@code null} for any
+   * @throws StaleException if the latest revision is another one
+   */
+  public Stored createRevision(
+      String templateId,
+      Map<String, byte[]> files,
+      String kind,
+      List<LayoutPin> layouts,
+      Integer expectedLatest) {
     return transaction(
         c -> {
           update(
@@ -172,6 +207,19 @@ public class TemplateStore {
               if (!r.getString(1).equals(kind)) {
                 throw new KindMismatchException(
                     "'" + templateId + "' is a " + r.getString(1) + " template, not a " + kind);
+              }
+            }
+          }
+          if (expectedLatest != null) {
+            try (PreparedStatement s =
+                c.prepareStatement(
+                    "select coalesce(max(number), 0) from revision where template_id = ?")) {
+              s.setString(1, templateId);
+              try (ResultSet r = s.executeQuery()) {
+                r.next();
+                if (r.getInt(1) != expectedLatest) {
+                  throw new StaleException(r.getInt(1));
+                }
               }
             }
           }
