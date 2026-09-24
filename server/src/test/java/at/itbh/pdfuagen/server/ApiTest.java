@@ -740,6 +740,24 @@ class ApiTest {
         .contentType("application/pdf");
   }
 
+  @Test
+  @Order(22)
+  void offersTheNamesAnEditMayUse() {
+    // demo@7 lists memo-layout@1 and demo-layout@2: what both offer, and the data fields.
+    given()
+        .contentType("application/json")
+        .body(Map.of())
+        .post("/templates/demo/revisions/7/vocabulary")
+        .then()
+        .statusCode(200)
+        .body("fields.path", hasItem("order.positions[].price"))
+        .body("fields.find { it.path == 'order.date' }.type", equalTo("date"))
+        .body("areas.name", hasItem("body"))
+        .body("components.find { it.name == 'box' }.parameters", hasItem("title"))
+        .body("styles.name", hasItem("lead"))
+        .body("texts", hasItem("logo"));
+  }
+
   /** A copy of a TrueType font with another OS/2 fsType. */
   private static byte[] fsType(byte[] font, int fsType) {
     byte[] copy = font.clone();

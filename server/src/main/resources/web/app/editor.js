@@ -13,6 +13,7 @@ import { html } from '@codemirror/lang-html';
 import { json } from '@codemirror/lang-json';
 import { css } from '@codemirror/lang-css';
 import { lintGutter, setDiagnostics } from '@codemirror/lint';
+import { qute } from './qute.js';
 
 const DEFAULT_VARIANT = 'template.xhtml';
 const TEXT = /\.(xhtml|json|css|txt)$/i;
@@ -37,6 +38,7 @@ function start(root) {
   let problems = [];
   let timer = null;
   let previewing = null; // the running preview request, aborted when a newer one starts
+  let vocabulary = null; // the names the edited files may use, for completion
 
   const $ = (selector) => root.querySelector(selector);
   const nav = $('.files');
@@ -70,6 +72,7 @@ function start(root) {
     if (file) $('input[name="asset-path"]').value = FONT.test(file.name) ? `fonts/${file.name}` : file.name;
   });
   loadAssets();
+  loadVocabulary();
   compareSelect.addEventListener('change', () => open(other, compareSelect.value));
   window.addEventListener('beforeunload', (e) => {
     if (changes()) e.preventDefault();
@@ -164,7 +167,8 @@ function start(root) {
   function language(file) {
     if (file.endsWith('.json')) return json();
     if (file.endsWith('.css')) return css();
-    if (file.endsWith('.xhtml')) return html();
+    if (file.endsWith('.xhtml')) return [html(), qute(() => vocabulary)];
+    if (file.endsWith('.txt')) return qute(() => vocabulary);
     return [];
   }
 
@@ -395,7 +399,13 @@ function start(root) {
     refresh();
   }
 
+  async function loadVocabulary() {
+    const response = await post(`${api}/vocabulary`, { files: edited, delete: [...deleted] });
+    if (response.ok) vocabulary = await response.json();
+  }
+
   async function check() {
+    loadVocabulary();
     const response = await post(`${api}/check`, body());
     const result = await response.json();
     if (!response.ok) {

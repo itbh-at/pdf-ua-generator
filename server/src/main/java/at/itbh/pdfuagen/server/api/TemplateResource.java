@@ -314,6 +314,20 @@ public class TemplateResource {
         });
   }
 
+  /**
+   * The names edited files may use, for an editor's completion: data fields, and the areas,
+   * components, catalog styles and texts every listed layout offers.
+   */
+  @POST
+  @Path("/{id}/revisions/{n}/vocabulary")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public CompletionStage<at.itbh.pdfuagen.core.schema.Vocabulary> vocabulary(
+      @PathParam("id") String id, @PathParam("n") int n, Views.DraftRequest draft) {
+    Targets.checkId(id);
+    return Problems.submit(
+        service, () -> actions.vocabulary(targets.draftFiles(id, n, draft).files()));
+  }
+
   @GET
   @Path("/{id}/revisions/{n}/bundle")
   @Produces(ZIP)

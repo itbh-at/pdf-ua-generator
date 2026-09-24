@@ -237,6 +237,26 @@ details.schema pre {
   font-size: 0.85rem;
 }
 
+/* Qute inside the markup: expressions, sections, comments. */
+#editor .cm-qute-expression,
+#editor .cm-qute-expression span {
+  color: #8a3c00;
+  background: #fff4e5;
+}
+
+#editor .cm-qute-section,
+#editor .cm-qute-section span {
+  color: #6a1b9a;
+  background: #f5ecfa;
+  font-weight: 600;
+}
+
+#editor .cm-qute-comment,
+#editor .cm-qute-comment span {
+  color: #6b6b6b;
+  font-style: italic;
+}
+
 /* The editor page uses the whole width: files on the left, the preview beside them. */
 main:has(#editor) {
   max-width: none;

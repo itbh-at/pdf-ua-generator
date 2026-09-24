@@ -472,6 +472,36 @@ public class TemplateActions {
   }
 
   /**
+   * The names unsaved files may use, for the completion of the editor: the fields of their data
+   * model and the areas, components, catalog styles and texts that every layout they list offers.
+   */
+  public at.itbh.pdfuagen.core.schema.Vocabulary vocabulary(Map<String, byte[]> files) {
+    List<TemplateStore.Revision> layouts = new ArrayList<>();
+    if (!files.containsKey(LayoutDescriptor.FILE)) {
+      byte[] descriptor = files.get(LanguageVariants.descriptorPath(Bundle.TEMPLATE));
+      if (descriptor != null) {
+        try {
+          for (TemplateDescriptor.LayoutRef ref :
+              TemplateDescriptor.parse(descriptor, Bundle.TEMPLATE).layouts()) {
+            layout(new TemplateStore.LayoutPin(ref.id(), ref.revision())).ifPresent(layouts::add);
+          }
+        } catch (RenderException e) {
+          // The quick check reports it.
+        }
+      }
+    }
+    List<TemplateStore.Revision> composed =
+        layouts.isEmpty() ? java.util.Arrays.asList((TemplateStore.Revision) null) : layouts;
+    return at.itbh.pdfuagen.core.schema.Vocabulary.common(
+        composed.stream()
+            .map(
+                l ->
+                    at.itbh.pdfuagen.core.schema.Vocabulary.of(
+                        service.draft(files, l), Bundle.TEMPLATE))
+            .toList());
+  }
+
+  /**
    * Every font file must allow embedding — also one no stylesheet names yet, so an uploaded font is
    * checked at once. A font the layout rules already reported (under {@code layout/}) is not
    * reported twice.

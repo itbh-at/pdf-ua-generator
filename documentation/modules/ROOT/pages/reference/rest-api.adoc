@@ -75,6 +75,14 @@ the layout rules and texts hold, for each listed layout, and every font file
 allows embedding. 200 with `problems` (as in a revision) and `warnings`. The
 full publish checks run on saving.
 
+|`+POST /templates/{id}/revisions/{n}/vocabulary+` +
+`Content-Type: application/json`
+|The names edited files may use, for the completion of an editor (`files` and
+`delete` as above): `fields` (`path` such as `order.positions[].price`, `type`,
+`label`, `description`), `areas`, `components` with their `parameters`, catalog
+`styles` with their `kind`, and the keys of the layout's `texts`. For a document
+template listing several layouts, only what all of them offer.
+
 |`+GET /templates/{id}/revisions/{n}/bundle+`
 |The files of the revision as a ZIP archive.
 
