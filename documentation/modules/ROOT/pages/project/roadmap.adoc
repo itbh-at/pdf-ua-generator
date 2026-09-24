@@ -101,12 +101,12 @@ accessibility checker
 publishing; CodeMirror 6 with Qute mode, completion and server diagnostics; PDF
 preview; ETag conflict detection; editing language variants side by side
 |An experienced editor publishes a document template without a developer
-|next
+|done
 
 |Prototype
 |Clickable block editor, tested with real editors
 |The interaction design is settled
-|
+|next
 
 |8 Editor, stage 2
 |TipTap block editor; Qute only as placeholder, loop and condition nodes; own
